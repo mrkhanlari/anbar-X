@@ -1,0 +1,1859 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>انبارگردان | سیستم مدیریت انبار</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap');
+
+  :root {
+    --bg:        #0f1117;
+    --bg2:       #161b27;
+    --bg3:       #1e2535;
+    --border:    #2a3347;
+    --accent:    #3b82f6;
+    --accent2:   #6366f1;
+    --green:     #22c55e;
+    --yellow:    #f59e0b;
+    --red:       #ef4444;
+    --text:      #e2e8f0;
+    --text2:     #94a3b8;
+    --text3:     #475569;
+    --card-r:    14px;
+    --shadow:    0 4px 24px rgba(0,0,0,.4);
+  }
+
+  html[data-theme="light"] {
+    --bg:        #f1f5f9;
+    --bg2:       #ffffff;
+    --bg3:       #f8fafc;
+    --border:    #e2e8f0;
+    --accent:    #2563eb;
+    --accent2:   #6366f1;
+    --green:     #16a34a;
+    --yellow:    #d97706;
+    --red:       #dc2626;
+    --text:      #1e293b;
+    --text2:     #64748b;
+    --text3:     #94a3b8;
+    --shadow:    0 4px 24px rgba(15,23,42,.08);
+  }
+
+  html, body, #sidebar, #topbar, .card, .stat-card, .wh-card, .modal,
+  input, select, textarea, .nav-item, .btn, .badge, table, .toast {
+    transition: background-color .35s ease, color .35s ease, border-color .35s ease, box-shadow .35s ease;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { overflow-x: hidden; width: 100%; max-width: 100vw; }
+
+  body {
+    font-family: 'Vazirmatn', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+  }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 240px;
+    min-height: 100vh;
+    background: var(--bg2);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    right: 0; top: 0; bottom: 0;
+    z-index: 100;
+    transition: transform .3s;
+  }
+  .sidebar-logo {
+    padding: 28px 20px 20px;
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .logo-text { font-size: 18px; font-weight: 800; letter-spacing: -.5px; }
+  .logo-sub  { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+  .nav-section { padding: 16px 12px 8px; }
+  .nav-label { font-size: 10px; color: var(--text3); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; padding: 0 8px 8px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 8px; cursor: pointer;
+    color: var(--text2); font-size: 14px; font-weight: 500;
+    transition: all .15s; margin-bottom: 2px;
+  }
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { background: rgba(59,130,246,.15); color: var(--accent); }
+  .nav-item .icon { font-size: 18px; width: 22px; text-align: center; }
+
+  .sidebar-footer {
+    margin-top: auto; padding: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--text3); text-align: center;
+  }
+
+  /* ── Main ── */
+  #main {
+    margin-right: 240px;
+    flex: 1;
+    display: flex; flex-direction: column;
+    min-height: 100vh;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  #topbar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    height: 64px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .page-title { font-size: 20px; font-weight: 700; }
+  .topbar-actions { display: flex; gap: 10px; align-items: center; }
+
+  /* ── Theme Toggle ── */
+  .theme-toggle-btn {
+    width: 40px; height: 40px; min-width: 40px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .3s, border-color .3s, transform .2s;
+    overflow: hidden;
+  }
+  .theme-toggle-btn:hover {
+    border-color: var(--accent);
+    transform: scale(1.08) rotate(8deg);
+  }
+  .theme-toggle-btn:active { transform: scale(0.94); }
+  .theme-toggle-btn svg { display: block; }
+  .theme-toggle-btn .ray {
+    transition: opacity .4s ease, transform .4s ease;
+    transform-origin: 12px 12px;
+  }
+  .theme-toggle-btn .sun-core {
+    transition: r .45s cubic-bezier(.4,0,.2,1), fill .35s ease;
+  }
+  .theme-toggle-btn .moon-mask {
+    transition: transform .5s cubic-bezier(.4,0,.2,1);
+  }
+  .theme-toggle-btn .star {
+    transition: opacity .4s ease, transform .5s ease;
+  }
+
+  #content { padding: 28px; flex: 1; min-width: 0; max-width: 100%; overflow-x: hidden; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--card-r);
+    padding: 24px;
+    box-shadow: var(--shadow);
+    max-width: 100%;
+    min-width: 0;
+  }
+  .card-title {
+    font-size: 15px; font-weight: 700; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* ── Stat Cards ── */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px; margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--card-r);
+    padding: 20px 24px;
+    display: flex; flex-direction: column; gap: 8px;
+    transition: border-color .2s;
+  }
+  .stat-card:hover { border-color: var(--accent); }
+  .stat-label { font-size: 12px; color: var(--text2); font-weight: 500; }
+  .stat-value { font-size: 28px; font-weight: 800; letter-spacing: -1px; }
+  .stat-icon  { font-size: 28px; margin-bottom: 4px; }
+  .stat-sub   { font-size: 12px; color: var(--text3); }
+  .val-blue   { color: var(--accent); }
+  .val-green  { color: var(--green); }
+  .val-yellow { color: var(--yellow); }
+  .val-red    { color: var(--red); }
+
+  /* ── Buttons ── */
+  .btn {
+    padding: 9px 18px; border-radius: 8px; border: none;
+    cursor: pointer; font-family: 'Vazirmatn', sans-serif;
+    font-size: 13px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: all .15s;
+  }
+  .btn-primary {
+    background: var(--accent); color: #fff;
+  }
+  .btn-primary:hover { background: #2563eb; transform: translateY(-1px); }
+  .btn-secondary {
+    background: var(--bg3); color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+  .btn-danger:hover { background: rgba(239,68,68,.25); }
+  .btn-success { background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+  .btn-success:hover { background: rgba(34,197,94,.25); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-icon { padding: 7px; }
+
+  /* ── Table ── */
+  .table-wrap {
+    overflow-x: auto;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+  table { width: 100%; min-width: 600px; border-collapse: collapse; }
+  thead th {
+    padding: 12px 16px; text-align: right;
+    font-size: 12px; font-weight: 600; color: var(--text2);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 13px 16px; font-size: 14px;
+    border-bottom: 1px solid rgba(42,51,71,.5);
+  }
+  tbody tr:hover td { background: var(--bg3); }
+  tbody tr:last-child td { border-bottom: none; }
+
+  /* ── Badge ── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  }
+  .badge-green  { background: rgba(34,197,94,.15);  color: var(--green); }
+  .badge-yellow { background: rgba(245,158,11,.15); color: var(--yellow); }
+  .badge-red    { background: rgba(239,68,68,.15);  color: var(--red); }
+  .badge-blue   { background: rgba(59,130,246,.15); color: var(--accent); }
+  .badge-in     { background: rgba(34,197,94,.15);  color: var(--green); }
+  .badge-out    { background: rgba(239,68,68,.15);  color: var(--red); }
+  .badge-adjust { background: rgba(59,130,246,.15); color: var(--accent); }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.7); backdrop-filter: blur(4px);
+    z-index: 1000; align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px; width: 520px; max-width: 95vw;
+    max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    animation: slideUp .2s ease;
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .modal-title {
+    font-size: 18px; font-weight: 700; margin-bottom: 24px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal-close {
+    width: 30px; height: 30px; border-radius: 6px; background: var(--bg3);
+    border: none; cursor: pointer; color: var(--text2);
+    font-size: 16px; display: flex; align-items: center; justify-content: center;
+  }
+  .modal-close:hover { background: var(--red); color: #fff; }
+  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+
+  /* ── Form ── */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: 13px; font-weight: 600; color: var(--text2); }
+  input, select, textarea {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px;
+    color: var(--text); font-family: 'Vazirmatn', sans-serif;
+    font-size: 14px; transition: border-color .15s;
+    outline: none; width: 100%;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 80px; }
+  select option { background: var(--bg3); }
+
+  /* ── Search ── */
+  .search-bar {
+    position: relative; display: flex; align-items: center;
+  }
+  .search-bar input { padding-right: 40px; }
+  .search-bar .search-icon {
+    position: absolute; right: 14px; color: var(--text3); font-size: 16px;
+    pointer-events: none;
+  }
+
+  /* ── Warehouse Cards Grid ── */
+  .wh-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+  .wh-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--card-r); padding: 22px; cursor: pointer;
+    transition: all .2s; position: relative; overflow: hidden;
+  }
+  .wh-card::before {
+    content: ''; position: absolute; top: 0; right: 0;
+    width: 4px; height: 100%;
+    background: linear-gradient(to bottom, var(--accent), var(--accent2));
+  }
+  .wh-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow); }
+  .wh-card-name { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+  .wh-card-loc  { font-size: 13px; color: var(--text2); margin-bottom: 16px; display: flex; gap: 4px; align-items: center; }
+  .wh-card-stats { display: flex; gap: 16px; }
+  .wh-stat { text-align: center; }
+  .wh-stat-val { font-size: 20px; font-weight: 800; color: var(--accent); }
+  .wh-stat-label { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .wh-card-actions {
+    position: absolute; top: 14px; left: 14px;
+    display: flex; gap: 6px; opacity: 0; transition: opacity .2s;
+  }
+  .wh-card:hover .wh-card-actions { opacity: 1; }
+
+  /* ── Transaction tabs ── */
+  .tx-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .tx-tab {
+    padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border);
+    background: transparent; color: var(--text2); cursor: pointer;
+    font-family: 'Vazirmatn', sans-serif; font-size: 13px; font-weight: 600;
+    transition: all .15s;
+  }
+  .tx-tab.active-in    { background: rgba(34,197,94,.15);  color: var(--green);  border-color: rgba(34,197,94,.3); }
+  .tx-tab.active-out   { background: rgba(239,68,68,.15);  color: var(--red);    border-color: rgba(239,68,68,.3); }
+  .tx-tab.active-adj   { background: rgba(59,130,246,.15); color: var(--accent); border-color: rgba(59,130,246,.3); }
+
+  /* ── Empty State ── */
+  .empty { text-align: center; padding: 60px 20px; color: var(--text3); }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-text { font-size: 16px; margin-bottom: 6px; color: var(--text2); }
+  .empty-sub  { font-size: 13px; }
+
+  /* ── Toast ── */
+  #toast-container { position: fixed; bottom: 24px; left: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 18px; font-size: 13px; font-weight: 500;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: var(--shadow); animation: slideLeft .3s ease;
+    max-width: 320px;
+  }
+  @keyframes slideLeft {
+    from { opacity: 0; transform: translateX(-20px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .toast-success { border-color: var(--green); }
+  .toast-error   { border-color: var(--red); }
+  .toast-icon { font-size: 18px; }
+
+  /* ── Loading ── */
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; margin: 40px auto; display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+  /* ── Mobile menu button + overlay ── */
+  .mobile-menu-btn {
+    display: none;
+    width: 38px; height: 38px;
+    border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg3); color: var(--text);
+    font-size: 18px; cursor: pointer;
+    align-items: center; justify-content: center;
+  }
+  .sidebar-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.5);
+    z-index: 99;
+  }
+  .sidebar-overlay.show { display: block; }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .mobile-menu-btn { display: flex; }
+
+    #sidebar {
+      transform: translateX(100%);
+      width: 78vw; max-width: 280px;
+      box-shadow: -8px 0 30px rgba(0,0,0,.3);
+    }
+    #sidebar.open { transform: translateX(0); }
+    #main { margin-right: 0; }
+
+    #topbar { padding: 0 14px; gap: 10px; flex-wrap: wrap; height: auto; min-height: 56px; padding-top: 8px; padding-bottom: 8px; }
+    .page-title { font-size: 15px; }
+    .topbar-actions { flex-wrap: wrap; gap: 6px; }
+    .topbar-actions .btn { font-size: 12px; padding: 7px 12px; }
+    #content { padding: 14px; }
+
+    .form-grid { grid-template-columns: 1fr; }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat-card { padding: 14px 16px; }
+    .stat-value { font-size: 20px; }
+
+    .wh-grid { grid-template-columns: 1fr; }
+
+    .modal { width: 94vw; padding: 18px; }
+    .modal-footer { flex-wrap: wrap; }
+    .modal-footer .btn { flex: 1; justify-content: center; }
+
+    table { font-size: 13px; }
+    thead th, tbody td { padding: 9px 8px; }
+
+    .card { padding: 16px; }
+
+    .tx-tabs { flex-wrap: wrap; }
+    .tx-tab { flex: 1; min-width: 90px; text-align: center; }
+
+    #toast-container { left: 12px; right: 12px; bottom: 12px; }
+    .toast { max-width: 100%; }
+
+    .search-bar input { width: 100% !important; }
+  }
+
+  @media (max-width: 480px) {
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .logo-text { font-size: 16px; }
+    .wh-card-stats { flex-wrap: wrap; gap: 10px; }
+  }
+
+  .separator { height: 1px; background: var(--border); margin: 8px 12px; }
+  .flex-between { display: flex; justify-content: space-between; align-items: center; }
+  .flex-gap { display: flex; gap: 10px; align-items: center; }
+  .mt-4  { margin-top: 16px; }
+  .mb-4  { margin-bottom: 16px; }
+  .text-sm { font-size: 13px; }
+  .text-muted { color: var(--text2); }
+  .fw-bold { font-weight: 700; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .num { font-variant-numeric: tabular-nums; }
+
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📦</div>
+    <div>
+      <div class="logo-text">انبارگردان</div>
+      <div class="logo-sub">سیستم مدیریت انبار</div>
+    </div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">منو اصلی</div>
+    <div class="nav-item active" onclick="navigate('dashboard')">
+      <span class="icon">📊</span> داشبورد
+    </div>
+    <div class="nav-item" onclick="navigate('warehouses')">
+      <span class="icon">🏭</span> انبارها
+    </div>
+    <div class="nav-item" onclick="navigate('products')">
+      <span class="icon">📦</span> همه کالاها
+    </div>
+  </div>
+  <div class="separator"></div>
+  <div class="nav-section">
+    <div class="nav-label">گزارشات</div>
+    <div class="nav-item" onclick="navigate('transactions')">
+      <span class="icon">🔄</span> تراکنش‌ها
+    </div>
+    <div class="nav-item" onclick="navigate('report')">
+      <span class="icon">📋</span> گزارش موجودی
+    </div>
+  </div>
+  <div class="separator"></div>
+  <div class="nav-section">
+    <div class="nav-label">مدیریت</div>
+    <div class="nav-item nav-admin-only" onclick="navigate('users')" style="display:none;">
+      <span class="icon">👥</span> کاربران
+    </div>
+    <div class="nav-item" onclick="openChangePasswordModal()">
+      <span class="icon">🔑</span> تغییر رمز
+    </div>
+    <div class="nav-item" onclick="doLogout()" style="color:var(--red);">
+      <span class="icon">🚪</span> خروج
+    </div>
+  </div>
+  <div style="padding:12px 16px;border-top:1px solid var(--border);">
+    <div id="user-badge" style="font-size:13px;display:flex;flex-direction:column;gap:4px;"></div>
+  </div>
+  <div class="sidebar-footer">نسخه ۲.۰.۰</div>
+</nav>
+
+<!-- Main -->
+<div id="main">
+  <header id="topbar">
+    <div class="flex-gap">
+      <button class="mobile-menu-btn" onclick="toggleSidebar()" aria-label="منو">☰</button>
+      <div class="page-title" id="page-title">داشبورد</div>
+    </div>
+    <div class="flex-gap">
+      <button id="theme-toggle" class="theme-toggle-btn" onclick="toggleTheme()" title="تغییر حالت روشن/تاریک" aria-label="تغییر تم">
+        <svg id="theme-icon" viewBox="0 0 24 24" width="22" height="22">
+          <g id="theme-icon-group"></g>
+        </svg>
+      </button>
+      <div class="topbar-actions" id="topbar-actions"></div>
+    </div>
+  </header>
+  <main id="content">
+    <div class="spinner"></div>
+  </main>
+</div>
+
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<!-- ─── Modals ─────────────────────────────────────────────────────── -->
+
+<!-- Warehouse Modal -->
+<div class="modal-overlay" id="modal-warehouse">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="modal-wh-title">انبار جدید</span>
+      <button class="modal-close" onclick="closeModal('modal-warehouse')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>نام انبار *</label>
+        <input id="wh-name" placeholder="مثلاً: انبار مرکزی"/>
+      </div>
+      <div class="form-group full">
+        <label>مکان / آدرس</label>
+        <input id="wh-location" placeholder="مثلاً: تهران - ونک"/>
+      </div>
+      <div class="form-group full">
+        <label>توضیحات</label>
+        <textarea id="wh-desc" placeholder="توضیح اختیاری..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-warehouse')">انصراف</button>
+      <button class="btn btn-primary" onclick="saveWarehouse()">💾 ذخیره</button>
+    </div>
+  </div>
+</div>
+
+<!-- Product Modal -->
+<div class="modal-overlay" id="modal-product">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="modal-prod-title">کالای جدید</span>
+      <button class="modal-close" onclick="closeModal('modal-product')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>نام کالا *</label>
+        <input id="prod-name" placeholder="مثلاً: لپ‌تاپ دل"/>
+      </div>
+      <div class="form-group">
+        <label>کد کالا (SKU)</label>
+        <input id="prod-sku" placeholder="مثلاً: DELL-001"/>
+      </div>
+      <div class="form-group">
+        <label>دسته‌بندی</label>
+        <input id="prod-cat" placeholder="مثلاً: الکترونیک"/>
+      </div>
+      <div class="form-group">
+        <label>موجودی</label>
+        <input id="prod-qty" type="number" min="0" placeholder="0"/>
+        <span id="prod-qty-hint" style="display:none;font-size:11px;color:var(--yellow);margin-top:4px;">
+          ⚠️ تغییر موجودی یک تراکنش تنظیم خودکار ثبت می‌کند
+        </span>
+      </div>
+      <div class="form-group">
+        <label>واحد</label>
+        <select id="prod-unit">
+          <option>عدد</option><option>دستگاه</option><option>کیلوگرم</option>
+          <option>متر</option><option>لیتر</option><option>جعبه</option>
+          <option>بسته</option><option>رول</option><option>جفت</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>قیمت واحد (ریال)</label>
+        <input id="prod-price" type="number" min="0" placeholder="0"/>
+      </div>
+      <div class="form-group">
+        <label>حداقل موجودی (هشدار)</label>
+        <input id="prod-min" type="number" min="0" placeholder="0"/>
+      </div>
+      <div class="form-group full" id="prod-wh-group">
+        <label>انبار *</label>
+        <select id="prod-wh"></select>
+      </div>
+      <div class="form-group full">
+        <label>توضیحات کالا</label>
+        <textarea id="prod-desc" placeholder="توضیح اختیاری..."></textarea>
+      </div>
+      <div class="form-group full" id="prod-edit-note-group" style="display:none;">
+        <label style="color:var(--yellow);">💬 دلیل تغییر موجودی (ثبت در تراکنش)</label>
+        <input id="prod-edit-note" placeholder="مثلاً: اصلاح موجودی پس از انبارگردانی..."/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-product')">انصراف</button>
+      <button class="btn btn-primary" onclick="saveProduct()">💾 ذخیره</button>
+    </div>
+  </div>
+</div>
+
+<!-- Transaction Modal -->
+<div class="modal-overlay" id="modal-tx">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="modal-tx-title">ثبت تراکنش</span>
+      <button class="modal-close" onclick="closeModal('modal-tx')">✕</button>
+    </div>
+    <div id="modal-tx-product-info" class="card" style="margin-bottom:20px;padding:16px;"></div>
+    <div class="tx-tabs" id="tx-type-tabs">
+      <button class="tx-tab" onclick="setTxType('in')"  id="tab-in">⬆️ ورود کالا</button>
+      <button class="tx-tab" onclick="setTxType('out')" id="tab-out">⬇️ خروج کالا</button>
+      <button class="tx-tab" onclick="setTxType('adjust')" id="tab-adj">⚖️ تنظیم موجودی</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label id="tx-qty-label">مقدار *</label>
+        <input id="tx-qty" type="number" min="0.01" step="0.01" placeholder="0"/>
+      </div>
+      <div class="form-group">
+        <label>تاریخ شمسی *</label>
+        <input id="tx-date" placeholder="۱۴۰۴/۰۳/۲۲" dir="ltr" style="text-align:right;"/>
+      </div>
+      <div class="form-group">
+        <label>شماره مرجع</label>
+        <input id="tx-ref" placeholder="شماره فاکتور یا سند..."/>
+      </div>
+      <div class="form-group">
+        <label>وضعیت پس از ثبت</label>
+        <select id="tx-status">
+          <option value="auto">خودکار (بر اساس موجودی)</option>
+          <option value="available">✅ موجود</option>
+          <option value="unavailable">🚫 ناموجود</option>
+          <option value="low">⚠️ موجودی کم</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label>توضیحات</label>
+        <textarea id="tx-note" placeholder="دلیل یا توضیح تراکنش..." style="min-height:60px;"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-tx')">انصراف</button>
+      <button class="btn btn-primary" onclick="saveTx()" id="btn-save-tx">✅ ثبت ورود</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual Status Modal -->
+<div class="modal-overlay" id="modal-status">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-title">
+      <span>تغییر وضعیت کالا</span>
+      <button class="modal-close" onclick="closeModal('modal-status')">✕</button>
+    </div>
+    <div id="modal-status-info" style="margin-bottom:20px;padding:14px;background:var(--bg3);border-radius:10px;font-weight:700;font-size:15px;"></div>
+    <div class="form-group">
+      <label>وضعیت جدید</label>
+      <select id="status-select">
+        <option value="available">✅ موجود</option>
+        <option value="unavailable">🚫 ناموجود</option>
+        <option value="low">⚠️ موجودی کم</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-status')">انصراف</button>
+      <button class="btn btn-primary" onclick="saveStatus()">💾 ذخیره وضعیت</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Login Screen ─────────────────────────────────────────────── -->
+<div id="login-screen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:40px;width:360px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 12px;">📦</div>
+      <div style="font-size:22px;font-weight:800;">انبارگردان</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:4px;">برای ادامه وارد شوید</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="form-group">
+        <label>نام کاربری</label>
+        <input id="login-username" placeholder="admin" onkeydown="if(event.key==='Enter')document.getElementById('login-password').focus()"/>
+      </div>
+      <div class="form-group">
+        <label>رمز عبور</label>
+        <input id="login-password" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/>
+      </div>
+      <div id="login-error" style="color:var(--red);font-size:13px;text-align:center;min-height:20px;"></div>
+      <button id="login-btn" class="btn btn-primary" onclick="doLogin()" style="width:100%;justify-content:center;padding:12px;">ورود</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── User Modal ─────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-user">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="modal-user-title">کاربر جدید</span>
+      <button class="modal-close" onclick="closeModal('modal-user')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group full" id="user-username-group">
+        <label>نام کاربری *</label>
+        <input id="user-username" placeholder="مثلاً: ali123" dir="ltr"/>
+      </div>
+      <div class="form-group full">
+        <label>نام نمایشی</label>
+        <input id="user-displayname" placeholder="مثلاً: علی رضایی"/>
+      </div>
+      <div class="form-group">
+        <label>نقش *</label>
+        <select id="user-role">
+          <option value="viewer">👁 بازدیدکننده — فقط مشاهده</option>
+          <option value="operator">✏️ اپراتور — مشاهده و ویرایش</option>
+          <option value="admin">👑 مدیر — همه کارها</option>
+        </select>
+      </div>
+      <div class="form-group" style="justify-content:flex-end;padding-top:24px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="user-active" style="width:16px;height:16px;"/> فعال
+        </label>
+      </div>
+      <div class="form-group full">
+        <label>رمز عبور</label>
+        <input id="user-password" type="password" placeholder="••••••••" dir="ltr"/>
+        <span id="user-pass-hint" style="display:none;font-size:11px;color:var(--text3);margin-top:4px;">برای تغییر رمز وارد کنید، در غیر این صورت خالی بگذارید</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-user')">انصراف</button>
+      <button class="btn btn-primary" onclick="saveUser()">💾 ذخیره</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Change Password Modal ──────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-change-password">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-title">
+      <span>تغییر رمز عبور</span>
+      <button class="modal-close" onclick="closeModal('modal-change-password')">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="form-group">
+        <label>رمز عبور فعلی</label>
+        <input id="cp-old" type="password" dir="ltr"/>
+      </div>
+      <div class="form-group">
+        <label>رمز عبور جدید</label>
+        <input id="cp-new" type="password" dir="ltr"/>
+      </div>
+      <div id="cp-error" style="color:var(--red);font-size:13px;min-height:18px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-change-password')">انصراف</button>
+      <button class="btn btn-primary" onclick="saveChangePassword()">💾 ذخیره</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+
+// ─── Auth State ───────────────────────────────────────────────────────────────
+let currentUser = null;
+
+function getToken() {
+  try { return localStorage.getItem('anbar-token'); } catch(e) { return null; }
+}
+function setToken(t) {
+  try { localStorage.setItem('anbar-token', t); } catch(e) {}
+}
+function clearToken() {
+  try { localStorage.removeItem('anbar-token'); } catch(e) {}
+}
+
+let state = {
+  page: 'dashboard',
+  warehouses: [],
+  editWarehouseId: null,
+  editProductId: null,
+  currentWarehouseId: null,
+  txProductId: null,
+  txType: 'in',
+};
+
+// ─── Navigation ──────────────────────────────────────────────────────────────
+
+function navigate(page, params={}) {
+  // viewer نمیتونه بره به صفحه users
+  if (page === 'users' && currentUser && currentUser.role !== 'admin') return;
+  state.page = page;
+  Object.assign(state, params);
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active',
+      el.textContent.trim() === {
+        dashboard: 'داشبورد', warehouses: 'انبارها',
+        products: 'همه کالاها', transactions: 'تراکنش‌ها', report: 'گزارش موجودی',
+        warehouse_detail: 'انبارها', users: 'کاربران',
+      }[page]);
+  });
+  closeSidebar();
+  renderPage();
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('show');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+}
+
+// ─── API helpers ─────────────────────────────────────────────────────────────
+
+async function api(method, path, body) {
+  try {
+    const headers = {'Content-Type': 'application/json'};
+    const token = getToken();
+    if (token) headers['X-Auth-Token'] = token;
+    const r = await fetch(API + path, {
+      method, headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const d = await r.json();
+    if (r.status === 401) {
+      clearToken(); currentUser = null;
+      showLogin(); return;
+    }
+    if (!r.ok) throw new Error(d.error || 'خطای سرور');
+    return d;
+  } catch(e) {
+    if (e.message !== 'undefined') toast(e.message || 'خطای ارتباط با سرور', 'error');
+    throw e;
+  }
+}
+
+// ─── Toast ───────────────────────────────────────────────────────────────────
+
+function toast(msg, type='success') {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.innerHTML = `<span class="toast-icon">${type==='success'?'✅':'❌'}</span>${msg}`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ─── Modal helpers ───────────────────────────────────────────────────────────
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function fmt(n) { return Number(n||0).toLocaleString('fa-IR'); }
+function fmtPrice(n) { return Number(n||0).toLocaleString('fa-IR') + ' ریال'; }
+
+// ─── Render Pages ────────────────────────────────────────────────────────────
+
+async function renderPage() {
+  const c = document.getElementById('content');
+  c.innerHTML = '<div class="spinner"></div>';
+  document.getElementById('topbar-actions').innerHTML = '';
+  const titles = {
+    dashboard: 'داشبورد', warehouses: 'مدیریت انبارها',
+    products: 'همه کالاها', transactions: 'تراکنش‌ها', report: 'گزارش موجودی',
+    warehouse_detail: '', users: 'مدیریت کاربران',
+  };
+  document.getElementById('page-title').textContent = titles[state.page] || '';
+
+  try {
+    if      (state.page === 'dashboard')        await renderDashboard();
+    else if (state.page === 'warehouses')       await renderWarehouses();
+    else if (state.page === 'warehouse_detail') await renderWarehouseDetail();
+    else if (state.page === 'products')         await renderAllProducts();
+    else if (state.page === 'transactions')     await renderTransactions();
+    else if (state.page === 'report')           await renderReport();
+    else if (state.page === 'users')            await renderUsers();
+  } catch(e) {
+    c.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">خطا در بارگذاری</div><div class="empty-sub">${e.message}</div></div>`;
+  }
+}
+
+// ─── Dashboard ───────────────────────────────────────────────────────────────
+
+async function renderDashboard() {
+  const d = await api('GET', '/dashboard');
+  const c = document.getElementById('content');
+  c.innerHTML = `
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-icon">🏭</div><div class="stat-label">تعداد انبار</div><div class="stat-value val-blue">${fmt(d.warehouse_count)}</div></div>
+    <div class="stat-card"><div class="stat-icon">📦</div><div class="stat-label">کل کالاها</div><div class="stat-value val-green">${fmt(d.product_count)}</div></div>
+    <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-label">موجودی کم</div><div class="stat-value val-yellow">${fmt(d.low_stock_count)}</div></div>
+    <div class="stat-card"><div class="stat-icon">🚫</div><div class="stat-label">اتمام موجودی</div><div class="stat-value val-red">${fmt(d.out_of_stock_count)}</div></div>
+    <div class="stat-card" style="grid-column:span 2"><div class="stat-icon">💰</div><div class="stat-label">ارزش کل موجودی</div><div class="stat-value val-blue" style="font-size:22px">${fmtPrice(d.total_value)}</div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">⚠️ کالاهای کم‌موجود / تمام‌شده</div>
+      ${[...d.out_of_stock, ...d.low_stock].length === 0
+        ? '<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">همه کالاها موجودی کافی دارند</div></div>'
+        : `<div class="table-wrap"><table><thead><tr>
+            <th>کالا</th><th>موجودی</th><th>وضعیت</th>
+           </tr></thead><tbody>
+           ${[...d.out_of_stock,...d.low_stock].map(p=>`<tr>
+             <td class="fw-bold">${p.name}</td>
+             <td class="num">${fmt(p.quantity)} ${p.unit}</td>
+             <td>${p.status==='out'
+               ? '<span class="badge badge-red">🚫 تمام شد</span>'
+               : '<span class="badge badge-yellow">⚠️ کم است</span>'}</td>
+           </tr>`).join('')}
+           </tbody></table></div>`}
+    </div>
+    <div class="card">
+      <div class="card-title">🔄 آخرین تراکنش‌ها</div>
+      ${d.recent_transactions.length === 0
+        ? '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">تراکنشی ثبت نشده</div></div>'
+        : `<div class="table-wrap"><table><thead><tr>
+            <th>کالا</th><th>نوع</th><th>مقدار</th><th>تاریخ</th>
+           </tr></thead><tbody>
+           ${d.recent_transactions.map(t=>`<tr>
+             <td>${t.product_name}</td>
+             <td>${txBadge(t.type)}</td>
+             <td class="num">${fmt(t.quantity)}</td>
+             <td class="text-sm text-muted num">${t.created_at}</td>
+           </tr>`).join('')}
+           </tbody></table></div>`}
+    </div>
+  </div>`;
+}
+
+function txBadge(type) {
+  if (type==='in')     return '<span class="badge badge-in">⬆️ ورود</span>';
+  if (type==='out')    return '<span class="badge badge-out">⬇️ خروج</span>';
+  return '<span class="badge badge-adjust">⚖️ تنظیم</span>';
+}
+
+// ─── Warehouses ──────────────────────────────────────────────────────────────
+
+async function renderWarehouses() {
+  const whs = await api('GET', '/warehouses');
+  state.warehouses = whs;
+  const c = document.getElementById('content');
+  document.getElementById('topbar-actions').innerHTML =
+    window._isViewer ? '' : `<button class="btn btn-primary" onclick="openWarehouseModal()">➕ انبار جدید</button>`;
+
+  if (!whs.length) {
+    c.innerHTML = `<div class="empty"><div class="empty-icon">🏭</div>
+      <div class="empty-text">هنوز انباری ثبت نشده</div>
+      <div class="empty-sub">اولین انبار خود را اضافه کنید</div>
+      <br><button class="btn btn-primary" onclick="openWarehouseModal()">➕ انبار جدید</button></div>`;
+    return;
+  }
+
+  c.innerHTML = `<div class="wh-grid">${whs.map(w=>`
+    <div class="wh-card" onclick="navigate('warehouse_detail',{currentWarehouseId:${w.id}})">
+      ${window._isViewer ? '' : `<div class="wh-card-actions">
+        <button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="event.stopPropagation();openWarehouseModal(${w.id})">✏️</button>
+        <button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="event.stopPropagation();deleteWarehouse(${w.id},'${w.name}')">🗑️</button>
+      </div>`}
+      <div class="wh-card-name">${w.name}</div>
+      <div class="wh-card-loc">${w.location ? '📍 '+w.location : '📍 مکان ثبت نشده'}</div>
+      <div class="wh-card-stats">
+        <div class="wh-stat"><div class="wh-stat-val">${fmt(w.product_count)}</div><div class="wh-stat-label">نوع کالا</div></div>
+        <div class="wh-stat"><div class="wh-stat-val">${fmt(w.total_items)}</div><div class="wh-stat-label">کل موجودی</div></div>
+        <div class="wh-stat"><div class="wh-stat-val" style="font-size:14px;">${Number(w.total_value).toLocaleString('fa-IR',{notation:'compact'})}</div><div class="wh-stat-label">ارزش (ریال)</div></div>
+      </div>
+      <div class="text-sm text-muted mt-4">ساخته شده: ${w.created_at}</div>
+    </div>`).join('')}</div>`;
+}
+
+async function renderWarehouseDetail() {
+  const wid = state.currentWarehouseId;
+  const [whs, prods] = await Promise.all([
+    api('GET', '/warehouses'),
+    api('GET', `/warehouses/${wid}/products`),
+  ]);
+  state.warehouses = whs;
+  const wh = whs.find(w=>w.id===wid);
+  if (!wh) { navigate('warehouses'); return; }
+
+  document.getElementById('page-title').textContent = `📦 ${wh.name}`;
+  document.getElementById('topbar-actions').innerHTML = `
+    <button class="btn btn-secondary" onclick="navigate('warehouses')">← بازگشت</button>
+    ${window._isViewer ? '' : `<button class="btn btn-primary" onclick="openProductModal(null,${wid})">➕ کالای جدید</button>`}`;
+
+  const low = prods.filter(p=>p.status==='low').length;
+  const out = prods.filter(p=>p.status==='out').length;
+  const totalVal = prods.reduce((s,p)=>s+p.total_value,0);
+
+  document.getElementById('content').innerHTML = `
+  <div class="stats-grid" style="margin-bottom:24px;">
+    <div class="stat-card"><div class="stat-label">📦 نوع کالا</div><div class="stat-value val-blue">${fmt(prods.length)}</div></div>
+    <div class="stat-card"><div class="stat-label">⚠️ موجودی کم</div><div class="stat-value val-yellow">${fmt(low)}</div></div>
+    <div class="stat-card"><div class="stat-label">🚫 تمام‌شده</div><div class="stat-value val-red">${fmt(out)}</div></div>
+    <div class="stat-card"><div class="stat-label">💰 ارزش کل</div><div class="stat-value val-green" style="font-size:18px;">${fmtPrice(totalVal)}</div></div>
+  </div>
+  <div class="card">
+    <div class="flex-between mb-4">
+      <div class="card-title" style="margin:0">کالاهای این انبار</div>
+      <div class="search-bar"><span class="search-icon">🔍</span><input id="prod-search" placeholder="جستجوی کالا..." oninput="filterProds()" style="width:220px;"/></div>
+    </div>
+    ${prods.length===0
+      ? `<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">هنوز کالایی ثبت نشده</div><br>
+         <button class="btn btn-primary" onclick="openProductModal(null,${wid})">➕ کالای جدید</button></div>`
+      : `<div class="table-wrap"><table id="prods-table">
+          <thead><tr>
+            <th>نام کالا</th><th>کد SKU</th><th>دسته</th>
+            <th>موجودی</th><th>قیمت واحد</th><th>ارزش کل</th><th>وضعیت</th><th>عملیات</th>
+          </tr></thead><tbody>
+          ${prods.map(p=>prodRow(p)).join('')}
+          </tbody></table></div>`}
+  </div>`;
+  window._prods = prods;
+}
+
+function prodRow(p) {
+  const statusBadge = p.manual_status === 'unavailable' || p.status==='out'
+    ? '<span class="badge badge-red" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal('+p.id+',\''+p.name+'\',\''+p.status+'\')">🚫 ناموجود</span>'
+    : p.manual_status === 'low' || p.status==='low'
+    ? '<span class="badge badge-yellow" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal('+p.id+',\''+p.name+'\',\''+p.status+'\')">⚠️ کم است</span>'
+    : '<span class="badge badge-green" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal('+p.id+',\''+p.name+'\',\''+p.status+'\')">✅ موجود</span>';
+  return `<tr id="prod-row-${p.id}">
+    <td class="fw-bold">${p.name}${p.description?`<br><span class="text-sm text-muted">${p.description}</span>`:''}</td>
+    <td class="text-muted num">${p.sku||'—'}</td>
+    <td>${p.category||'—'}</td>
+    <td class="num fw-bold">${fmt(p.quantity)} ${p.unit}</td>
+    <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
+    <td class="num">${fmtPrice(p.total_value)}</td>
+    <td>${statusBadge}</td>
+    <td>
+      <div class="flex-gap">
+        ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" onclick="openTxModal(${p.id})">🔄 ثبت</button>`}
+        ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️</button>`}
+        ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id},'${p.name}')">🗑️</button>`}
+      </div>
+    </td>
+  </tr>`;
+}
+
+function filterProds() {
+  const q = document.getElementById('prod-search').value.toLowerCase();
+  const prods = window._prods||[];
+  const tbody = document.querySelector('#prods-table tbody');
+  if (!tbody) return;
+  tbody.innerHTML = prods.filter(p=>p.name.toLowerCase().includes(q)||p.sku.toLowerCase().includes(q)||(p.category||'').toLowerCase().includes(q)).map(prodRow).join('');
+}
+
+// ─── All Products ─────────────────────────────────────────────────────────────
+
+async function renderAllProducts() {
+  const prods = await api('GET', '/products');
+  document.getElementById('topbar-actions').innerHTML =
+    window._isViewer ? '' : `<button class="btn btn-primary" onclick="openProductModal()">➕ کالای جدید</button>`;
+  const c = document.getElementById('content');
+  if (!prods.length) {
+    c.innerHTML = `<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">هیچ کالایی ثبت نشده</div></div>`;
+    return;
+  }
+  c.innerHTML = `<div class="card">
+    <div class="flex-between mb-4">
+      <div class="card-title" style="margin:0">همه کالاها (${fmt(prods.length)})</div>
+      <div class="search-bar"><span class="search-icon">🔍</span><input id="all-prod-search" placeholder="جستجو..." oninput="filterAllProds()" style="width:220px;"/></div>
+    </div>
+    <div class="table-wrap"><table id="all-prods-table">
+      <thead><tr>
+        <th>نام کالا</th><th>انبار</th><th>دسته</th><th>موجودی</th><th>قیمت</th><th>وضعیت</th><th>عملیات</th>
+      </tr></thead><tbody>
+      ${prods.map(p=>`<tr>
+        <td class="fw-bold">${p.name}</td>
+        <td class="text-muted">${(state.warehouses.find(w=>w.id===p.warehouse_id)||{name:'—'}).name}</td>
+        <td>${p.category||'—'}</td>
+        <td class="num">${fmt(p.quantity)} ${p.unit}</td>
+        <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
+        <td>${p.status==='out'?'<span class="badge badge-red">🚫 تمام شد</span>':p.status==='low'?'<span class="badge badge-yellow">⚠️ کم</span>':'<span class="badge badge-green">✅ موجود</span>'}</td>
+        <td><div class="flex-gap">
+          <button class="btn btn-sm btn-success" onclick="openTxModal(${p.id})">🔄</button>
+          <button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️</button>
+        </div></td>
+      </tr>`).join('')}
+      </tbody></table></div></div>`;
+  window._allProds = prods;
+}
+
+function filterAllProds() {
+  const q = document.getElementById('all-prod-search').value.toLowerCase();
+  const prods = window._allProds||[];
+  document.querySelector('#all-prods-table tbody').innerHTML =
+    prods.filter(p=>p.name.toLowerCase().includes(q)).map(p=>`<tr>
+      <td class="fw-bold">${p.name}</td>
+      <td class="text-muted">${(state.warehouses.find(w=>w.id===p.warehouse_id)||{name:'—'}).name}</td>
+      <td>${p.category||'—'}</td>
+      <td class="num">${fmt(p.quantity)} ${p.unit}</td>
+      <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
+      <td>${p.status==='out'?'<span class="badge badge-red">🚫 تمام</span>':p.status==='low'?'<span class="badge badge-yellow">⚠️ کم</span>':'<span class="badge badge-green">✅ موجود</span>'}</td>
+      <td><button class="btn btn-sm btn-success" onclick="openTxModal(${p.id})">🔄</button></td>
+    </tr>`).join('');
+}
+
+// ─── Transactions ────────────────────────────────────────────────────────────
+
+function txChangeCell(t) {
+  if (t.type === 'adjust') return `<span class="val-blue">= ${fmt(t.quantity)}</span>`;
+  if (t.type === 'in')  return `<span class="val-green">+ ${fmt(t.quantity)}</span>`;
+  return `<span class="val-red">- ${fmt(t.quantity)}</span>`;
+}
+
+function buildTxTable(txs) {
+  if (!txs.length) return '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">نتیجه‌ای یافت نشد</div></div>';
+  return `<div class="table-wrap"><table id="tx-table">
+    <thead><tr>
+      <th>تاریخ</th><th>کالا</th><th>انبار</th><th>نوع</th><th>قبل</th><th>تغییر</th><th>بعد</th><th>مرجع</th><th>توضیحات</th>
+    </tr></thead><tbody>
+    ${txs.map(t=>`<tr>
+      <td class="num text-sm text-muted" style="white-space:nowrap">${t.created_at}</td>
+      <td class="fw-bold">${t.product_name}</td>
+      <td class="text-muted">${t.warehouse_name}</td>
+      <td>${txBadge(t.type)}</td>
+      <td class="num">${fmt(t.before_qty)}</td>
+      <td class="num fw-bold">${txChangeCell(t)}</td>
+      <td class="num fw-bold">${fmt(t.after_qty)}</td>
+      <td class="text-sm">${t.ref_number||'—'}</td>
+      <td class="text-sm" style="max-width:200px;">
+        ${t.note ? `<span title="${t.note}" style="color:var(--text2);">💬 ${t.note}</span>` : '<span class="text-muted">—</span>'}
+      </td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+async function renderTransactions() {
+  const whs = state.warehouses.length ? state.warehouses : await api('GET', '/warehouses');
+  state.warehouses = whs;
+  const c = document.getElementById('content');
+
+  c.innerHTML = `
+  <div class="card mb-4">
+    <div class="flex-gap" style="flex-wrap:wrap;gap:12px;">
+      <div class="search-bar" style="flex:1;min-width:200px;">
+        <span class="search-icon">🔍</span>
+        <input id="tx-search" placeholder="جستجو در کالا، توضیحات، مرجع..." oninput="searchTx()" style="width:100%;"/>
+      </div>
+      <select id="tx-filter-type" onchange="searchTx()" style="width:150px;">
+        <option value="">همه انواع</option>
+        <option value="in">⬆️ ورود</option>
+        <option value="out">⬇️ خروج</option>
+        <option value="adjust">⚖️ تنظیم</option>
+      </select>
+      <select id="tx-filter-wh" onchange="searchTx()" style="width:170px;">
+        <option value="">همه انبارها</option>
+        ${whs.map(w=>`<option value="${w.id}">${w.name}</option>`).join('')}
+      </select>
+      <button class="btn btn-secondary" onclick="searchTx()">🔄 بروزرسانی</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="flex-between mb-4">
+      <div class="card-title" style="margin:0" id="tx-count-title">در حال بارگذاری...</div>
+    </div>
+    <div id="tx-results"><div class="spinner"></div></div>
+  </div>`;
+
+  await searchTx();
+}
+
+async function searchTx() {
+  const search = (document.getElementById('tx-search')||{}).value || '';
+  const type   = (document.getElementById('tx-filter-type')||{}).value || '';
+  const whId   = (document.getElementById('tx-filter-wh')||{}).value || '';
+
+  const params = new URLSearchParams();
+  if (search) params.set('search', search);
+  if (type)   params.set('type', type);
+  if (whId)   params.set('warehouse_id', whId);
+
+  const txs = await api('GET', `/transactions?${params.toString()}`);
+  const title = document.getElementById('tx-count-title');
+  const results = document.getElementById('tx-results');
+  if (title) title.textContent = `🔄 تاریخچه تراکنش‌ها — ${fmt(txs.length)} مورد`;
+  if (results) results.innerHTML = buildTxTable(txs);
+}
+
+// ─── Report ──────────────────────────────────────────────────────────────────
+
+async function renderReport() {
+  const whs = await api('GET', '/warehouses');
+  state.warehouses = whs;
+  const c = document.getElementById('content');
+  c.innerHTML = `<div class="card mb-4">
+    <div class="flex-gap" style="flex-wrap:wrap;">
+      <label class="fw-bold">فیلتر انبار:</label>
+      <select id="rep-wh" onchange="loadReport()" style="width:200px;">
+        <option value="">همه انبارها</option>
+        ${whs.map(w=>`<option value="${w.id}">${w.name}</option>`).join('')}
+      </select>
+      <label class="fw-bold">وضعیت:</label>
+      <select id="rep-status" onchange="loadReport()" style="width:160px;">
+        <option value="">همه وضعیت‌ها</option>
+        <option value="normal">✅ موجود</option>
+        <option value="low">⚠️ کم‌موجود</option>
+        <option value="out">🚫 ناموجود</option>
+      </select>
+      <button class="btn btn-secondary" onclick="printReport()">🖨️ چاپ</button>
+    </div>
+  </div>
+  <div id="report-content"><div class="spinner"></div></div>`;
+  loadReport();
+}
+
+async function loadReport() {
+  const wid = document.getElementById('rep-wh').value;
+  const status = document.getElementById('rep-status').value;
+  const params = new URLSearchParams();
+  if (wid) params.set('warehouse_id', wid);
+  if (status) params.set('status', status);
+  const d = await api('GET', `/report/inventory?${params.toString()}`);
+  const rc = document.getElementById('report-content');
+  rc.innerHTML = `
+  <div class="card" id="printable-report">
+    <div class="flex-between mb-4">
+      <div class="card-title" style="margin:0">📋 گزارش موجودی — ${d.generated_at}</div>
+      <div class="fw-bold val-blue">ارزش کل: ${fmtPrice(d.total_value)}</div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th>#</th><th>نام کالا</th><th>کد</th><th>دسته</th><th>موجودی</th><th>واحد</th><th>قیمت واحد</th><th>ارزش کل</th><th>آخرین بروزرسانی</th><th>وضعیت</th>
+      </tr></thead><tbody>
+      ${d.products.map((p,i)=>`<tr>
+        <td class="text-muted">${i+1}</td>
+        <td class="fw-bold">${p.name}</td>
+        <td class="num text-muted">${p.sku||'—'}</td>
+        <td>${p.category||'—'}</td>
+        <td class="num fw-bold">${fmt(p.quantity)}</td>
+        <td>${p.unit}</td>
+        <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
+        <td class="num">${fmtPrice(p.total_value)}</td>
+        <td class="text-sm text-muted num">${p.updated_at}</td>
+        <td>${p.status==='out'?'<span class="badge badge-red">🚫 تمام</span>':p.status==='low'?'<span class="badge badge-yellow">⚠️ کم</span>':'<span class="badge badge-green">✅ موجود</span>'}</td>
+      </tr>`).join('')}
+      </tbody></table></div></div>`;
+}
+
+function printReport() {
+  const reportEl = document.getElementById('printable-report');
+  if (!reportEl) { toast('گزارشی برای چاپ وجود ندارد', 'error'); return; }
+
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(`
+    <!DOCTYPE html>
+    <html lang="fa" dir="rtl">
+    <head>
+      <meta charset="UTF-8"/>
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;700&display=swap');
+        * { box-sizing: border-box; }
+        body {
+          font-family: 'Vazirmatn', sans-serif;
+          color: #111; background: #fff;
+          padding: 24px; margin: 0;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        thead th {
+          text-align: right; padding: 8px 10px;
+          border-bottom: 2px solid #333; font-weight: 700;
+        }
+        tbody td { padding: 7px 10px; border-bottom: 1px solid #ddd; }
+        .report-header {
+          display: flex; justify-content: space-between; align-items: center;
+          margin-bottom: 16px; font-weight: 700; font-size: 15px;
+        }
+        .badge {
+          display: inline-block; padding: 2px 8px; border-radius: 10px;
+          font-size: 11px; font-weight: 600;
+        }
+        .badge-green  { background: #dcfce7; color: #15803d; }
+        .badge-yellow { background: #fef3c7; color: #b45309; }
+        .badge-red    { background: #fee2e2; color: #b91c1c; }
+        @page { size: A4; margin: 14mm; }
+      </style>
+    </head>
+    <body>${reportEl.innerHTML}</body>
+    </html>
+  `);
+  doc.close();
+
+  iframe.onload = () => {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    setTimeout(() => iframe.remove(), 1000);
+  };
+}
+
+// ─── Warehouse CRUD ──────────────────────────────────────────────────────────
+
+async function openWarehouseModal(id=null) {
+  state.editWarehouseId = id;
+  document.getElementById('modal-wh-title').textContent = id ? 'ویرایش انبار' : 'انبار جدید';
+  if (id) {
+    const whs = state.warehouses.length ? state.warehouses : await api('GET','/warehouses');
+    const wh = whs.find(w=>w.id===id);
+    document.getElementById('wh-name').value = wh.name;
+    document.getElementById('wh-location').value = wh.location||'';
+    document.getElementById('wh-desc').value = wh.description||'';
+  } else {
+    document.getElementById('wh-name').value = '';
+    document.getElementById('wh-location').value = '';
+    document.getElementById('wh-desc').value = '';
+  }
+  openModal('modal-warehouse');
+}
+
+async function saveWarehouse() {
+  const name = document.getElementById('wh-name').value.trim();
+  if (!name) { toast('نام انبار را وارد کنید', 'error'); return; }
+  const body = {
+    name, location: document.getElementById('wh-location').value,
+    description: document.getElementById('wh-desc').value,
+  };
+  if (state.editWarehouseId) {
+    await api('PUT', `/warehouses/${state.editWarehouseId}`, body);
+    toast('انبار ویرایش شد ✏️');
+  } else {
+    await api('POST', '/warehouses', body);
+    toast('انبار جدید ثبت شد 🏭');
+  }
+  closeModal('modal-warehouse');
+  renderPage();
+}
+
+async function deleteWarehouse(id, name) {
+  if (!confirm(`آیا از حذف انبار "${name}" مطمئن هستید؟`)) return;
+  await api('DELETE', `/warehouses/${id}`);
+  toast('انبار حذف شد 🗑️');
+  renderPage();
+}
+
+// ─── Product CRUD ────────────────────────────────────────────────────────────
+
+async function openProductModal(id=null, whId=null) {
+  state.editProductId = id;
+  const whs = state.warehouses.length ? state.warehouses : await api('GET','/warehouses');
+  state.warehouses = whs;
+
+  const sel = document.getElementById('prod-wh');
+  sel.innerHTML = whs.map(w=>`<option value="${w.id}">${w.name}</option>`).join('');
+
+  document.getElementById('modal-prod-title').textContent = id ? 'ویرایش کالا' : 'کالای جدید';
+  if (id) {
+    const prods = await api('GET', '/products');
+    const p = prods.find(x=>x.id===id);
+    if (p) {
+      document.getElementById('prod-name').value = p.name;
+      document.getElementById('prod-sku').value = p.sku||'';
+      document.getElementById('prod-cat').value = p.category||'';
+      document.getElementById('prod-qty').value = p.quantity;
+      document.getElementById('prod-unit').value = p.unit;
+      document.getElementById('prod-price').value = p.unit_price||0;
+      document.getElementById('prod-min').value = p.min_stock||0;
+      document.getElementById('prod-desc').value = p.description||'';
+      sel.value = p.warehouse_id;
+    }
+    document.getElementById('prod-wh-group').style.display = 'none';
+    const qtyHint = document.getElementById('prod-qty-hint');
+    if (qtyHint) qtyHint.style.display = 'block';
+    const editNoteGroup = document.getElementById('prod-edit-note-group');
+    if (editNoteGroup) editNoteGroup.style.display = 'flex';
+    document.getElementById('prod-edit-note').value = '';
+  } else {
+    ['prod-name','prod-sku','prod-cat','prod-desc'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('prod-qty').value = 0;
+    document.getElementById('prod-price').value = 0;
+    document.getElementById('prod-min').value = 0;
+    document.getElementById('prod-unit').value = 'عدد';
+    if (whId) sel.value = whId;
+    document.getElementById('prod-wh-group').style.display = 'flex';
+    const qtyHint2 = document.getElementById('prod-qty-hint');
+    if (qtyHint2) qtyHint2.style.display = 'none';
+    const editNoteGroup2 = document.getElementById('prod-edit-note-group');
+    if (editNoteGroup2) editNoteGroup2.style.display = 'none';
+  }
+  openModal('modal-product');
+}
+
+async function saveProduct() {
+  const name = document.getElementById('prod-name').value.trim();
+  if (!name) { toast('نام کالا را وارد کنید', 'error'); return; }
+  const body = {
+    name, sku: document.getElementById('prod-sku').value,
+    category: document.getElementById('prod-cat').value,
+    quantity: parseFloat(document.getElementById('prod-qty').value)||0,
+    unit: document.getElementById('prod-unit').value,
+    unit_price: parseFloat(document.getElementById('prod-price').value)||0,
+    min_stock: parseFloat(document.getElementById('prod-min').value)||0,
+    description: document.getElementById('prod-desc').value,
+    warehouse_id: parseInt(document.getElementById('prod-wh').value),
+  };
+  if (state.editProductId) {
+    // quantity و توضیح رو هم بفرست تا سرور تراکنش خودکار ثبت کنه
+    body.quantity = parseFloat(document.getElementById('prod-qty').value) || 0;
+    body.note = document.getElementById('prod-edit-note').value || '';
+    await api('PUT', `/products/${state.editProductId}`, body);
+    toast('کالا ویرایش شد ✏️');
+  } else {
+    await api('POST', '/products', body);
+    toast('کالای جدید ثبت شد 📦');
+  }
+  closeModal('modal-product');
+  renderPage();
+}
+
+async function deleteProduct(id, name) {
+  if (!confirm(`آیا از حذف کالای "${name}" مطمئن هستید؟`)) return;
+  await api('DELETE', `/products/${id}`);
+  toast('کالا حذف شد 🗑️');
+  renderPage();
+}
+
+// ─── Transactions ────────────────────────────────────────────────────────────
+
+// Returns today as Jalali string using Intl
+function todayJalali() {
+  return new Date().toLocaleDateString('fa-IR-u-nu-latn', {
+    year:'numeric', month:'2-digit', day:'2-digit'
+  }).replace(/\//g, '/');
+}
+
+// Convert Jalali input string to ISO for backend
+function jalaliToISO(jStr) {
+  // Accepts ۱۴۰۴/۰۳/۲۲ or 1404/03/22
+  const normalized = jStr.replace(/[۰-۹]/g, d => String.fromCharCode(d.charCodeAt(0) - 1776));
+  const parts = normalized.split('/');
+  if (parts.length !== 3) return null;
+  const [jy, jm, jd] = parts.map(Number);
+  // Jalali to Gregorian (simple algorithm)
+  const jy2 = jy - 979; const jm2 = jm - 1; const jd2 = jd - 1;
+  let jDayNo = 365 * jy2 + Math.floor(jy2 / 4) - Math.floor(jy2 / 100) + Math.floor(jy2 / 400);
+  for (let i = 0; i < jm2; i++) jDayNo += [31,28+(jy%4===0&&(jy%100!==0||jy%400===0)?1:0),31,30,31,30,31,31,30,31,30,31][i]||[31,31,31,31,31,31,30,30,30,29,29,29][i];
+  jDayNo += jd2;
+  let gDayNo = jDayNo + 79;
+  let gy = 1600 + 400 * Math.floor(gDayNo / 146097); gDayNo %= 146097;
+  let leap = true;
+  if (gDayNo >= 36525) { gDayNo--; gy += 100 * Math.floor(gDayNo / 36524); gDayNo %= 36524; if (gDayNo >= 365) gDayNo++; else leap = false; }
+  gy += 4 * Math.floor(gDayNo / 1461); gDayNo %= 1461;
+  if (gDayNo >= 366) { leap = false; gDayNo--; gy += Math.floor(gDayNo / 365); gDayNo %= 365; }
+  const gMonths = [31, 28+leap, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  let gm = 0;
+  for (; gm < 12 && gDayNo >= gMonths[gm]; gm++) gDayNo -= gMonths[gm];
+  return `${gy}-${String(gm+1).padStart(2,'0')}-${String(gDayNo+1).padStart(2,'0')}T12:00:00`;
+}
+
+async function openTxModal(prodId) {
+  state.txProductId = prodId;
+  const prods = await api('GET', '/products');
+  const p = prods.find(x=>x.id===prodId);
+  if (!p) return;
+  const statusLabel = p.status==='out' ? '🚫 ناموجود' : p.status==='low' ? '⚠️ کم‌موجود' : '✅ موجود';
+  document.getElementById('modal-tx-product-info').innerHTML = `
+    <div class="flex-between">
+      <div>
+        <div class="fw-bold" style="font-size:16px;">${p.name}</div>
+        <div class="text-sm text-muted">${p.sku?'SKU: '+p.sku+' | ':''}${p.category||''}</div>
+        <div style="margin-top:6px;">${statusLabel}</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:28px;font-weight:800;color:var(--accent)">${fmt(p.quantity)}</div>
+        <div class="text-sm text-muted">${p.unit} فعلی</div>
+      </div>
+    </div>`;
+  document.getElementById('tx-qty').value = '';
+  document.getElementById('tx-ref').value = '';
+  document.getElementById('tx-note').value = '';
+  document.getElementById('tx-date').value = todayJalali();
+  document.getElementById('tx-status').value = 'auto';
+  setTxType('in');
+  openModal('modal-tx');
+}
+
+function setTxType(type) {
+  state.txType = type;
+  ['in','out','adjust'].forEach(t => {
+    const tab = document.getElementById('tab-'+t);
+    tab.className = 'tx-tab' + (t===type ? ` active-${t==='adjust'?'adj':t}` : '');
+  });
+  const labels = { in:'مقدار ورودی *', out:'مقدار خروجی *', adjust:'موجودی جدید *' };
+  const btns = { in:'✅ ثبت ورود', out:'✅ ثبت خروج', adjust:'✅ تنظیم موجودی' };
+  document.getElementById('tx-qty-label').textContent = labels[type];
+  document.getElementById('btn-save-tx').textContent = btns[type];
+  document.getElementById('modal-tx-title').textContent =
+    type==='in' ? '⬆️ ورود کالا' : type==='out' ? '⬇️ خروج کالا' : '⚖️ تنظیم موجودی';
+}
+
+async function saveTx() {
+  const qty = parseFloat(document.getElementById('tx-qty').value);
+  if (!qty || qty <= 0) { toast('مقدار را صحیح وارد کنید', 'error'); return; }
+  const dateStr = document.getElementById('tx-date').value.trim();
+  if (!dateStr) { toast('تاریخ را وارد کنید', 'error'); return; }
+  const isoDate = jalaliToISO(dateStr);
+  if (!isoDate) { toast('فرمت تاریخ اشتباه است — مثال: ۱۴۰۴/۰۳/۲۲', 'error'); return; }
+  const manualStatus = document.getElementById('tx-status').value;
+  await api('POST', `/products/${state.txProductId}/transactions`, {
+    type: state.txType,
+    quantity: qty,
+    note: document.getElementById('tx-note').value,
+    ref_number: document.getElementById('tx-ref').value,
+    custom_date: isoDate,
+    manual_status: manualStatus === 'auto' ? null : manualStatus,
+  });
+  const msgs = { in: 'ورود کالا ثبت شد ⬆️', out: 'خروج کالا ثبت شد ⬇️', adjust: 'موجودی تنظیم شد ⚖️' };
+  toast(msgs[state.txType]);
+  closeModal('modal-tx');
+  renderPage();
+}
+
+// ─── Manual Status Change ─────────────────────────────────────────────────────
+
+function openStatusModal(prodId, prodName, currentStatus) {
+  state.statusProductId = prodId;
+  document.getElementById('modal-status-info').textContent = prodName;
+  const map = { normal: 'available', out: 'unavailable', low: 'low' };
+  document.getElementById('status-select').value = map[currentStatus] || 'available';
+  openModal('modal-status');
+}
+
+async function saveStatus() {
+  const s = document.getElementById('status-select').value;
+  await api('PATCH', `/products/${state.statusProductId}/status`, { manual_status: s });
+  toast('وضعیت کالا تغییر کرد ✅');
+  closeModal('modal-status');
+  renderPage();
+}
+
+// ─── Close modal on overlay click ───────────────────────────────────────────
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+
+// ─── Theme Toggle (دارک / لایت با افکت ماه و خورشید) ──────────────────────────
+
+const SUN_SVG = `
+  <g class="ray" style="opacity:1">
+    <line x1="12" y1="1.5" x2="12" y2="4" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+    <line x1="12" y1="20" x2="12" y2="22.5" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+    <line x1="1.5" y1="12" x2="4" y2="12" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+    <line x1="20" y1="12" x2="22.5" y2="12" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+    <line x1="4.2" y1="4.2" x2="6" y2="6" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+    <line x1="18" y1="18" x2="19.8" y2="19.8" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+    <line x1="4.2" y1="19.8" x2="6" y2="18" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+    <line x1="18" y1="6" x2="19.8" y2="4.2" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <circle class="sun-core" cx="12" cy="12" r="5" fill="#f59e0b"/>
+`;
+
+const MOON_SVG = `
+  <circle class="star" cx="6" cy="6" r="0.8" fill="#cbd5e1" style="opacity:.9"/>
+  <circle class="star" cx="18" cy="8" r="0.6" fill="#cbd5e1" style="opacity:.7"/>
+  <circle class="star" cx="16" cy="17" r="0.5" fill="#cbd5e1" style="opacity:.6"/>
+  <path class="moon-mask" d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 1 0 10.5 10.5Z" fill="#cbd5e1"/>
+`;
+
+function renderThemeIcon(theme) {
+  const g = document.getElementById('theme-icon-group');
+  if (!g) return;
+  g.innerHTML = theme === 'light' ? SUN_SVG : MOON_SVG;
+}
+
+function applyTheme(theme, animate=true) {
+  const html = document.documentElement;
+  if (animate) {
+    const btn = document.getElementById('theme-toggle');
+    if (btn) {
+      btn.style.transform = 'scale(0.8) rotate(-25deg)';
+      setTimeout(() => { btn.style.transform = ''; }, 250);
+    }
+  }
+  if (theme === 'light') {
+    html.setAttribute('data-theme', 'light');
+  } else {
+    html.removeAttribute('data-theme');
+  }
+  renderThemeIcon(theme);
+  try { localStorage.setItem('anbar-theme', theme); } catch(e) {}
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  applyTheme(current === 'light' ? 'dark' : 'light');
+}
+
+(function initTheme() {
+  let saved = 'dark';
+  try { saved = localStorage.getItem('anbar-theme') || 'dark'; } catch(e) {}
+  applyTheme(saved, false);
+})();
+
+// ─── Login / Logout ──────────────────────────────────────────────────────────
+
+function showLogin() {
+  document.getElementById('sidebar').style.display = 'none';
+  document.getElementById('main').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-password').value = '';
+  setTimeout(() => document.getElementById('login-username').focus(), 100);
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('sidebar').style.display = 'flex';
+  document.getElementById('main').style.display = 'flex';
+  updateUserBadge();
+  // نشون دادن منوی کاربران فقط به ادمین
+  const adminOnly = document.querySelectorAll('.nav-admin-only');
+  adminOnly.forEach(el => {
+    el.style.display = currentUser && currentUser.role === 'admin' ? 'flex' : 'none';
+  });
+  // غیرفعال کردن بخش‌های نوشتنی برای viewer
+  window._isViewer = currentUser && currentUser.role === 'viewer';
+}
+
+function updateUserBadge() {
+  const badge = document.getElementById('user-badge');
+  if (!badge || !currentUser) return;
+  const roleLabel = {admin: '👑 مدیر', operator: '✏️ اپراتور', viewer: '👁 بازدیدکننده'};
+  badge.innerHTML = `<span style="font-weight:700">${currentUser.display_name || currentUser.username}</span>
+    <span class="badge badge-blue" style="font-size:11px;">${roleLabel[currentUser.role]||currentUser.role}</span>`;
+}
+
+async function doLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  if (!username || !password) { errEl.textContent = 'نام کاربری و رمز عبور را وارد کنید'; return; }
+  btn.disabled = true; btn.textContent = 'در حال ورود...';
+  try {
+    const headers = {'Content-Type': 'application/json'};
+    const r = await fetch(API + '/auth/login', {method:'POST', headers, body: JSON.stringify({username, password})});
+    const d = await r.json();
+    if (!r.ok) { errEl.textContent = d.error || 'خطا در ورود'; return; }
+    setToken(d.token);
+    currentUser = d.user;
+    showApp();
+    navigate('dashboard');
+  } catch(e) {
+    errEl.textContent = 'خطا در ارتباط با سرور';
+  } finally {
+    btn.disabled = false; btn.textContent = 'ورود';
+  }
+}
+
+async function doLogout() {
+  try { await api('POST', '/auth/logout'); } catch(e) {}
+  clearToken(); currentUser = null;
+  showLogin();
+}
+
+// ─── Change Password ──────────────────────────────────────────────────────────
+
+function openChangePasswordModal() {
+  document.getElementById('cp-old').value = '';
+  document.getElementById('cp-new').value = '';
+  document.getElementById('cp-error').textContent = '';
+  openModal('modal-change-password');
+}
+
+async function saveChangePassword() {
+  const old_password = document.getElementById('cp-old').value;
+  const new_password = document.getElementById('cp-new').value;
+  if (!old_password || !new_password) {
+    document.getElementById('cp-error').textContent = 'همه فیلدها الزامی است';
+    return;
+  }
+  try {
+    await api('POST', '/auth/change-password', {old_password, new_password});
+    toast('رمز عبور تغییر کرد ✅');
+    closeModal('modal-change-password');
+  } catch(e) {
+    document.getElementById('cp-error').textContent = e.message;
+  }
+}
+
+// ─── User Management Page ─────────────────────────────────────────────────────
+
+async function renderUsers() {
+  const users = await api('GET', '/users');
+  const c = document.getElementById('content');
+  document.getElementById('topbar-actions').innerHTML =
+    `<button class="btn btn-primary" onclick="openUserModal()">➕ کاربر جدید</button>`;
+  c.innerHTML = `
+  <div class="card mb-4">
+    <div class="card-title">📋 لاگ ورود کاربران (آخرین ۲۰۰ مورد)</div>
+    <div id="login-log-section"><div class="spinner"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">👥 مدیریت کاربران</div>
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th>نام کاربری</th><th>نام نمایشی</th><th>نقش</th><th>وضعیت</th><th>آخرین ورود</th><th>عملیات</th>
+      </tr></thead><tbody>
+      ${users.map(u => `<tr>
+        <td class="fw-bold">${u.username}</td>
+        <td>${u.display_name}</td>
+        <td>${roleBadge(u.role)}</td>
+        <td>${u.is_active ? '<span class="badge badge-green">✅ فعال</span>' : '<span class="badge badge-red">🚫 غیرفعال</span>'}</td>
+        <td class="text-sm text-muted num">${u.last_login || '—'}</td>
+        <td><div class="flex-gap">
+          <button class="btn btn-sm btn-secondary" onclick="openUserModal(${u.id})">✏️ ویرایش</button>
+          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id},'${u.username}')">🗑️</button>` : ''}
+        </div></td>
+      </tr>`).join('')}
+      </tbody></table></div>
+  </div>`;
+  loadLoginLogs();
+}
+
+function roleBadge(role) {
+  if (role === 'admin') return '<span class="badge badge-blue">👑 مدیر</span>';
+  if (role === 'operator') return '<span class="badge badge-yellow">✏️ اپراتور</span>';
+  return '<span class="badge" style="background:var(--bg3);color:var(--text2);">👁 بازدیدکننده</span>';
+}
+
+async function loadLoginLogs() {
+  const logs = await api('GET', '/login-logs');
+  const el = document.getElementById('login-log-section');
+  if (!el) return;
+  if (!logs.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">هنوز ورودی ثبت نشده</div></div>'; return; }
+  el.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>تاریخ و ساعت</th><th>نام کاربری</th><th>نام نمایشی</th><th>IP</th></tr></thead>
+    <tbody>${logs.map(l=>`<tr>
+      <td class="num text-sm">${l.logged_in_at}</td>
+      <td class="fw-bold">${l.username}</td>
+      <td>${l.display_name}</td>
+      <td class="text-sm text-muted">${l.ip_address}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+let editUserId = null;
+
+function openUserModal(id=null) {
+  editUserId = id;
+  document.getElementById('modal-user-title').textContent = id ? 'ویرایش کاربر' : 'کاربر جدید';
+  document.getElementById('user-username').value = '';
+  document.getElementById('user-displayname').value = '';
+  document.getElementById('user-password').value = '';
+  document.getElementById('user-role').value = 'viewer';
+  document.getElementById('user-active').checked = true;
+  document.getElementById('user-pass-hint').style.display = id ? 'block' : 'none';
+  document.getElementById('user-username-group').style.display = id ? 'none' : 'flex';
+  if (id) {
+    api('GET', '/users').then(users => {
+      const u = users.find(x => x.id === id);
+      if (!u) return;
+      document.getElementById('user-displayname').value = u.display_name;
+      document.getElementById('user-role').value = u.role;
+      document.getElementById('user-active').checked = u.is_active;
+    });
+  }
+  openModal('modal-user');
+}
+
+async function saveUser() {
+  const body = {
+    display_name: document.getElementById('user-displayname').value.trim(),
+    role: document.getElementById('user-role').value,
+    is_active: document.getElementById('user-active').checked,
+  };
+  const pass = document.getElementById('user-password').value;
+  if (pass) body.password = pass;
+  if (!editUserId) {
+    body.username = document.getElementById('user-username').value.trim();
+    if (!body.username || !pass) { toast('نام کاربری و رمز عبور الزامی است', 'error'); return; }
+  }
+  try {
+    if (editUserId) {
+      await api('PUT', `/users/${editUserId}`, body);
+      toast('کاربر ویرایش شد ✅');
+    } else {
+      await api('POST', '/users', body);
+      toast('کاربر جدید ساخته شد ✅');
+    }
+    closeModal('modal-user');
+    renderPage();
+  } catch(e) {}
+}
+
+async function deleteUser(id, username) {
+  if (!confirm(`آیا از حذف کاربر "${username}" مطمئن هستید؟`)) return;
+  await api('DELETE', `/users/${id}`);
+  toast('کاربر حذف شد 🗑️');
+  renderPage();
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+
+async function initApp() {
+  const token = getToken();
+  if (!token) { showLogin(); return; }
+  try {
+    const r = await fetch(API + '/auth/me', {headers: {'X-Auth-Token': token}});
+    if (!r.ok) { clearToken(); showLogin(); return; }
+    currentUser = await r.json();
+    showApp();
+    navigate('dashboard');
+  } catch(e) {
+    showLogin();
+  }
+}
+
+initApp();
+</script>
+</body>
+</html>

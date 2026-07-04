@@ -1,0 +1,13 @@
+services:
+  warehouse:
+    build: .
+    image: anbar-x-warehouse:latest
+    container_name: warehouse-app
+    ports:
+      - "5000:5000"
+    volumes:
+      # نکته مهم: این خط دیتابیس رو نگه می‌داره
+      # پوشه ./data روی کامپیوتر خودت، به /data داخل کانتینر وصل میشه
+      # یعنی حتی اگه کانتینر رو پاک کنی، فایل warehouse.db همینجا روی دیسک خودت باقی می‌مونه
+      - ./data:/data
+    restart: unless-stopped
