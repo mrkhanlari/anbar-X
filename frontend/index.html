@@ -69,6 +69,8 @@
     right: 0; top: 0; bottom: 0;
     z-index: 100;
     transition: transform .3s;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
   .sidebar-logo {
     padding: 28px 20px 20px;
@@ -522,45 +524,54 @@
       <div class="logo-sub">سیستم مدیریت انبار</div>
     </div>
   </div>
-  <div class="nav-section">
-    <div class="nav-label">منو اصلی</div>
-    <div class="nav-item active" onclick="navigate('dashboard')">
-      <span class="icon">📊</span> داشبورد
+  <div style="flex:1;overflow-y:auto;overflow-x:hidden;">
+    <div class="nav-section">
+      <div class="nav-label">منو اصلی</div>
+      <div class="nav-item active" onclick="navigate('dashboard')">
+        <span class="icon">📊</span> داشبورد
+      </div>
+      <div class="nav-item" onclick="navigate('warehouses')">
+        <span class="icon">🏭</span> انبارها
+      </div>
+      <div class="nav-item" onclick="navigate('products')">
+        <span class="icon">📦</span> همه کالاها
+      </div>
+      <div class="nav-item" onclick="navigate('departments')">
+        <span class="icon">🏥</span> بخش‌ها
+      </div>
+      <div class="nav-item nav-operator-only" onclick="navigate('dispatch')" style="display:none;">
+        <span class="icon">🚚</span> خروج رسمی
+      </div>
     </div>
-    <div class="nav-item" onclick="navigate('warehouses')">
-      <span class="icon">🏭</span> انبارها
+    <div class="separator"></div>
+    <div class="nav-section">
+      <div class="nav-label">گزارشات</div>
+      <div class="nav-item" onclick="navigate('transactions')">
+        <span class="icon">🔄</span> تراکنش‌ها
+      </div>
+      <div class="nav-item" onclick="navigate('dept_report')">
+        <span class="icon">📊</span> گزارش بخش‌ها
+      </div>
+      <div class="nav-item" onclick="navigate('report')">
+        <span class="icon">📋</span> گزارش موجودی
+      </div>
     </div>
-    <div class="nav-item" onclick="navigate('products')">
-      <span class="icon">📦</span> همه کالاها
+    <div class="separator"></div>
+    <div class="nav-section">
+      <div class="nav-label">مدیریت</div>
+      <div class="nav-item nav-admin-only" onclick="navigate('users')" style="display:none;">
+        <span class="icon">👥</span> کاربران
+      </div>
+      <div class="nav-item" onclick="openChangePasswordModal()">
+        <span class="icon">🔑</span> تغییر رمز
+      </div>
+      <div class="nav-item" onclick="doLogout()" style="color:var(--red);">
+        <span class="icon">🚪</span> خروج
+      </div>
     </div>
   </div>
-  <div class="separator"></div>
-  <div class="nav-section">
-    <div class="nav-label">گزارشات</div>
-    <div class="nav-item" onclick="navigate('transactions')">
-      <span class="icon">🔄</span> تراکنش‌ها
-    </div>
-    <div class="nav-item" onclick="navigate('report')">
-      <span class="icon">📋</span> گزارش موجودی
-    </div>
-  </div>
-  <div class="separator"></div>
-  <div class="nav-section">
-    <div class="nav-label">مدیریت</div>
-    <div class="nav-item nav-admin-only" onclick="navigate('users')" style="display:none;">
-      <span class="icon">👥</span> کاربران
-    </div>
-    <div class="nav-item" onclick="openChangePasswordModal()">
-      <span class="icon">🔑</span> تغییر رمز
-    </div>
-    <div class="nav-item" onclick="doLogout()" style="color:var(--red);">
-      <span class="icon">🚪</span> خروج
-    </div>
-  </div>
-  <div style="padding:12px 16px;border-top:1px solid var(--border);">
-    <div id="user-badge" style="font-size:13px;display:flex;flex-direction:column;gap:4px;"></div>
-  </div>
-  <div class="sidebar-footer">نسخه ۲.۰.۰</div>
+  <div id="user-badge" style="display:none;"></div>
+  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۱.۰</div>
 </nav>
 
 <!-- Main -->
@@ -691,6 +702,30 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-product')">انصراف</button>
       <button class="btn btn-primary" onclick="saveProduct()">💾 ذخیره</button>
+    </div>
+  </div>
+</div>
+
+<!-- Department Modal -->
+<div class="modal-overlay" id="modal-dept">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-title">
+      <span id="modal-dept-title">بخش جدید</span>
+      <button class="modal-close" onclick="closeModal('modal-dept')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>نام بخش *</label>
+        <input id="dept-name" placeholder="مثلاً: رادیولوژی"/>
+      </div>
+      <div class="form-group full">
+        <label>توضیحات</label>
+        <textarea id="dept-desc" placeholder="توضیح اختیاری..." style="min-height:70px;"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-dept')">انصراف</button>
+      <button class="btn btn-primary" onclick="saveDept()">💾 ذخیره</button>
     </div>
   </div>
 </div>
@@ -894,6 +929,7 @@ function navigate(page, params={}) {
         dashboard: 'داشبورد', warehouses: 'انبارها',
         products: 'همه کالاها', transactions: 'تراکنش‌ها', report: 'گزارش موجودی',
         warehouse_detail: 'انبارها', users: 'کاربران',
+        departments: 'بخش‌ها', dispatch: 'خروج رسمی', dept_report: 'گزارش بخش‌ها',
       }[page]);
   });
   closeSidebar();
@@ -961,6 +997,7 @@ async function renderPage() {
     dashboard: 'داشبورد', warehouses: 'مدیریت انبارها',
     products: 'همه کالاها', transactions: 'تراکنش‌ها', report: 'گزارش موجودی',
     warehouse_detail: '', users: 'مدیریت کاربران',
+    departments: 'مدیریت بخش‌ها', dispatch: 'خروج رسمی کالا', dept_report: 'گزارش بخش‌ها',
   };
   document.getElementById('page-title').textContent = titles[state.page] || '';
 
@@ -972,6 +1009,9 @@ async function renderPage() {
     else if (state.page === 'transactions')     await renderTransactions();
     else if (state.page === 'report')           await renderReport();
     else if (state.page === 'users')            await renderUsers();
+    else if (state.page === 'departments')      await renderDepartments();
+    else if (state.page === 'dispatch')         await renderDispatch();
+    else if (state.page === 'dept_report')      await renderDeptReport();
   } catch(e) {
     c.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">خطا در بارگذاری</div><div class="empty-sub">${e.message}</div></div>`;
   }
@@ -1698,7 +1738,273 @@ function toggleTheme() {
   applyTheme(saved, false);
 })();
 
+
+// ─── Departments Page ─────────────────────────────────────────────────────────
+
+async function renderDepartments() {
+  const depts = await api('GET', '/departments');
+  const c = document.getElementById('content');
+  document.getElementById('topbar-actions').innerHTML =
+    window._isViewer ? '' : '<button class="btn btn-primary" onclick="openDeptModal()">➕ بخش جدید</button>';
+
+  if (!depts.length) {
+    c.innerHTML = '<div class="empty"><div class="empty-icon">🏥</div><div class="empty-text">هنوز بخشی تعریف نشده</div><br><button class="btn btn-primary" onclick="openDeptModal()">➕ بخش جدید</button></div>';
+    return;
+  }
+
+  c.innerHTML = '<div class="card"><div class="card-title">🏥 بخش‌های تعریف شده</div><div class="table-wrap"><table><thead><tr><th>نام بخش</th><th>توضیحات</th><th>تاریخ ثبت</th><th>عملیات</th></tr></thead><tbody>' +
+    depts.map(d => '<tr><td class="fw-bold">' + d.name + '</td><td class="text-muted">' + (d.description || '—') + '</td><td class="text-sm num">' + d.created_at + '</td><td><div class="flex-gap">' +
+      (window._isViewer ? '' : '<button class="btn btn-sm btn-secondary" onclick="openDeptModal(' + d.id + ')">✏️</button>') +
+      (window._isViewer ? '' : '<button class="btn btn-sm btn-danger" onclick="deleteDept(' + d.id + ',\''+d.name+'\')">🗑️</button>') +
+      '</div></td></tr>').join('') +
+    '</tbody></table></div></div>';
+}
+
+let editDeptId = null;
+
+function openDeptModal(id = null) {
+  editDeptId = id;
+  document.getElementById('modal-dept-title').textContent = id ? 'ویرایش بخش' : 'بخش جدید';
+  document.getElementById('dept-name').value = '';
+  document.getElementById('dept-desc').value = '';
+  if (id) {
+    api('GET', '/departments').then(depts => {
+      const d = depts.find(x => x.id === id);
+      if (!d) return;
+      document.getElementById('dept-name').value = d.name;
+      document.getElementById('dept-desc').value = d.description || '';
+    });
+  }
+  openModal('modal-dept');
+}
+
+async function saveDept() {
+  const name = document.getElementById('dept-name').value.trim();
+  if (!name) { toast('نام بخش الزامی است', 'error'); return; }
+  const body = { name, description: document.getElementById('dept-desc').value };
+  if (editDeptId) {
+    await api('PUT', '/departments/' + editDeptId, body);
+    toast('بخش ویرایش شد ✏️');
+  } else {
+    await api('POST', '/departments', body);
+    toast('بخش جدید ثبت شد 🏥');
+  }
+  closeModal('modal-dept');
+  renderPage();
+}
+
+async function deleteDept(id, name) {
+  if (!confirm('آیا از حذف بخش "' + name + '" مطمئن هستید؟')) return;
+  await api('DELETE', '/departments/' + id);
+  toast('بخش حذف شد 🗑️');
+  renderPage();
+}
+
+
+// ─── Dispatch Page (خروج رسمی) ───────────────────────────────────────────────
+
+async function renderDispatch() {
+  const [whs, depts] = await Promise.all([
+    api('GET', '/warehouses'),
+    api('GET', '/departments'),
+  ]);
+  state.warehouses = whs;
+  const c = document.getElementById('content');
+
+  if (!depts.length) {
+    c.innerHTML = '<div class="empty"><div class="empty-icon">🏥</div><div class="empty-text">ابتدا بخش‌ها را تعریف کنید</div><br><button class="btn btn-primary" onclick="navigate(\'departments\')">رفتن به بخش‌ها</button></div>';
+    return;
+  }
+
+  c.innerHTML = '<div class="card" style="max-width:600px;margin:0 auto;">' +
+    '<div class="card-title">🚚 خروج رسمی کالا</div>' +
+    '<div class="form-grid">' +
+      '<div class="form-group full"><label>انبار *</label>' +
+        '<select id="disp-wh" onchange="loadDispatchProducts()">' +
+          '<option value="">انتخاب انبار...</option>' +
+          whs.map(w => '<option value="' + w.id + '">' + w.name + '</option>').join('') +
+        '</select></div>' +
+      '<div class="form-group full"><label>کالا *</label>' +
+        '<select id="disp-prod"><option value="">ابتدا انبار را انتخاب کنید</option></select>' +
+        '<span id="disp-stock" style="font-size:12px;color:var(--text2);margin-top:4px;"></span></div>' +
+      '<div class="form-group"><label>تعداد خروجی *</label>' +
+        '<input id="disp-qty" type="number" min="0" step="1" value="1" placeholder="1" oninput="updateDispatchPreview()"/></div>' +
+      '<div class="form-group"><label>بخش مقصد *</label>' +
+        '<select id="disp-dept"><option value="">انتخاب بخش...</option>' +
+          depts.map(d => '<option value="' + d.id + '">' + d.name + '</option>').join('') +
+        '</select></div>' +
+      '<div class="form-group full"><label>توضیحات</label>' +
+        '<textarea id="disp-note" placeholder="مثلاً: تحویل برای مصرف ماهانه..."></textarea></div>' +
+      '<div class="form-group full" id="disp-preview" style="display:none;">' +
+        '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;font-size:14px;" id="disp-preview-content"></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="modal-footer" style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">' +
+      '<button class="btn btn-secondary" onclick="navigate(\'dashboard\')">انصراف</button>' +
+      '<button class="btn btn-primary" onclick="submitDispatch()">✅ ثبت خروج رسمی</button>' +
+    '</div>' +
+  '</div>';
+
+  document.getElementById('disp-prod').addEventListener('change', updateDispatchPreview);
+  document.getElementById('disp-dept').addEventListener('change', updateDispatchPreview);
+}
+
+async function loadDispatchProducts() {
+  const whId = document.getElementById('disp-wh').value;
+  const sel = document.getElementById('disp-prod');
+  const stockEl = document.getElementById('disp-stock');
+  sel.innerHTML = '<option value="">در حال بارگذاری...</option>';
+  if (!whId) { sel.innerHTML = '<option value="">ابتدا انبار را انتخاب کنید</option>'; return; }
+  const allProds = await api('GET', '/warehouses/' + whId + '/products');
+  const prods = allProds.filter(p => p.quantity > 0);
+  if (!prods.length) {
+    sel.innerHTML = '<option value="">موجودی موجود نیست</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">انتخاب کالا...</option>' +
+    prods.map(p => '<option value="' + p.id + '" data-qty="' + p.quantity + '" data-unit="' + p.unit + '">' +
+      p.name + (p.sku ? ' (' + p.sku + ')' : '') + ' — موجودی: ' + fmt(p.quantity) + ' ' + p.unit +
+      '</option>').join('');
+  stockEl.textContent = '';
+  sel.addEventListener('change', function() {
+    const opt = sel.options[sel.selectedIndex];
+    stockEl.textContent = opt.value ? 'موجودی فعلی: ' + fmt(opt.dataset.qty) + ' ' + opt.dataset.unit : '';
+    updateDispatchPreview();
+  });
+}
+
+function updateDispatchPreview() {
+  const prodSel = document.getElementById('disp-prod');
+  const deptSel = document.getElementById('disp-dept');
+  const qty = parseFloat(document.getElementById('disp-qty').value) || 0;
+  const prevEl = document.getElementById('disp-preview');
+  const prevContent = document.getElementById('disp-preview-content');
+  const opt = prodSel.options[prodSel.selectedIndex];
+  const deptOpt = deptSel.options[deptSel.selectedIndex];
+
+  if (!opt || !opt.value || !deptOpt || !deptOpt.value || qty <= 0) {
+    prevEl.style.display = 'none';
+    return;
+  }
+
+  const currentQty = parseFloat(opt.dataset.qty) || 0;
+  const afterQty = currentQty - qty;
+  const unit = opt.dataset.unit || '';
+  prevEl.style.display = 'block';
+  prevContent.innerHTML =
+    '<div style="display:flex;justify-content:space-between;margin-bottom:8px;">' +
+      '<span>📦 ' + opt.text.split('—')[0].trim() + '</span>' +
+      '<span class="fw-bold">→ 🏥 ' + deptOpt.text + '</span>' +
+    '</div>' +
+    '<div style="display:flex;gap:16px;font-size:13px;">' +
+      '<span>موجودی قبل: <b>' + fmt(currentQty) + ' ' + unit + '</b></span>' +
+      '<span>خروج: <b style="color:var(--red)">- ' + fmt(qty) + ' ' + unit + '</b></span>' +
+      '<span>موجودی بعد: <b style="color:' + (afterQty < 0 ? 'var(--red)' : 'var(--green)') + '">' + fmt(afterQty) + ' ' + unit + '</b></span>' +
+    '</div>' +
+    (afterQty < 0 ? '<div style="color:var(--red);margin-top:8px;font-size:13px;">⚠️ موجودی کافی نیست!</div>' : '');
+}
+
+async function submitDispatch() {
+  const prodId  = document.getElementById('disp-prod').value;
+  const deptId  = document.getElementById('disp-dept').value;
+  const qty     = parseFloat(document.getElementById('disp-qty').value);
+  const note    = document.getElementById('disp-note').value.trim();
+  if (!prodId)   { toast('کالا را انتخاب کنید', 'error'); return; }
+  if (!deptId)   { toast('بخش مقصد را انتخاب کنید', 'error'); return; }
+  if (!qty || qty <= 0) { toast('تعداد را وارد کنید', 'error'); return; }
+  try {
+    await api('POST', '/dispatch', { product_id: parseInt(prodId), department_id: parseInt(deptId), quantity: qty, note });
+    toast('خروج رسمی ثبت شد ✅');
+    navigate('dispatch');
+  } catch(e) {}
+}
+
+
+// ─── Department Report Page ───────────────────────────────────────────────────
+
+async function renderDeptReport() {
+  const [depts, whs] = await Promise.all([
+    api('GET', '/departments'),
+    api('GET', '/warehouses'),
+  ]);
+  state.warehouses = whs;
+  const c = document.getElementById('content');
+
+  c.innerHTML = '<div class="card mb-4"><div class="flex-gap" style="flex-wrap:wrap;gap:12px;">' +
+    '<div><label class="fw-bold" style="margin-left:6px;">بخش:</label>' +
+      '<select id="dr-dept" onchange="loadDeptReport()" style="width:180px;"><option value="">همه بخش‌ها</option>' +
+        depts.map(d => '<option value="' + d.id + '">' + d.name + '</option>').join('') +
+      '</select></div>' +
+    '<div><label class="fw-bold" style="margin-left:6px;">کالا:</label>' +
+      '<input id="dr-prod" placeholder="جستجوی نام کالا..." oninput="loadDeptReport()" style="width:180px;"/></div>' +
+    '<div><label class="fw-bold" style="margin-left:6px;">انبار:</label>' +
+      '<select id="dr-wh" onchange="loadDeptReport()" style="width:160px;"><option value="">همه انبارها</option>' +
+        whs.map(w => '<option value="' + w.id + '">' + w.name + '</option>').join('') +
+      '</select></div>' +
+    '<button class="btn btn-secondary" onclick="loadDeptReport()">🔄 بروزرسانی</button>' +
+    '</div></div>' +
+    '<div id="dr-results"><div class="spinner"></div></div>';
+
+  loadDeptReport();
+}
+
+async function loadDeptReport() {
+  const deptId = (document.getElementById('dr-dept') || {}).value || '';
+  const prodSearch = (document.getElementById('dr-prod') || {}).value || '';
+  const whId = (document.getElementById('dr-wh') || {}).value || '';
+  const params = new URLSearchParams({ type: 'out' });
+  if (deptId) params.set('department_id', deptId);
+  if (prodSearch) params.set('search', prodSearch);
+  if (whId) params.set('warehouse_id', whId);
+  const txs = await api('GET', '/transactions?' + params.toString());
+  const el = document.getElementById('dr-results');
+  if (!el) return;
+  if (!txs.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">هیچ خروجی یافت نشد</div></div>';
+    return;
+  }
+  const total = txs.reduce((s, t) => s + t.quantity, 0);
+  el.innerHTML = '<div class="card">' +
+    '<div class="flex-between mb-4"><div class="card-title" style="margin:0">📊 خروجی‌ها — ' + txs.length + ' مورد</div>' +
+    '<div class="text-sm text-muted">مجموع: <b>' + fmt(total) + '</b></div></div>' +
+    '<div class="table-wrap"><table><thead><tr>' +
+      '<th>تاریخ</th><th>کالا</th><th>انبار</th><th>بخش مقصد</th><th>تعداد</th><th>ثبت‌کننده</th><th>علت</th>' +
+    '</tr></thead><tbody>' +
+    txs.map((t, i) =>
+      '<tr><td class="num text-sm text-muted" style="white-space:nowrap">' + t.created_at + '</td>' +
+      '<td class="fw-bold">' + t.product_name + '</td>' +
+      '<td class="text-muted">' + t.warehouse_name + '</td>' +
+      '<td>' + (t.department_name ? '<span class="badge badge-blue">' + t.department_name + '</span>' : '—') + '</td>' +
+      '<td class="num fw-bold val-red">- ' + fmt(t.quantity) + '</td>' +
+      '<td class="text-sm">' + (t.created_by || '—') + '</td>' +
+      '<td>' + (t.note ? '<span style="display:flex;align-items:center;gap:6px;"><button class="btn btn-sm btn-secondary" data-note="' + t.note.replace(/"/g,"&quot;") + '" onclick="toggleNote(this)">💬 علت</button><span class="note-text" style="display:none;font-size:12px;color:var(--text2);"></span></span>' : '<span class="text-muted">—</span>') + '</td>' +
+      '</tr>'
+    ).join('') +
+    '</tbody></table></div></div>';
+}
+
+function showNote(idx, note) {
+  // legacy - kept for compatibility
+}
+
+function toggleNote(btn) {
+  const note = btn.getAttribute('data-note');
+  const span = btn.nextElementSibling;
+  if (!span) return;
+  if (span.style.display === 'none' || span.style.display === '') {
+    span.textContent = note || '—';
+    span.style.display = 'inline';
+    btn.textContent = '💬 بستن';
+    btn.style.background = 'rgba(59,130,246,.2)';
+  } else {
+    span.style.display = 'none';
+    btn.textContent = '💬 علت';
+    btn.style.background = '';
+  }
+}
+
 // ─── Login / Logout ──────────────────────────────────────────────────────────
+
 
 function showLogin() {
   document.getElementById('sidebar').style.display = 'none';
@@ -1718,6 +2024,10 @@ function showApp() {
   const adminOnly = document.querySelectorAll('.nav-admin-only');
   adminOnly.forEach(el => {
     el.style.display = currentUser && currentUser.role === 'admin' ? 'flex' : 'none';
+  });
+  const operatorOnly = document.querySelectorAll('.nav-operator-only');
+  operatorOnly.forEach(el => {
+    el.style.display = currentUser && currentUser.role !== 'viewer' ? 'flex' : 'none';
   });
   window._isViewer = currentUser && currentUser.role === 'viewer';
 }
