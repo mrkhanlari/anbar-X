@@ -743,13 +743,12 @@ def inventory_report():
 def migrate():
     """اضافه کردن ستون‌های جدید به دیتابیس قدیمی"""
     with db.engine.connect() as conn:
-        # department_id به transactions
         try:
             conn.execute(db.text('ALTER TABLE transactions ADD COLUMN department_id INTEGER REFERENCES departments(id)'))
             conn.commit()
             print('[MIGRATE] department_id added to transactions')
         except Exception:
-            pass  # قبلاً اضافه شده
+            pass
 
 def init_admin():
     if User.query.count() == 0:
@@ -761,10 +760,95 @@ def init_admin():
         db.session.commit()
         print(f'[INIT] admin created: {admin_user} / {admin_pass}')
 
+def cleanup_sessions():
+    """حذف session های منقضی‌شده"""
+    try:
+        deleted = Session.query.filter(Session.expires_at < now_tehran()).delete()
+        db.session.commit()
+        if deleted:
+            print(f'[CLEANUP] {deleted} expired sessions removed')
+    except Exception as e:
+        print(f'[CLEANUP] error: {e}')
+        db.session.rollback()
+
+def auto_backup():
+    import shutil
+    backup_dir = os.path.join(data_dir, 'backups')
+    os.makedirs(backup_dir, exist_ok=True)
+    db_path = os.path.join(data_dir, 'warehouse.db')
+    if not os.path.exists(db_path):
+        return
+    today = jdatetime.date.today().strftime('%Y-%m-%d')
+    backup_path = os.path.join(backup_dir, f'warehouse_{today}.db')
+    if not os.path.exists(backup_path):
+        shutil.copy2(db_path, backup_path)
+        print(f'[BACKUP] created: warehouse_{today}.db')
+        backups = sorted([
+            f for f in os.listdir(backup_dir)
+            if f.startswith('warehouse_') and f.endswith('.db')
+        ])
+        for bk in backups[:-30]:
+            os.remove(os.path.join(backup_dir, bk))
+            print(f'[BACKUP] removed old: {bk}')
+
+def start_daily_scheduler():
+    import threading, time
+    def loop():
+        while True:
+            now = now_tehran()
+            next_run = now.replace(hour=2, minute=0, second=0, microsecond=0)
+            if now >= next_run:
+                next_run = next_run + timedelta(days=1)
+            wait = (next_run - now).total_seconds()
+            print(f'[SCHEDULER] next run in {int(wait/3600)}h {int((wait%3600)/60)}m')
+            time.sleep(wait)
+            with app.app_context():
+                cleanup_sessions()
+                auto_backup()
+    t = threading.Thread(target=loop, daemon=True)
+    t.start()
+    print('[SCHEDULER] daily maintenance started')
+
+# ─── Error Handlers ────────────────────────────────────────────────────────────
+
+@app.errorhandler(401)
+def unauthorized(e):
+    return jsonify({'error': 'لاگین نشدید', 'code': 'UNAUTHORIZED'}), 401
+
+@app.errorhandler(403)
+def forbidden(e):
+    return jsonify({'error': 'دسترسی ندارید', 'code': 'FORBIDDEN'}), 403
+
+@app.errorhandler(404)
+def not_found(e):
+    # اگه API بود JSON برگردون، وگرنه index.html
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'یافت نشد'}), 404
+    return send_from_directory(frontend_dir, 'index.html')
+
+@app.errorhandler(500)
+def server_error(e):
+    db.session.rollback()
+    print(f'[ERROR 500] {request.path}: {e}')
+    return jsonify({'error': 'خطای سرور، لطفاً دوباره امتحان کنید'}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    db.session.rollback()
+    print(f'[UNHANDLED] {request.path}: {type(e).__name__}: {e}')
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'خطای داخلی سرور'}), 500
+    return send_from_directory(frontend_dir, 'index.html')
+
+# ─── Startup ────────────────────────────────────────────────────────────────────
+
 with app.app_context():
     db.create_all()
     migrate()
     init_admin()
+    cleanup_sessions()
+    auto_backup()
+    start_daily_scheduler()
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
