@@ -758,7 +758,7 @@ def init_admin():
         u.set_password(admin_pass)
         db.session.add(u)
         db.session.commit()
-        print(f'[INIT] admin created: {admin_user} / {admin_pass}')
+        print(f'[INIT] admin user created: {admin_user}')
 
 def cleanup_sessions():
     """حذف session های منقضی‌شده"""

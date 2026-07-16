@@ -512,6 +512,7 @@
   .num { font-variant-numeric: tabular-nums; }
 
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -571,7 +572,7 @@
     </div>
   </div>
   <div id="user-badge" style="display:none;"></div>
-  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۱.۰</div>
+  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۲.۰</div>
 </nav>
 
 <!-- Main -->
@@ -1337,6 +1338,7 @@ async function renderReport() {
         <option value="out">🚫 ناموجود</option>
       </select>
       <button class="btn btn-secondary" onclick="printReport()">🖨️ چاپ</button>
+      <button class="btn btn-secondary" onclick="exportInventoryExcel()">📥 Excel</button>
     </div>
   </div>
   <div id="report-content"><div class="spinner"></div></div>`;
@@ -1942,6 +1944,7 @@ async function renderDeptReport() {
         whs.map(w => '<option value="' + w.id + '">' + w.name + '</option>').join('') +
       '</select></div>' +
     '<button class="btn btn-secondary" onclick="loadDeptReport()">🔄 بروزرسانی</button>' +
+    '<button class="btn btn-secondary" onclick="exportDeptExcel()">📥 Excel</button>' +
     '</div></div>' +
     '<div id="dr-results"><div class="spinner"></div></div>';
 
@@ -2223,6 +2226,97 @@ async function deleteUser(id, username) {
 }
 
 // ─── Init ────────────────────────────────────────────────────────────────────
+
+
+// ─── Excel Export ─────────────────────────────────────────────────────────────
+
+function downloadExcel(rows, headers, filename) {
+  if (!window.XLSX) { toast('کتابخانه Excel بارگذاری نشده', 'error'); return; }
+  const ws = XLSX.utils.json_to_sheet(rows, { header: Object.keys(headers) });
+  // تغییر header های انگلیسی به فارسی
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  Object.keys(headers).forEach((key, i) => {
+    const cell = XLSX.utils.encode_cell({ r: 0, c: i });
+    if (ws[cell]) ws[cell].v = headers[key];
+  });
+  // عرض ستون‌ها
+  ws['!cols'] = Object.keys(headers).map(() => ({ wch: 20 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  XLSX.writeFile(wb, filename + '.xlsx');
+}
+
+async function exportInventoryExcel() {
+  const wid    = (document.getElementById('rep-wh')     || {}).value || '';
+  const status = (document.getElementById('rep-status') || {}).value || '';
+  const params = new URLSearchParams();
+  if (wid)    params.set('warehouse_id', wid);
+  if (status) params.set('status', status);
+  const d = await api('GET', `/report/inventory?${params}`);
+  if (!d || !d.products.length) { toast('داده‌ای برای خروجی وجود ندارد', 'error'); return; }
+
+  const statusLabel = { normal: 'موجود', low: 'کم‌موجود', out: 'ناموجود' };
+  const rows = d.products.map(p => ({
+    name:       p.name,
+    sku:        p.sku || '',
+    category:   p.category || '',
+    quantity:   p.quantity,
+    unit:       p.unit,
+    unit_price: p.unit_price || 0,
+    total_value: p.total_value || 0,
+    min_stock:  p.min_stock || 0,
+    status:     statusLabel[p.status] || '',
+    updated_at: p.updated_at,
+  }));
+
+  const headers = {
+    name: 'نام کالا', sku: 'کد SKU', category: 'دسته‌بندی',
+    quantity: 'موجودی', unit: 'واحد',
+    unit_price: 'قیمت واحد (ریال)', total_value: 'ارزش کل (ریال)',
+    min_stock: 'حداقل موجودی', status: 'وضعیت', updated_at: 'آخرین بروزرسانی',
+  };
+
+  const now = new Date().toLocaleDateString('fa-IR-u-nu-latn').replace(/\//g, '-');
+  downloadExcel(rows, headers, `گزارش-موجودی-${now}`);
+  toast('فایل Excel دانلود شد 📥');
+}
+
+async function exportDeptExcel() {
+  const deptId  = (document.getElementById('dr-dept') || {}).value || '';
+  const product = (document.getElementById('dr-prod') || {}).value || '';
+  const whId    = (document.getElementById('dr-wh')   || {}).value || '';
+  const params  = new URLSearchParams();
+  if (deptId)  params.set('department_id', deptId);
+  if (product) params.set('product', product);
+  if (whId)    params.set('warehouse_id', whId);
+  const d = await api('GET', `/dispatch/report?${params}`);
+  if (!d || !d.transactions.length) { toast('داده‌ای برای خروجی وجود ندارد', 'error'); return; }
+
+  const typeLabel = { in: 'ورود', out: 'خروج', adjust: 'تنظیم' };
+  const rows = d.transactions.map(t => ({
+    date:        t.created_at,
+    product:     t.product_name,
+    warehouse:   t.warehouse_name,
+    department:  t.department_name || '',
+    quantity:    t.quantity,
+    before:      t.before_qty,
+    after:       t.after_qty,
+    note:        t.note || '',
+    created_by:  t.created_by,
+    ref:         t.ref_number || '',
+  }));
+
+  const headers = {
+    date: 'تاریخ', product: 'نام کالا', warehouse: 'انبار',
+    department: 'بخش', quantity: 'مقدار خروج',
+    before: 'موجودی قبل', after: 'موجودی بعد',
+    note: 'توضیحات', created_by: 'ثبت‌کننده', ref: 'شماره مرجع',
+  };
+
+  const now = new Date().toLocaleDateString('fa-IR-u-nu-latn').replace(/\//g, '-');
+  downloadExcel(rows, headers, `گزارش-بخش‌ها-${now}`);
+  toast('فایل Excel دانلود شد 📥');
+}
 
 async function initApp() {
   const token = getToken();
