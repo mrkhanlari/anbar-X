@@ -1,0 +1,7 @@
+ با DB Browser (برای حذف کامل)
+۱. برنامه رو خاموش کن: docker compose down
+۲. DB Browser for SQLite رو باز کن
+۳. فایل data/warehouse.db رو باز کن
+۴. تب Browse Data → جدول مورد نظر رو انتخاب کن
+۵. ردیف رو انتخاب کن → کلید Delete → Write Changes
+۶. برنامه رو دوباره روشن کن: docker compose up -d

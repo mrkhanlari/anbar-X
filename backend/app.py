@@ -194,6 +194,8 @@ class Transaction(db.Model):
     ref_number    = db.Column(db.String(100))
     created_at    = db.Column(db.DateTime, default=now_tehran, index=True)
     created_by    = db.Column(db.String(100), default='کاربر')
+    is_reversed   = db.Column(db.Boolean, default=False, index=True)
+    reversed_by_id= db.Column(db.Integer, db.ForeignKey('transactions.id'), nullable=True)
     department    = db.relationship('Department', backref='transactions')
 
     def to_dict(self):
@@ -213,6 +215,9 @@ class Transaction(db.Model):
             'ref_number': self.ref_number or '',
             'created_at': jdt.strftime('%Y/%m/%d %H:%M'),
             'created_by': self.created_by,
+            'is_reversed': self.is_reversed or False,
+            'reversed_by_id': self.reversed_by_id,
+            'unit_name': self.product.unit if self.product else '',
         }
 
 
@@ -659,6 +664,48 @@ def create_dispatch():
     db.session.commit()
     return jsonify({'transaction': tx.to_dict(), 'product': product.to_dict()}), 201
 
+@app.route('/api/dispatch/<int:tx_id>/reverse', methods=['POST'])
+@require_auth('operator')
+def reverse_dispatch(tx_id):
+    user = get_current_user()
+    tx = Transaction.query.get_or_404(tx_id)
+
+    if tx.type != 'out' or tx.department_id is None:
+        return jsonify({'error': 'فقط خروج رسمی قابل بازگشت است'}), 400
+    if tx.is_reversed:
+        return jsonify({'error': 'این تراکنش قبلاً بازگشت خورده'}), 400
+
+    product = Product.query.get_or_404(tx.product_id)
+
+    # ثبت تراکنش بازگشت
+    before = product.quantity
+    product.quantity += tx.quantity
+    product.updated_at = now_tehran()
+
+    reverse_tx = Transaction(
+        product_id    = tx.product_id,
+        department_id = tx.department_id,
+        type          = 'in',
+        quantity      = tx.quantity,
+        before_qty    = before,
+        after_qty     = product.quantity,
+        note          = f'بازگشت خروج رسمی (شناسه تراکنش: {tx_id})',
+        created_by    = user.display_name or user.username,
+        reversed_by_id= tx_id,
+    )
+    db.session.add(reverse_tx)
+
+    # علامت‌گذاری تراکنش اصلی
+    tx.is_reversed = True
+    db.session.commit()
+
+    return jsonify({
+        'ok': True,
+        'reverse_transaction': reverse_tx.to_dict(),
+        'product': product.to_dict(),
+    })
+
+
 @app.route('/api/dispatch/report', methods=['GET'])
 @require_auth()
 def dispatch_report():
@@ -743,12 +790,17 @@ def inventory_report():
 def migrate():
     """اضافه کردن ستون‌های جدید به دیتابیس قدیمی"""
     with db.engine.connect() as conn:
-        try:
-            conn.execute(db.text('ALTER TABLE transactions ADD COLUMN department_id INTEGER REFERENCES departments(id)'))
-            conn.commit()
-            print('[MIGRATE] department_id added to transactions')
-        except Exception:
-            pass
+        for sql, msg in [
+            ('ALTER TABLE transactions ADD COLUMN department_id INTEGER REFERENCES departments(id)', 'department_id'),
+            ('ALTER TABLE transactions ADD COLUMN is_reversed BOOLEAN DEFAULT 0', 'is_reversed'),
+            ('ALTER TABLE transactions ADD COLUMN reversed_by_id INTEGER', 'reversed_by_id'),
+        ]:
+            try:
+                conn.execute(db.text(sql))
+                conn.commit()
+                print(f'[MIGRATE] {msg} added to transactions')
+            except Exception:
+                pass  # قبلاً اضافه شده
 
 def init_admin():
     if User.query.count() == 0:

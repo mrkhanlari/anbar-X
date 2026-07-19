@@ -512,7 +512,7 @@
   .num { font-variant-numeric: tabular-nums; }
 
 </style>
-<script src="/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -613,6 +613,21 @@
 
 <!-- Toast Container -->
 <div id="toast-container"></div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-title">
+      <span id="confirm-title">تأیید عملیات</span>
+      <button class="modal-close" onclick="closeModal('modal-confirm')">✕</button>
+    </div>
+    <p id="confirm-message" style="color:var(--text2);line-height:1.8;margin-bottom:8px;"></p>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-confirm')">انصراف</button>
+      <button class="btn btn-danger" id="confirm-ok-btn" onclick="confirmAction()">تأیید</button>
+    </div>
+  </div>
+</div>
 
 <!-- ─── Modals ─────────────────────────────────────────────────────── -->
 
@@ -1971,7 +1986,7 @@ async function loadDeptReport() {
     '<div class="flex-between mb-4"><div class="card-title" style="margin:0">📊 خروجی‌ها — ' + txs.length + ' مورد</div>' +
     '<div class="text-sm text-muted">مجموع: <b>' + fmt(total) + '</b></div></div>' +
     '<div class="table-wrap"><table><thead><tr>' +
-      '<th>تاریخ</th><th>کالا</th><th>انبار</th><th>بخش مقصد</th><th>تعداد</th><th>ثبت‌کننده</th><th>علت</th>' +
+      '<th>تاریخ</th><th>کالا</th><th>انبار</th><th>بخش مقصد</th><th>تعداد</th><th>ثبت‌کننده</th><th>علت</th><th>عملیات</th>' +
     '</tr></thead><tbody>' +
     txs.map((t, i) =>
       '<tr><td class="num text-sm text-muted" style="white-space:nowrap">' + t.created_at + '</td>' +
@@ -1981,6 +1996,10 @@ async function loadDeptReport() {
       '<td class="num fw-bold val-red">- ' + fmt(t.quantity) + '</td>' +
       '<td class="text-sm">' + (t.created_by || '—') + '</td>' +
       '<td>' + (t.note ? '<span style="display:flex;align-items:center;gap:6px;"><button class="btn btn-sm btn-secondary" data-note="' + t.note.replace(/"/g,"&quot;") + '" onclick="toggleNote(this)">💬 علت</button><span class="note-text" style="display:none;font-size:12px;color:var(--text2);"></span></span>' : '<span class="text-muted">—</span>') + '</td>' +
+      '<td>' + (t.is_reversed
+        ? '<span class="badge badge-yellow">↩️ بازگشت‌خورده</span>'
+        : (!window._isViewer ? '<button class="btn btn-sm btn-danger" onclick="reverseDispatch(' + t.id + ',\''+t.product_name+'\',\''+t.department_name+'\','+t.quantity+',\''+t.unit_name+'\')" title="بازگشت این خروج">↩️ بازگشت</button>' : '')
+      ) + '</td>' +
       '</tr>'
     ).join('') +
     '</tbody></table></div></div>';
@@ -2316,6 +2335,44 @@ async function exportDeptExcel() {
   const now = new Date().toLocaleDateString('fa-IR-u-nu-latn').replace(/\//g, '-');
   downloadExcel(rows, headers, `گزارش-بخش‌ها-${now}`);
   toast('فایل Excel دانلود شد 📥');
+}
+
+// ─── Confirm Dialog ──────────────────────────────────────────────────────────
+
+let _confirmCallback = null;
+
+function showConfirm(title, message, onConfirm, confirmLabel='تأیید', danger=true) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-message').textContent = message;
+  const btn = document.getElementById('confirm-ok-btn');
+  btn.textContent = confirmLabel;
+  btn.className = danger ? 'btn btn-danger' : 'btn btn-primary';
+  _confirmCallback = onConfirm;
+  openModal('modal-confirm');
+}
+
+function confirmAction() {
+  closeModal('modal-confirm');
+  if (_confirmCallback) _confirmCallback();
+  _confirmCallback = null;
+}
+
+// ─── Reverse Dispatch ────────────────────────────────────────────────────────
+
+async function reverseDispatch(txId, productName, deptName, qty, unit) {
+  showConfirm(
+    '↩️ بازگشت خروج رسمی',
+    `آیا از بازگشت ${qty} ${unit} از کالای "${productName}" که به بخش "${deptName}" تحویل داده شده مطمئن هستید؟ این مقدار دوباره به موجودی انبار اضافه می‌شود.`,
+    async () => {
+      try {
+        await api('POST', `/dispatch/${txId}/reverse`);
+        toast('بازگشت با موفقیت ثبت شد ↩️');
+        renderPage();
+      } catch(e) {}
+    },
+    '↩️ بله، بازگشت بزن',
+    true
+  );
 }
 
 async function initApp() {
