@@ -1,172 +1,171 @@
-# 📦 انبارگردان — راهنمای نصب و راه‌اندازی
+| [English](README.md) | [فارسی](README_FA.md) |
+|---|---|
 
-## ساختار پروژه
+<div align="center">
 
-```
-warehouse-app/
-├── backend/
-│   ├── app.py           ← سرور اصلی (Flask)
-│   ├── requirements.txt ← کتابخانه‌های Python
-│   └── warehouse.db     ← دیتابیس (خودکار ساخته می‌شود)
-└── frontend/
-    └── index.html       ← رابط کاربری (یک فایل کامل)
-```
+# 📦 Anbar-X
 
----
+**A self-hosted, multi-warehouse inventory management system built for LAN environments.**
 
-## پیش‌نیازها
+![Version](https://img.shields.io/badge/version-2.2.0-blue)
+![Python](https://img.shields.io/badge/python-3.11-green)
+![Flask](https://img.shields.io/badge/flask-3.0-lightgrey)
+![Docker](https://img.shields.io/badge/docker-ready-blue)
+![License](https://img.shields.io/badge/license-MIT-orange)
 
-- **Python 3.9+** — دانلود: https://python.org
-- مرورگر کروم یا فایرفاکس
+</div>
 
 ---
 
-## نصب و راه‌اندازی
+## ✨ Features
 
-### ۱. نصب کتابخانه‌های Python
-
-```bash
-cd warehouse-app/backend
-pip install -r requirements.txt
-```
-
-### ۲. اجرای سرور
-
-```bash
-python app.py
-```
-
-> پیام زیر نشان می‌دهد سرور آماده است:
-> ```
-> * Running on http://0.0.0.0:5000
-> ```
-
-### ۳. باز کردن رابط کاربری
-
-فایل `frontend/index.html` را مستقیماً در مرورگر باز کنید.
+- **Multi-warehouse management** — create, edit, and monitor multiple warehouses with live statistics
+- **Product inventory** — track items with SKU, category, unit price, and low-stock alerts
+- **Formal dispatch** — issue stock to named departments (e.g. Radiology, Reception) with reversal support
+- **Transaction history** — every stock movement is logged with timestamp, user, and notes
+- **Role-based access** — Admin / Operator / Viewer with session management and login logs
+- **Reports & Export** — inventory reports and department reports, printable and exportable to Excel
+- **Jalali (Shamsi) calendar** — all dates displayed in Persian calendar
+- **Dark / Light mode** — smooth theme toggle with preference saved per browser
+- **Responsive UI** — works on desktop and mobile
+- **Automatic daily backup** — database backed up every night at 2 AM (Tehran time), 30-day retention
+- **Offline-ready** — designed for air-gapped LAN servers with no internet dependency
 
 ---
 
-## استفاده روی شبکه داخلی (LAN) — چند کاربر
+## 🛠 Tech Stack
 
-### روی سرور / کامپیوتر اصلی:
+| Layer | Technology |
+|---|---|
+| Backend | Python 3.11, Flask 3.0, SQLAlchemy, SQLite |
+| Frontend | Vanilla HTML / CSS / JavaScript (single file) |
+| Server | Waitress (production WSGI) |
+| Deployment | Docker + Docker Compose |
+| Auth | bcrypt password hashing, token-based sessions |
+
+---
+
+## 🚀 Quick Start (Docker)
+
+**Prerequisites:** [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+
 ```bash
-python app.py
+git clone https://github.com/YOUR_USERNAME/anbar-x.git
+cd anbar-x
+docker compose up --build -d
 ```
-IP سرور را پیدا کنید:
+
+Open your browser at `http://localhost:5000`
+
+**Default credentials:**
+```
+Username: admin
+Password: admin123
+```
+> ⚠️ Change the password immediately after first login.
+
+---
+
+## 🌐 LAN Deployment (Multi-user)
+
+All users on the same network can access the system through the server's IP:
+
+```
+http://192.168.x.x:5000
+```
+
+Find the server IP:
 ```bash
-# Windows:
+# Windows
 ipconfig
 
-# Linux/Mac:
+# Linux
 hostname -I
 ```
-فرض کنید IP سرور `192.168.1.100` است.
-
-### ویرایش فایل index.html برای سایر کاربران:
-خط زیر را در `index.html` پیدا کنید:
-```javascript
-const API = 'http://localhost:5000/api';
-```
-و تغییر دهید به:
-```javascript
-const API = 'http://192.168.1.100:5000/api';
-```
-
-### سایر کاربران:
-فایل `index.html` ویرایش‌شده را روی کامپیوترشان کپی کنند و در مرورگر باز کنند.
 
 ---
 
-## امکانات سیستم
+## 📁 Project Structure
 
-### 🏭 مدیریت انبار
-- ساخت، ویرایش، حذف انبار
-- هر انبار دارای نام، مکان و توضیحات
-- مشاهده آمار هر انبار (تعداد کالا، موجودی کل، ارزش)
-
-### 📦 مدیریت کالا
-- تعریف کالا با: نام، کد SKU، دسته‌بندی، واحد، قیمت
-- تعیین حداقل موجودی (هشدار خودکار)
-- هشدار موجودی کم (زرد) و اتمام (قرمز)
-
-### 🔄 تراکنش‌ها
-- **ورود کالا** ⬆️ — افزایش موجودی
-- **خروج کالا** ⬇️ — کاهش موجودی
-- **تنظیم موجودی** ⚖️ — تعیین مستقیم
-- ثبت شماره مرجع (فاکتور/سند)
-- تاریخچه کامل تراکنش‌ها
-
-### 📊 داشبورد
-- آمار کلی سیستم
-- لیست کالاهای بحرانی
-- آخرین تراکنش‌ها
-
-### 📋 گزارش موجودی
-- گزارش فیلتر بر اساس انبار
-- تاریخ هجری شمسی
-- قابل چاپ
-
----
-
-## اجرای خودکار هنگام روشن شدن سرور (اختیاری)
-
-### Windows — Task Scheduler:
-یک فایل `start.bat` بسازید:
-```batch
-@echo off
-cd /d "C:\path\to\warehouse-app\backend"
-python app.py
 ```
-سپس در Task Scheduler تنظیم کنید که هنگام ورود به Windows اجرا شود.
-
-### Linux — Systemd:
-```ini
-# /etc/systemd/system/warehouse.service
-[Unit]
-Description=Warehouse App
-
-[Service]
-WorkingDirectory=/path/to/warehouse-app/backend
-ExecStart=/usr/bin/python3 app.py
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-```bash
-sudo systemctl enable warehouse
-sudo systemctl start warehouse
+anbar-x/
+├── backend/
+│   ├── app.py              ← Flask server (all business logic)
+│   └── requirements.txt    ← Python dependencies
+├── frontend/
+│   ├── index.html          ← Full UI (HTML + CSS + JS in one file)
+│   └── xlsx.full.min.js    ← SheetJS for Excel export (offline)
+├── data/
+│   └── .gitkeep            ← Database lives here (mounted as Docker volume)
+├── Dockerfile
+├── docker-compose.yml
+├── start.bat               ← Windows: start the app
+├── stop.bat                ← Windows: stop the app
+└── make-tar.bat            ← Windows: export Docker image for offline transfer
 ```
 
 ---
 
-## بک‌آپ دیتابیس
+## 🔐 User Roles
 
-فقط کافیه فایل `backend/warehouse.db` را کپی کنید!
+| Role | View | Edit Stock | Manage Warehouses | Manage Users |
+|---|---|---|---|---|
+| 👑 Admin | ✅ | ✅ | ✅ | ✅ |
+| ✏️ Operator | ✅ | ✅ | ✅ | ❌ |
+| 👁 Viewer | ✅ | ❌ | ❌ | ❌ |
+
+---
+
+## 📦 Offline Transfer
+
+To move the app to a server without internet access:
 
 ```bash
-# مثال بک‌آپ روزانه (Linux cron):
-0 2 * * * cp /path/to/warehouse.db /backups/warehouse_$(date +\%Y\%m\%d).db
+# On the internet-connected machine
+docker compose build
+docker save -o warehouse-app.tar anbar-x-warehouse:latest
+
+# Transfer warehouse-app.tar and docker-compose.yml to the target server
+
+# On the offline server
+docker load -i warehouse-app.tar
+docker compose up -d
 ```
 
 ---
 
-## API مرجع (برای توسعه‌دهندگان)
+## 🗄 Database & Backup
 
-| Method | Endpoint | توضیح |
-|--------|----------|-------|
-| GET    | /api/warehouses | لیست انبارها |
-| POST   | /api/warehouses | انبار جدید |
-| PUT    | /api/warehouses/:id | ویرایش انبار |
-| DELETE | /api/warehouses/:id | حذف انبار |
-| GET    | /api/warehouses/:id/products | کالاهای یک انبار |
-| GET    | /api/products | همه کالاها |
-| POST   | /api/products | کالای جدید |
-| PUT    | /api/products/:id | ویرایش کالا |
-| DELETE | /api/products/:id | حذف کالا |
-| POST   | /api/products/:id/transactions | ثبت تراکنش |
-| GET    | /api/products/:id/transactions | تاریخچه تراکنش |
-| GET    | /api/transactions | همه تراکنش‌ها |
-| GET    | /api/dashboard | آمار داشبورد |
-| GET    | /api/report/inventory | گزارش موجودی |
+- Database: `data/warehouse.db` (SQLite, mounted as Docker volume — persists across rebuilds)
+- Automatic backup: runs nightly at 02:00 Tehran time → `data/backups/warehouse_YYYY-MM-DD.db`
+- Retention: last 30 daily backups are kept automatically
+
+To browse or edit the database manually: [DB Browser for SQLite](https://sqlitebrowser.org)
+
+---
+
+## 📡 API Reference
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | /api/auth/login | Login |
+| GET | /api/warehouses | List warehouses |
+| POST | /api/warehouses | Create warehouse |
+| GET | /api/warehouses/:id/products | Products in a warehouse |
+| GET | /api/products | All products |
+| POST | /api/products | Create product |
+| POST | /api/products/:id/transactions | Add transaction |
+| GET | /api/departments | List departments |
+| POST | /api/dispatch | Formal dispatch to department |
+| POST | /api/dispatch/:id/reverse | Reverse a dispatch |
+| GET | /api/dispatch/report | Dispatch report |
+| GET | /api/dashboard | Dashboard stats |
+| GET | /api/report/inventory | Inventory report |
+| GET | /api/users | List users (admin only) |
+| GET | /api/login-logs | Login history (admin only) |
+
+---
+
+## 📄 License
+
+MIT © 2025
