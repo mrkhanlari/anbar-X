@@ -1547,6 +1547,10 @@ async function openProductModal(id=null, whId=null) {
 async function saveProduct() {
   const name = document.getElementById('prod-name').value.trim();
   if (!name) { toast('نام کالا را وارد کنید', 'error'); return; }
+  // جلوگیری از ثبت دوباره
+  const saveBtn = document.querySelector('#modal-product .btn-primary');
+  if (saveBtn && saveBtn.disabled) return;
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'در حال ذخیره...'; }
   const body = {
     name, sku: document.getElementById('prod-sku').value,
     category: document.getElementById('prod-cat').value,
@@ -1557,18 +1561,22 @@ async function saveProduct() {
     description: document.getElementById('prod-desc').value,
     warehouse_id: parseInt(document.getElementById('prod-wh').value),
   };
-  if (state.editProductId) {
-    // quantity و توضیح رو هم بفرست تا سرور تراکنش خودکار ثبت کنه
-    body.quantity = parseFloat(document.getElementById('prod-qty').value) || 0;
-    body.note = document.getElementById('prod-edit-note').value || '';
-    await api('PUT', `/products/${state.editProductId}`, body);
-    toast('کالا ویرایش شد ✏️');
-  } else {
-    await api('POST', '/products', body);
-    toast('کالای جدید ثبت شد 📦');
+  try {
+    if (state.editProductId) {
+      body.quantity = parseFloat(document.getElementById('prod-qty').value) || 0;
+      body.note = document.getElementById('prod-edit-note').value || '';
+      await api('PUT', `/products/${state.editProductId}`, body);
+      toast('کالا ویرایش شد ✏️');
+    } else {
+      await api('POST', '/products', body);
+      toast('کالای جدید ثبت شد 📦');
+    }
+    closeModal('modal-product');
+    renderPage();
+  } catch(e) {
+    const saveBtn2 = document.querySelector('#modal-product .btn-primary');
+    if (saveBtn2) { saveBtn2.disabled = false; saveBtn2.textContent = '💾 ذخیره'; }
   }
-  closeModal('modal-product');
-  renderPage();
 }
 
 async function deleteProduct(id, name) {
@@ -1659,19 +1667,31 @@ async function saveTx() {
   if (!dateStr) { toast('تاریخ را وارد کنید', 'error'); return; }
   const isoDate = jalaliToISO(dateStr);
   if (!isoDate) { toast('فرمت تاریخ اشتباه است — مثال: ۱۴۰۴/۰۳/۲۲', 'error'); return; }
-  const manualStatus = document.getElementById('tx-status').value;
-  await api('POST', `/products/${state.txProductId}/transactions`, {
-    type: state.txType,
-    quantity: qty,
-    note: document.getElementById('tx-note').value,
-    ref_number: document.getElementById('tx-ref').value,
-    custom_date: isoDate,
-    manual_status: manualStatus === 'auto' ? null : manualStatus,
-  });
-  const msgs = { in: 'ورود کالا ثبت شد ⬆️', out: 'خروج کالا ثبت شد ⬇️', adjust: 'موجودی تنظیم شد ⚖️' };
-  toast(msgs[state.txType]);
-  closeModal('modal-tx');
-  renderPage();
+
+  const btn = document.getElementById('btn-save-tx');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const origText = btn.textContent;
+  btn.textContent = 'در حال ثبت...';
+
+  try {
+    const manualStatus = document.getElementById('tx-status').value;
+    await api('POST', `/products/${state.txProductId}/transactions`, {
+      type: state.txType,
+      quantity: qty,
+      note: document.getElementById('tx-note').value,
+      ref_number: document.getElementById('tx-ref').value,
+      custom_date: isoDate,
+      manual_status: manualStatus === 'auto' ? null : manualStatus,
+    });
+    const msgs = { in: 'ورود کالا ثبت شد ⬆️', out: 'خروج کالا ثبت شد ⬇️', adjust: 'موجودی تنظیم شد ⚖️' };
+    toast(msgs[state.txType]);
+    closeModal('modal-tx');
+    renderPage();
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
 }
 
 // ─── Manual Status Change ─────────────────────────────────────────────────────
@@ -1694,7 +1714,13 @@ async function saveStatus() {
 
 // ─── Close modal on overlay click ───────────────────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(el => {
-  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+  // مودال‌های مهم با کلیک بیرون بسته نمی‌شن
+  const safeIds = ['modal-tx', 'modal-product', 'modal-dispatch'];
+  el.addEventListener('click', e => {
+    if (e.target === el && !safeIds.includes(el.id)) {
+      el.classList.remove('open');
+    }
+  });
 });
 
 // ─── Theme Toggle (دارک / لایت با افکت ماه و خورشید) ──────────────────────────
@@ -1929,11 +1955,18 @@ async function submitDispatch() {
   if (!prodId)   { toast('کالا را انتخاب کنید', 'error'); return; }
   if (!deptId)   { toast('بخش مقصد را انتخاب کنید', 'error'); return; }
   if (!qty || qty <= 0) { toast('تعداد را وارد کنید', 'error'); return; }
+
+  const btn = document.querySelector('[onclick="submitDispatch()"]');
+  if (btn && btn.disabled) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'در حال ثبت...'; }
+
   try {
     await api('POST', '/dispatch', { product_id: parseInt(prodId), department_id: parseInt(deptId), quantity: qty, note });
     toast('خروج رسمی ثبت شد ✅');
     navigate('dispatch');
-  } catch(e) {}
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = '✅ ثبت خروج رسمی'; }
+  }
 }
 
 

@@ -1,0 +1,11 @@
+docker save -o warehouse-app.tar anbar-x-warehouse:latest
+این فایل warehouse-app.tar رو کنار پروژه می‌سازه (حدود ۱۵۰-۲۵۰ مگابایت، صبر کن کامل بشه).
+
+بعدش این سه چیز رو منتقل کن به سرور مقصد:
+warehouse-app.tar       ← همین فایلی که الان ساختی
+docker-compose.yml      ← از پوشه پروژه
+data/                   ← (اختیاری، اگه دیتای فعلی رو هم می‌خوای)
+
+روی سرور مقصد (بعد از نصب Docker Desktop روش):
+bashdocker load -i warehouse-app.tar
+docker compose up -d
