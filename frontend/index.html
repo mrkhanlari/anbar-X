@@ -1571,6 +1571,11 @@ async function deleteWarehouse(id, name) {
 
 async function openProductModal(id=null, whId=null) {
   state.editProductId = id;
+
+  // ریست دکمه ذخیره — جلوگیری از ماندن در حالت «در حال ذخیره»
+  const saveBtn = document.querySelector('#modal-product .btn-primary');
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ذخیره'; }
+
   const whs = state.warehouses.length ? state.warehouses : await api('GET','/warehouses');
   state.warehouses = whs;
 
@@ -1579,8 +1584,8 @@ async function openProductModal(id=null, whId=null) {
 
   document.getElementById('modal-prod-title').textContent = id ? 'ویرایش کالا' : 'کالای جدید';
   if (id) {
-    const prods = await api('GET', '/products');
-    const p = prods.find(x=>x.id===id);
+    // فقط یک کالا را بگیر — نه همه کالاها (سریع‌تر)
+    const p = await api('GET', `/products/${id}`);
     if (p) {
       document.getElementById('prod-name').value = p.name;
       document.getElementById('prod-sku').value = p.sku||'';
@@ -1642,10 +1647,13 @@ async function saveProduct() {
       toast('کالای جدید ثبت شد 📦');
     }
     closeModal('modal-product');
-    renderPage();
+    await renderPage();
   } catch(e) {
-    const saveBtn2 = document.querySelector('#modal-product .btn-primary');
-    if (saveBtn2) { saveBtn2.disabled = false; saveBtn2.textContent = '💾 ذخیره'; }
+    // خطا قبلاً در api() نمایش داده شده
+  } finally {
+    // همیشه دکمه را آزاد کن — چه موفق، چه خطا
+    const btn = document.querySelector('#modal-product .btn-primary');
+    if (btn) { btn.disabled = false; btn.textContent = '💾 ذخیره'; }
   }
 }
 
@@ -1725,7 +1733,9 @@ function setTxType(type) {
   const labels = { in:'مقدار ورودی *', out:'مقدار خروجی *', adjust:'موجودی جدید *' };
   const btns = { in:'✅ ثبت ورود', out:'✅ ثبت خروج', adjust:'✅ تنظیم موجودی' };
   document.getElementById('tx-qty-label').textContent = labels[type];
-  document.getElementById('btn-save-tx').textContent = btns[type];
+  const txBtn = document.getElementById('btn-save-tx');
+  txBtn.textContent = btns[type];
+  txBtn.disabled = false;  // ریست وضعیت disabled هنگام تغییر نوع
   document.getElementById('modal-tx-title').textContent =
     type==='in' ? '⬆️ ورود کالا' : type==='out' ? '⬇️ خروج کالا' : '⚖️ تنظیم موجودی';
 }
@@ -1757,8 +1767,11 @@ async function saveTx() {
     const msgs = { in: 'ورود کالا ثبت شد ⬆️', out: 'خروج کالا ثبت شد ⬇️', adjust: 'موجودی تنظیم شد ⚖️' };
     toast(msgs[state.txType]);
     closeModal('modal-tx');
-    renderPage();
+    await renderPage();
   } catch(e) {
+    // خطا در api() نمایش داده شده
+  } finally {
+    // همیشه دکمه را آزاد کن
     btn.disabled = false;
     btn.textContent = origText;
   }
@@ -2115,6 +2128,9 @@ async function submitDispatch() {
     toast('خروج رسمی ثبت شد ✅');
     navigate('dispatch');
   } catch(e) {
+    // خطا در api() نمایش داده شده
+  } finally {
+    // همیشه دکمه را آزاد کن
     if (btn) { btn.disabled = false; btn.textContent = '✅ ثبت خروج رسمی'; }
   }
 }

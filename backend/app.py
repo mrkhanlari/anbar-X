@@ -2,8 +2,11 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import joinedload
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+import sqlite3
 import jdatetime
 import bcrypt
 import secrets
@@ -28,8 +31,25 @@ data_dir = os.environ.get('DATA_DIR', basedir)
 os.makedirs(data_dir, exist_ok=True)
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(data_dir, "warehouse.db")}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
 
 db = SQLAlchemy(app)
+
+# ── SQLite performance: WAL mode + faster sync ──────────────────────────────
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")       # نوشتن بدون قفل کامل — سریع‌ترین حالت
+        cursor.execute("PRAGMA synchronous=NORMAL")      # امنیت کافی + سرعت بیشتر
+        cursor.execute("PRAGMA cache_size=-32000")       # 32 MB کش (منفی = کیلوبایت)
+        cursor.execute("PRAGMA temp_store=MEMORY")       # temp table در RAM
+        cursor.execute("PRAGMA mmap_size=268435456")     # 256MB memory-mapped I/O
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 # ═══════════════════════════════════════════════════════════════════
 # MODELS
@@ -309,7 +329,31 @@ def change_password():
 @app.route('/api/users', methods=['GET'])
 @require_auth('admin')
 def get_users():
-    return jsonify([u.to_dict() for u in User.query.order_by(User.id.desc()).all()])
+    users = User.query.order_by(User.id.desc()).all()
+    # یک query برای آخرین لاگین همه کاربران — نه N query جداگانه
+    user_ids = [u.id for u in users]
+    last_logins = {}
+    if user_ids:
+        from sqlalchemy import func
+        rows = (db.session.query(LoginLog.user_id, func.max(LoginLog.logged_in_at))
+                .filter(LoginLog.user_id.in_(user_ids))
+                .group_by(LoginLog.user_id).all())
+        last_logins = {uid: dt for uid, dt in rows}
+
+    result = []
+    for u in users:
+        jdt = jdatetime.datetime.fromgregorian(datetime=u.created_at)
+        last_dt = last_logins.get(u.id)
+        result.append({
+            'id': u.id,
+            'username': u.username,
+            'display_name': u.display_name or u.username,
+            'role': u.role,
+            'is_active': u.is_active,
+            'created_at': jdt.strftime('%Y/%m/%d'),
+            'last_login': jdatetime.datetime.fromgregorian(datetime=last_dt).strftime('%Y/%m/%d %H:%M') if last_dt else '',
+        })
+    return jsonify(result)
 
 @app.route('/api/users', methods=['POST'])
 @require_auth('admin')
@@ -387,7 +431,10 @@ def get_all_login_logs():
 @app.route('/api/warehouses', methods=['GET'])
 @require_auth()
 def get_warehouses():
-    whs = Warehouse.query.filter_by(is_active=True).all()
+    # joinedload جلوگیری می‌کند از N+1 query برای products
+    whs = Warehouse.query.filter_by(is_active=True).options(
+        joinedload(Warehouse.products)
+    ).all()
     return jsonify([w.to_dict() for w in whs])
 
 @app.route('/api/warehouses', methods=['POST'])
@@ -481,6 +528,12 @@ def get_all_products():
     if search:
         query = query.filter(Product.name.ilike(f'%{search}%'))
     return jsonify([p.to_dict() for p in query.order_by(Product.id.desc()).all()])
+
+@app.route('/api/products/<int:pid>', methods=['GET'])
+@require_auth()
+def get_product(pid):
+    p = Product.query.get_or_404(pid)
+    return jsonify(p.to_dict())
 
 @app.route('/api/products', methods=['POST'])
 @require_auth('operator')
