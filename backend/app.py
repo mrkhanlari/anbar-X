@@ -45,6 +45,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")       # نوشتن بدون قفل کامل — سریع‌ترین حالت
         cursor.execute("PRAGMA synchronous=NORMAL")      # امنیت کافی + سرعت بیشتر
+        cursor.execute("PRAGMA busy_timeout=8000")       # به‌جای خطای فوری «database locked»، تا ۸ ثانیه صبر کن
         cursor.execute("PRAGMA cache_size=-32000")       # 32 MB کش (منفی = کیلوبایت)
         cursor.execute("PRAGMA temp_store=MEMORY")       # temp table در RAM
         cursor.execute("PRAGMA mmap_size=268435456")     # 256MB memory-mapped I/O
@@ -524,10 +525,24 @@ def get_products(wid):
 @require_auth()
 def get_all_products():
     search = request.args.get('search', '')
+    page = max(1, request.args.get('page', 1, type=int))
+    per_page = min(max(request.args.get('per_page', 50, type=int), 1), 200)
+
     query = Product.query.filter_by(is_active=True)
     if search:
         query = query.filter(Product.name.ilike(f'%{search}%'))
-    return jsonify([p.to_dict() for p in query.order_by(Product.id.desc()).all()])
+    query = query.order_by(Product.id.desc())
+
+    total = query.count()
+    items = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    return jsonify({
+        'items': [p.to_dict() for p in items],
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': max(1, -(-total // per_page)),  # سقف تقسیم بدون import اضافه
+    })
 
 @app.route('/api/products/<int:pid>', methods=['GET'])
 @require_auth()
@@ -795,11 +810,22 @@ def dispatch_report():
 @app.route('/api/dashboard', methods=['GET'])
 @require_auth()
 def dashboard():
-    warehouses   = Warehouse.query.filter_by(is_active=True).all()
-    products     = Product.query.filter_by(is_active=True).all()
-    low_stock    = [p for p in products if p.min_stock and 0 < p.quantity <= p.min_stock]
-    out_of_stock = [p for p in products if p.quantity <= 0]
-    total_value  = sum(p.quantity * (p.unit_price or 0) for p in products)
+    from sqlalchemy import func, and_
+    # جمع‌بندی‌ها را خود دیتابیس حساب می‌کند — به‌جای لود کردن همه‌ی کالاها در پایتون
+    # (با رشد تعداد کالاها دیگر کند نمی‌شود)
+    low_stock_cond = and_(Product.is_active == True, Product.min_stock > 0,
+                           Product.quantity > 0, Product.quantity <= Product.min_stock)
+    out_stock_cond = and_(Product.is_active == True, Product.quantity <= 0)
+
+    warehouse_count    = db.session.query(func.count(Warehouse.id)).filter(Warehouse.is_active == True).scalar()
+    product_count      = db.session.query(func.count(Product.id)).filter(Product.is_active == True).scalar()
+    low_stock_count    = db.session.query(func.count(Product.id)).filter(low_stock_cond).scalar()
+    out_of_stock_count = db.session.query(func.count(Product.id)).filter(out_stock_cond).scalar()
+    total_value        = db.session.query(func.sum(Product.quantity * func.coalesce(Product.unit_price, 0))) \
+                            .filter(Product.is_active == True).scalar() or 0
+
+    low_stock    = Product.query.filter(low_stock_cond).limit(5).all()
+    out_of_stock = Product.query.filter(out_stock_cond).limit(5).all()
     recent_txs   = (Transaction.query
                     .options(
                         joinedload(Transaction.product).joinedload(Product.warehouse),
@@ -807,13 +833,13 @@ def dashboard():
                     )
                     .order_by(Transaction.created_at.desc()).limit(10).all())
     return jsonify({
-        'warehouse_count':   len(warehouses),
-        'product_count':     len(products),
-        'low_stock_count':   len(low_stock),
-        'out_of_stock_count': len(out_of_stock),
+        'warehouse_count':   warehouse_count,
+        'product_count':     product_count,
+        'low_stock_count':   low_stock_count,
+        'out_of_stock_count': out_of_stock_count,
         'total_value':       total_value,
-        'low_stock':         [p.to_dict() for p in low_stock[:5]],
-        'out_of_stock':      [p.to_dict() for p in out_of_stock[:5]],
+        'low_stock':         [p.to_dict() for p in low_stock],
+        'out_of_stock':      [p.to_dict() for p in out_of_stock],
         'recent_transactions': [t.to_dict() for t in recent_txs],
     })
 

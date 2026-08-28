@@ -425,6 +425,7 @@
   /* ── Loading ── */
   .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; margin: 40px auto; display: block; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .btn-spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; display: inline-block; animation: spin .6s linear infinite; }
 
   /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -1033,12 +1034,22 @@ function closeSidebar() {
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
 
+const API_TIMEOUT_MS = 20000; // جلوگیری از گیر کردن ابدی دکمه‌ها روی «در حال ذخیره»
+
+// fetch با timeout — اگر سرور جواب ندهد، بعد از این مدت درخواست لغو می‌شود
+// تا رابط کاربری همیشه (در همه‌ی فرم‌ها) آزاد شود، نه فقط در خطای شبکه‌ای معمول
+function fetchWithTimeout(url, opts={}, timeoutMs=API_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, {...opts, signal: controller.signal}).finally(() => clearTimeout(timer));
+}
+
 async function api(method, path, body) {
   try {
     const headers = {'Content-Type': 'application/json'};
     const token = getToken();
     if (token) headers['X-Auth-Token'] = token;
-    const r = await fetch(API + path, {
+    const r = await fetchWithTimeout(API + path, {
       method, headers,
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -1050,7 +1061,8 @@ async function api(method, path, body) {
     if (!r.ok) throw new Error(d.error || 'خطای سرور');
     return d;
   } catch(e) {
-    if (e.message !== 'undefined') toast(e.message || 'خطای ارتباط با سرور', 'error');
+    const msg = e.name === 'AbortError' ? 'پاسخ سرور طول کشید، دوباره امتحان کنید' : (e.message || 'خطای ارتباط با سرور');
+    if (msg !== 'undefined') toast(msg, 'error');
     throw e;
   }
 }
@@ -1069,6 +1081,23 @@ function toast(msg, type='success') {
 
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ─── وضعیت «در حال بارگذاری» دکمه‌ها ─────────────────────────────────────────
+// اسپینر کوچک + قفل ضد دوبار-کلیک، برای همه‌ی دکمه‌های ذخیره/ثبت در کل برنامه
+function btnLoading(btn, label) {
+  if (!btn) return;
+  btn.dataset.origHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="btn-spinner"></span>${label}`;
+}
+function btnDone(btn) {
+  if (!btn) return;
+  btn.disabled = false;
+  if (btn.dataset.origHtml !== undefined) {
+    btn.innerHTML = btn.dataset.origHtml;
+    delete btn.dataset.origHtml;
+  }
+}
 
 function fmt(n) { return Number(n||0).toLocaleString('fa-IR'); }
 function fmtPrice(n) { return Number(n||0).toLocaleString('fa-IR') + ' ریال'; }
@@ -1272,52 +1301,82 @@ function filterProds() {
 // ─── All Products ─────────────────────────────────────────────────────────────
 
 async function renderAllProducts() {
-  const prods = await api('GET', '/products');
+  window._allProdsSearch = '';
+  // بدون این، اگه مستقیم به این صفحه بیای (بدون رفتن به «انبارها» قبلش) ستون انبار همیشه «—» نشون داده می‌شد
+  state.warehouses = state.warehouses.length ? state.warehouses : await api('GET', '/warehouses');
   document.getElementById('topbar-actions').innerHTML =
     window._isViewer ? '' : `<button class="btn btn-primary" onclick="openProductModal()">➕ کالای جدید</button>`;
   const c = document.getElementById('content');
-  if (!prods.length) {
-    c.innerHTML = `<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">هیچ کالایی ثبت نشده</div></div>`;
-    return;
-  }
   c.innerHTML = `<div class="card">
     <div class="flex-between mb-4">
-      <div class="card-title" style="margin:0">همه کالاها (${fmt(prods.length)})</div>
-      <div class="search-bar"><span class="search-icon">🔍</span><input id="all-prod-search" placeholder="جستجو..." oninput="filterAllProds()" style="width:220px;"/></div>
+      <div class="card-title" style="margin:0" id="all-prods-count">در حال بارگذاری...</div>
+      <div class="search-bar"><span class="search-icon">🔍</span><input id="all-prod-search" placeholder="جستجو..." oninput="searchAllProds(this.value)" style="width:220px;"/></div>
     </div>
-    <div class="table-wrap"><table id="all-prods-table">
-      <thead><tr>
-        <th>نام کالا</th><th>انبار</th><th>دسته</th><th>موجودی</th><th>قیمت</th><th>وضعیت</th><th>عملیات</th>
-      </tr></thead><tbody>
-      ${prods.map(p=>`<tr>
-        <td class="fw-bold">${p.name}</td>
-        <td class="text-muted">${(state.warehouses.find(w=>w.id===p.warehouse_id)||{name:'—'}).name}</td>
-        <td>${p.category||'—'}</td>
-        <td class="num">${fmt(p.quantity)} ${p.unit}</td>
-        <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
-        <td>${p.status==='out'?'<span class="badge badge-red">🚫 تمام شد</span>':p.status==='low'?'<span class="badge badge-yellow">⚠️ کم</span>':'<span class="badge badge-green">✅ موجود</span>'}</td>
-        <td><div class="flex-gap">
-          <button class="btn btn-sm btn-success" onclick="openTxModal(${p.id})">🔄</button>
-          <button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️</button>
-        </div></td>
-      </tr>`).join('')}
-      </tbody></table></div></div>`;
-  window._allProds = prods;
+    <div id="all-prods-body"><div class="spinner"></div></div>
+  </div>`;
+  await loadProdPage(1);
 }
 
-function filterAllProds() {
-  const q = document.getElementById('all-prod-search').value.toLowerCase();
-  const prods = window._allProds||[];
-  document.querySelector('#all-prods-table tbody').innerHTML =
-    prods.filter(p=>p.name.toLowerCase().includes(q)).map(p=>`<tr>
-      <td class="fw-bold">${p.name}</td>
-      <td class="text-muted">${(state.warehouses.find(w=>w.id===p.warehouse_id)||{name:'—'}).name}</td>
-      <td>${p.category||'—'}</td>
-      <td class="num">${fmt(p.quantity)} ${p.unit}</td>
-      <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
-      <td>${p.status==='out'?'<span class="badge badge-red">🚫 تمام</span>':p.status==='low'?'<span class="badge badge-yellow">⚠️ کم</span>':'<span class="badge badge-green">✅ موجود</span>'}</td>
-      <td><button class="btn btn-sm btn-success" onclick="openTxModal(${p.id})">🔄</button></td>
-    </tr>`).join('');
+let _allProdsSearchTimer = null;
+function searchAllProds(val) {
+  // debounce — تا با هر حرف تایپ‌شده درخواست جدا به سرور نره
+  window._allProdsSearch = val;
+  clearTimeout(_allProdsSearchTimer);
+  _allProdsSearchTimer = setTimeout(() => loadProdPage(1), 350);
+}
+
+function goToProdPage(page) { loadProdPage(page); }
+
+async function loadProdPage(page) {
+  const search = window._allProdsSearch || '';
+  const params = new URLSearchParams({page, per_page: 50});
+  if (search) params.set('search', search);
+  const res = await api('GET', `/products?${params.toString()}`);
+
+  const countEl = document.getElementById('all-prods-count');
+  if (countEl) countEl.textContent = `همه کالاها (${fmt(res.total)})`;
+
+  const body = document.getElementById('all-prods-body');
+  if (!body) return;
+  if (!res.total) {
+    body.innerHTML = search
+      ? `<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">نتیجه‌ای یافت نشد</div></div>`
+      : `<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">هیچ کالایی ثبت نشده</div></div>`;
+    return;
+  }
+  body.innerHTML = `<div class="table-wrap"><table id="all-prods-table">
+    <thead><tr>
+      <th>نام کالا</th><th>انبار</th><th>دسته</th><th>موجودی</th><th>قیمت</th><th>وضعیت</th><th>عملیات</th>
+    </tr></thead><tbody>
+    ${res.items.map(p=>allProdRow(p)).join('')}
+    </tbody></table></div>
+    ${buildPager(res.page, res.total_pages)}`;
+}
+
+function allProdRow(p) {
+  return `<tr>
+    <td class="fw-bold">${p.name}</td>
+    <td class="text-muted">${(state.warehouses.find(w=>w.id===p.warehouse_id)||{name:'—'}).name}</td>
+    <td>${p.category||'—'}</td>
+    <td class="num">${fmt(p.quantity)} ${p.unit}</td>
+    <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
+    <td>${p.status==='out'?'<span class="badge badge-red">🚫 تمام شد</span>':p.status==='low'?'<span class="badge badge-yellow">⚠️ کم</span>':'<span class="badge badge-green">✅ موجود</span>'}</td>
+    <td><div class="flex-gap">
+      <button class="btn btn-sm btn-success" onclick="openTxModal(${p.id})">🔄</button>
+      <button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️</button>
+    </div></td>
+  </tr>`;
+}
+
+function buildPager(page, totalPages) {
+  if (totalPages <= 1) return '';
+  const prevDisabled = page <= 1 ? 'disabled' : '';
+  const nextDisabled = page >= totalPages ? 'disabled' : '';
+  return `<div class="flex-between mt-4" style="align-items:center;">
+    <button class="btn btn-sm btn-secondary" ${prevDisabled} onclick="goToProdPage(${page-1})">← قبلی</button>
+    <div class="text-sm text-muted">صفحه ${fmt(page)} از ${fmt(totalPages)}</div>
+    <button class="btn btn-sm btn-secondary" ${nextDisabled} onclick="goToProdPage(${page+1})">بعدی →</button>
+  </div>`;
 }
 
 // ─── Transactions ────────────────────────────────────────────────────────────
@@ -1545,19 +1604,28 @@ async function openWarehouseModal(id=null) {
 async function saveWarehouse() {
   const name = document.getElementById('wh-name').value.trim();
   if (!name) { toast('نام انبار را وارد کنید', 'error'); return; }
-  const body = {
-    name, location: document.getElementById('wh-location').value,
-    description: document.getElementById('wh-desc').value,
-  };
-  if (state.editWarehouseId) {
-    await api('PUT', `/warehouses/${state.editWarehouseId}`, body);
-    toast('انبار ویرایش شد ✏️');
-  } else {
-    await api('POST', '/warehouses', body);
-    toast('انبار جدید ثبت شد 🏭');
+  const btn = document.querySelector('#modal-warehouse .btn-primary');
+  if (btn && btn.disabled) return;
+  btnLoading(btn, 'در حال ذخیره...');
+  try {
+    const body = {
+      name, location: document.getElementById('wh-location').value,
+      description: document.getElementById('wh-desc').value,
+    };
+    if (state.editWarehouseId) {
+      await api('PUT', `/warehouses/${state.editWarehouseId}`, body);
+      toast('انبار ویرایش شد ✏️');
+    } else {
+      await api('POST', '/warehouses', body);
+      toast('انبار جدید ثبت شد 🏭');
+    }
+    closeModal('modal-warehouse');
+    await renderPage();
+  } catch(e) {
+    // خطا قبلاً در api() نمایش داده شده
+  } finally {
+    btnDone(btn);
   }
-  closeModal('modal-warehouse');
-  renderPage();
 }
 
 async function deleteWarehouse(id, name) {
@@ -1625,18 +1693,18 @@ async function saveProduct() {
   // جلوگیری از ثبت دوباره
   const saveBtn = document.querySelector('#modal-product .btn-primary');
   if (saveBtn && saveBtn.disabled) return;
-  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'در حال ذخیره...'; }
-  const body = {
-    name, sku: document.getElementById('prod-sku').value,
-    category: document.getElementById('prod-cat').value,
-    quantity: parseFloat(document.getElementById('prod-qty').value)||0,
-    unit: document.getElementById('prod-unit').value,
-    unit_price: parseFloat(document.getElementById('prod-price').value)||0,
-    min_stock: parseFloat(document.getElementById('prod-min').value)||0,
-    description: document.getElementById('prod-desc').value,
-    warehouse_id: parseInt(document.getElementById('prod-wh').value),
-  };
+  btnLoading(saveBtn, 'در حال ذخیره...');
   try {
+    const body = {
+      name, sku: document.getElementById('prod-sku').value,
+      category: document.getElementById('prod-cat').value,
+      quantity: parseFloat(document.getElementById('prod-qty').value)||0,
+      unit: document.getElementById('prod-unit').value,
+      unit_price: parseFloat(document.getElementById('prod-price').value)||0,
+      min_stock: parseFloat(document.getElementById('prod-min').value)||0,
+      description: document.getElementById('prod-desc').value,
+      warehouse_id: parseInt(document.getElementById('prod-wh').value),
+    };
     if (state.editProductId) {
       body.quantity = parseFloat(document.getElementById('prod-qty').value) || 0;
       body.note = document.getElementById('prod-edit-note').value || '';
@@ -1651,9 +1719,7 @@ async function saveProduct() {
   } catch(e) {
     // خطا قبلاً در api() نمایش داده شده
   } finally {
-    // همیشه دکمه را آزاد کن — چه موفق، چه خطا
-    const btn = document.querySelector('#modal-product .btn-primary');
-    if (btn) { btn.disabled = false; btn.textContent = '💾 ذخیره'; }
+    btnDone(saveBtn);
   }
 }
 
@@ -1699,8 +1765,7 @@ function jalaliToISO(jStr) {
 
 async function openTxModal(prodId) {
   state.txProductId = prodId;
-  const prods = await api('GET', '/products');
-  const p = prods.find(x=>x.id===prodId);
+  const p = await api('GET', `/products/${prodId}`);
   if (!p) return;
   const statusLabel = p.status==='out' ? '🚫 ناموجود' : p.status==='low' ? '⚠️ کم‌موجود' : '✅ موجود';
   document.getElementById('modal-tx-product-info').innerHTML = `
@@ -1750,9 +1815,7 @@ async function saveTx() {
 
   const btn = document.getElementById('btn-save-tx');
   if (btn.disabled) return;
-  btn.disabled = true;
-  const origText = btn.textContent;
-  btn.textContent = 'در حال ثبت...';
+  btnLoading(btn, 'در حال ثبت...');
 
   try {
     const manualStatus = document.getElementById('tx-status').value;
@@ -1771,9 +1834,7 @@ async function saveTx() {
   } catch(e) {
     // خطا در api() نمایش داده شده
   } finally {
-    // همیشه دکمه را آزاد کن
-    btn.disabled = false;
-    btn.textContent = origText;
+    btnDone(btn);
   }
 }
 
@@ -1789,10 +1850,19 @@ function openStatusModal(prodId, prodName, currentStatus) {
 
 async function saveStatus() {
   const s = document.getElementById('status-select').value;
-  await api('PATCH', `/products/${state.statusProductId}/status`, { manual_status: s });
-  toast('وضعیت کالا تغییر کرد ✅');
-  closeModal('modal-status');
-  renderPage();
+  const btn = document.querySelector('#modal-status .btn-primary');
+  if (btn && btn.disabled) return;
+  btnLoading(btn, 'در حال ذخیره...');
+  try {
+    await api('PATCH', `/products/${state.statusProductId}/status`, { manual_status: s });
+    toast('وضعیت کالا تغییر کرد ✅');
+    closeModal('modal-status');
+    await renderPage();
+  } catch(e) {
+    // خطا قبلاً در api() نمایش داده شده
+  } finally {
+    btnDone(btn);
+  }
 }
 
 // ─── Close modal on overlay click ───────────────────────────────────────────
@@ -1907,16 +1977,25 @@ function openDeptModal(id = null) {
 async function saveDept() {
   const name = document.getElementById('dept-name').value.trim();
   if (!name) { toast('نام بخش الزامی است', 'error'); return; }
-  const body = { name, description: document.getElementById('dept-desc').value };
-  if (editDeptId) {
-    await api('PUT', '/departments/' + editDeptId, body);
-    toast('بخش ویرایش شد ✏️');
-  } else {
-    await api('POST', '/departments', body);
-    toast('بخش جدید ثبت شد 🏥');
+  const btn = document.querySelector('#modal-dept .btn-primary');
+  if (btn && btn.disabled) return;
+  btnLoading(btn, 'در حال ذخیره...');
+  try {
+    const body = { name, description: document.getElementById('dept-desc').value };
+    if (editDeptId) {
+      await api('PUT', '/departments/' + editDeptId, body);
+      toast('بخش ویرایش شد ✏️');
+    } else {
+      await api('POST', '/departments', body);
+      toast('بخش جدید ثبت شد 🏥');
+    }
+    closeModal('modal-dept');
+    await renderPage();
+  } catch(e) {
+    // خطا قبلاً در api() نمایش داده شده
+  } finally {
+    btnDone(btn);
   }
-  closeModal('modal-dept');
-  renderPage();
 }
 
 async function deleteDept(id, name) {
@@ -2121,7 +2200,7 @@ async function submitDispatch() {
 
   const btn = document.querySelector('[onclick="submitDispatch()"]');
   if (btn && btn.disabled) return;
-  if (btn) { btn.disabled = true; btn.textContent = 'در حال ثبت...'; }
+  btnLoading(btn, 'در حال ثبت...');
 
   try {
     await api('POST', '/dispatch', { product_id: parseInt(prodId), department_id: parseInt(deptId), quantity: qty, note });
@@ -2130,8 +2209,7 @@ async function submitDispatch() {
   } catch(e) {
     // خطا در api() نمایش داده شده
   } finally {
-    // همیشه دکمه را آزاد کن
-    if (btn) { btn.disabled = false; btn.textContent = '✅ ثبت خروج رسمی'; }
+    btnDone(btn);
   }
 }
 
@@ -2281,10 +2359,11 @@ async function doLogin() {
   const errEl = document.getElementById('login-error');
   const btn = document.getElementById('login-btn');
   if (!username || !password) { errEl.textContent = 'نام کاربری و رمز عبور را وارد کنید'; return; }
-  btn.disabled = true; btn.textContent = 'در حال ورود...';
+  if (btn.disabled) return;
+  btnLoading(btn, 'در حال ورود...');
   try {
     const headers = {'Content-Type': 'application/json'};
-    const r = await fetch(API + '/auth/login', {method:'POST', headers, body: JSON.stringify({username, password})});
+    const r = await fetchWithTimeout(API + '/auth/login', {method:'POST', headers, body: JSON.stringify({username, password})});
     const d = await r.json();
     if (!r.ok) { errEl.textContent = d.error || 'خطا در ورود'; return; }
     setToken(d.token);
@@ -2292,9 +2371,9 @@ async function doLogin() {
     showApp();
     navigate('dashboard');
   } catch(e) {
-    errEl.textContent = 'خطا در ارتباط با سرور';
+    errEl.textContent = e.name === 'AbortError' ? 'پاسخ سرور طول کشید، دوباره امتحان کنید' : 'خطا در ارتباط با سرور';
   } finally {
-    btn.disabled = false; btn.textContent = 'ورود';
+    btnDone(btn);
   }
 }
 
@@ -2322,12 +2401,17 @@ async function saveChangePassword() {
     document.getElementById('cp-error').textContent = 'همه فیلدها الزامی است';
     return;
   }
+  const btn = document.querySelector('#modal-change-password .btn-primary');
+  if (btn && btn.disabled) return;
+  btnLoading(btn, 'در حال ذخیره...');
   try {
     await api('POST', '/auth/change-password', {old_password, new_password});
     toast('رمز عبور تغییر کرد ✅');
     closeModal('modal-change-password');
   } catch(e) {
     document.getElementById('cp-error').textContent = e.message;
+  } finally {
+    btnDone(btn);
   }
 }
 
@@ -2423,6 +2507,9 @@ async function saveUser() {
     body.username = document.getElementById('user-username').value.trim();
     if (!body.username || !pass) { toast('نام کاربری و رمز عبور الزامی است', 'error'); return; }
   }
+  const btn = document.querySelector('#modal-user .btn-primary');
+  if (btn && btn.disabled) return;
+  btnLoading(btn, 'در حال ذخیره...');
   try {
     if (editUserId) {
       await api('PUT', `/users/${editUserId}`, body);
@@ -2432,8 +2519,12 @@ async function saveUser() {
       toast('کاربر جدید ساخته شد ✅');
     }
     closeModal('modal-user');
-    renderPage();
-  } catch(e) {}
+    await renderPage();
+  } catch(e) {
+    // خطا قبلاً در api() نمایش داده شده
+  } finally {
+    btnDone(btn);
+  }
 }
 
 async function deleteUser(id, username) {
@@ -2578,7 +2669,7 @@ async function initApp() {
   const token = getToken();
   if (!token) { showLogin(); return; }
   try {
-    const r = await fetch(API + '/auth/me', {headers: {'X-Auth-Token': token}});
+    const r = await fetchWithTimeout(API + '/auth/me', {headers: {'X-Auth-Token': token}});
     if (!r.ok) { clearToken(); showLogin(); return; }
     currentUser = await r.json();
     showApp();
