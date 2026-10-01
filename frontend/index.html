@@ -1641,7 +1641,7 @@ async function renderWarehouses() {
     <div class="wh-card" onclick="navigate('warehouse_detail',{currentWarehouseId:${w.id}})">
       ${window._isViewer ? '' : `<div class="wh-card-actions">
         <button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="event.stopPropagation();openWarehouseModal(${w.id})">✏️</button>
-        <button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="event.stopPropagation();deleteWarehouse(${w.id},'${w.name}')">حذف</button>
+        <button class="btn btn-sm btn-danger" title="حذف" onclick="event.stopPropagation();deleteWarehouse(${w.id},'${w.name}')">حذف</button>
       </div>`}
       <div class="wh-card-name">${w.name}</div>
       <div class="wh-card-loc">${w.location ? '📍 '+w.location : '📍 مکان ثبت نشده'}</div>
@@ -1734,7 +1734,7 @@ function prodRow(p) {
         <button class="btn btn-sm btn-primary" title="کارت کالا" onclick="openProductCard(${p.id})">📋</button>
         ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" title="ورود خرید" onclick="openProductCard(${p.id},'in')">⬆️</button>`}
         ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openProductModal(${p.id})">✏️</button>`}
-        ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteProduct(${p.id},'${safeName}')">حذف</button>`}
+        ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger" title="حذف" onclick="deleteProduct(${p.id},'${safeName}')">حذف</button>`}
       </div>
     </td>
     <td class="col-qty num fw-bold">${fmt(p.quantity)} ${escHtml(p.unit)}</td>
@@ -2870,7 +2870,7 @@ async function renderDepartments() {
       return '<tr><td class="col-name fw-bold">' + escHtml(d.name) + '</td>' +
         '<td class="col-actions"><div class="row-actions">' +
         (window._isViewer ? '' : '<button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openDeptModal(' + d.id + ')">✏️</button>') +
-        (window._isViewer ? '' : '<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteDept(' + d.id + ',\'' + safeName + '\')">حذف</button>') +
+        (window._isViewer ? '' : '<button class="btn btn-sm btn-danger" title="حذف" onclick="deleteDept(' + d.id + ',\'' + safeName + '\')">حذف</button>') +
         '</div></td>' +
         '<td class="col-detail text-muted note-cell">' + escHtml(d.description || '—') + '</td>' +
         '<td class="col-date text-sm num">' + escHtml(d.created_at) + '</td></tr>';
@@ -3443,7 +3443,7 @@ async function renderUsers() {
         <td class="col-name fw-bold">${escHtml(u.username)}</td>
         <td class="col-actions"><div class="row-actions">
           <button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openUserModal(${u.id})">✏️</button>
-          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteUser(${u.id},'${safeUser}')">حذف</button>` : ''}
+          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" title="حذف" onclick="deleteUser(${u.id},'${safeUser}')">حذف</button>` : ''}
         </div></td>
         <td class="col-name">${escHtml(u.display_name)}</td>
         <td class="col-status">${roleBadge(u.role)}</td>
