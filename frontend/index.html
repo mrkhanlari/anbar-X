@@ -332,23 +332,26 @@
   .col-sku { width: 9%; }
   .col-cat { width: 9%; }
   .col-status { width: 10%; }
-  .col-actions { width: 118px; }
-  .col-actions-wide { width: 148px; }
+  .col-actions { width: 104px; }
+  .col-actions-wide { width: 168px; }
   .row-actions {
     display: inline-flex;
     flex-wrap: nowrap;
-    gap: 4px;
+    gap: 5px;
     align-items: center;
     justify-content: flex-start;
+    width: max-content;
+    max-width: none;
   }
   .row-actions .btn {
     flex: 0 0 auto;
     white-space: nowrap;
-    padding: 4px 6px;
-    min-width: 30px;
+    padding: 5px 7px;
+    min-width: 32px;
     justify-content: center;
+    overflow: visible;
   }
-  .row-actions .btn-icon { padding: 4px 6px; }
+  .row-actions .btn-icon { padding: 5px 7px; }
   /* ستون عملیات کنار نام (سمت راست RTL) تا زیر لبه چپ مخفی نشود */
   table.table-fit.has-actions {
     min-width: 0;
@@ -359,6 +362,9 @@
   table.table-fit th.col-actions-wide {
     white-space: nowrap;
     vertical-align: middle;
+    overflow: visible;
+    padding-left: 10px;
+    padding-right: 8px;
   }
   .qty-stack { line-height: 1.35; }
   .qty-stack .muted { color: var(--text2); font-size: 11px; }
