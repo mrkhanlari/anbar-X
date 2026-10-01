@@ -1770,9 +1770,12 @@ async function renderAllProducts() {
     window._isViewer ? '' : `<button class="btn btn-primary" onclick="openProductModal()">➕ کالای جدید</button>`;
   const c = document.getElementById('content');
   c.innerHTML = `<div class="card">
-    <div class="flex-between mb-4">
+    <div class="flex-between mb-4" style="flex-wrap:wrap;gap:10px;">
       <div class="card-title" style="margin:0" id="all-prods-count">در حال بارگذاری...</div>
-      <div class="search-bar"><span class="search-icon">🔍</span><input id="all-prod-search" placeholder="جستجو..." oninput="searchAllProds(this.value)" style="width:220px;"/></div>
+      <div class="search-bar" style="flex:1;min-width:180px;max-width:320px;">
+        <span class="search-icon">🔍</span>
+        <input id="all-prod-search" placeholder="جستجو..." oninput="searchAllProds(this.value)" style="width:100%;"/>
+      </div>
     </div>
     <div id="all-prods-body"><div class="spinner"></div></div>
   </div>`;
@@ -1788,6 +1791,12 @@ function searchAllProds(val) {
 }
 
 function goToProdPage(page) { loadProdPage(page); }
+
+function prodStatusBadge(p) {
+  if (p.status === 'out') return '<span class="badge badge-red">🚫 تمام شد</span>';
+  if (p.status === 'low') return '<span class="badge badge-yellow">⚠️ کم</span>';
+  return '<span class="badge badge-green">✅ موجود</span>';
+}
 
 async function loadProdPage(page) {
   const search = window._allProdsSearch || '';
@@ -1806,28 +1815,54 @@ async function loadProdPage(page) {
       : `<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">هیچ کالایی ثبت نشده</div></div>`;
     return;
   }
-  body.innerHTML = `<div class="table-wrap"><table id="all-prods-table">
-    <thead><tr>
-      <th>نام کالا</th><th>انبار</th><th>دسته</th><th>موجودی</th><th>آخرین خرید</th><th>وضعیت</th><th>عملیات</th>
-    </tr></thead><tbody>
-    ${res.items.map(p=>allProdRow(p)).join('')}
-    </tbody></table></div>
+  body.innerHTML = `
+    <div class="table-wrap desk-only"><table id="all-prods-table">
+      <thead><tr>
+        <th>نام کالا</th><th>انبار</th><th>دسته</th><th>موجودی</th><th>آخرین خرید</th><th>وضعیت</th><th>عملیات</th>
+      </tr></thead><tbody>
+      ${res.items.map(p=>allProdRow(p)).join('')}
+      </tbody></table></div>
+    <div class="mobile-list mob-only">
+      ${res.items.map(p=>allProdCard(p)).join('')}
+    </div>
     ${buildPager(res.page, res.total_pages)}`;
 }
 
 function allProdRow(p) {
+  const wh = p.warehouse_name || (state.warehouses.find(w=>w.id===p.warehouse_id)||{name:'—'}).name;
   return `<tr>
-    <td class="fw-bold"><span class="clickable-name" onclick="openProductCard(${p.id})">${p.name}</span></td>
-    <td class="text-muted">${p.warehouse_name || (state.warehouses.find(w=>w.id===p.warehouse_id)||{name:'—'}).name}</td>
-    <td>${p.category||'—'}</td>
-    <td class="num">${fmt(p.quantity)} ${p.unit}</td>
+    <td class="fw-bold"><span class="clickable-name" onclick="openProductCard(${p.id})">${escHtml(p.name)}</span></td>
+    <td class="text-muted">${escHtml(wh)}</td>
+    <td>${escHtml(p.category)||'—'}</td>
+    <td class="num">${fmt(p.quantity)} ${escHtml(p.unit)}</td>
     <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
-    <td>${p.status==='out'?'<span class="badge badge-red">🚫 تمام شد</span>':p.status==='low'?'<span class="badge badge-yellow">⚠️ کم</span>':'<span class="badge badge-green">✅ موجود</span>'}</td>
+    <td>${prodStatusBadge(p)}</td>
     <td><div class="flex-gap">
       <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت</button>
       ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️</button>`}
     </div></td>
   </tr>`;
+}
+
+function allProdCard(p) {
+  const wh = p.warehouse_name || (state.warehouses.find(w=>w.id===p.warehouse_id)||{name:'—'}).name;
+  return `<article class="m-card">
+    <div class="m-card-head">
+      <div style="min-width:0;">
+        <div class="m-card-title clickable-name" onclick="openProductCard(${p.id})">${escHtml(p.name)}</div>
+        <div class="m-card-sub">${escHtml(wh)}${p.category ? ' · ' + escHtml(p.category) : ''}</div>
+      </div>
+      ${prodStatusBadge(p)}
+    </div>
+    <div class="m-card-grid">
+      <div><span class="lbl">موجودی</span><b>${fmt(p.quantity)} ${escHtml(p.unit||'')}</b></div>
+      <div><span class="lbl">آخرین خرید</span>${p.unit_price?fmtPrice(p.unit_price):'—'}</div>
+    </div>
+    <div class="flex-gap" style="margin-top:10px;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت کالا</button>
+      ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️ ویرایش</button>`}
+    </div>
+  </article>`;
 }
 
 function buildPager(page, totalPages) {
@@ -2574,12 +2609,39 @@ async function renderDepartments() {
     return;
   }
 
-  c.innerHTML = '<div class="card"><div class="card-title">🏥 بخش‌های تعریف شده</div><div class="table-wrap"><table><thead><tr><th>نام بخش</th><th>توضیحات</th><th>تاریخ ثبت</th><th>عملیات</th></tr></thead><tbody>' +
-    depts.map(d => '<tr><td class="fw-bold">' + d.name + '</td><td class="text-muted">' + (d.description || '—') + '</td><td class="text-sm num">' + d.created_at + '</td><td><div class="flex-gap">' +
-      (window._isViewer ? '' : '<button class="btn btn-sm btn-secondary" onclick="openDeptModal(' + d.id + ')">✏️</button>') +
-      (window._isViewer ? '' : '<button class="btn btn-sm btn-danger" onclick="deleteDept(' + d.id + ',\''+d.name+'\')">🗑️</button>') +
-      '</div></td></tr>').join('') +
-    '</tbody></table></div></div>';
+  const desk = '<div class="table-wrap desk-only"><table><thead><tr>' +
+    '<th>نام بخش</th><th>توضیحات</th><th>تاریخ ثبت</th><th>عملیات</th></tr></thead><tbody>' +
+    depts.map(d => {
+      const safeName = String(d.name || '').replace(/'/g, "\\'");
+      return '<tr><td class="fw-bold">' + escHtml(d.name) + '</td>' +
+        '<td class="text-muted note-cell">' + escHtml(d.description || '—') + '</td>' +
+        '<td class="text-sm num">' + escHtml(d.created_at) + '</td><td><div class="flex-gap">' +
+        (window._isViewer ? '' : '<button class="btn btn-sm btn-secondary" onclick="openDeptModal(' + d.id + ')">✏️</button>') +
+        (window._isViewer ? '' : '<button class="btn btn-sm btn-danger" onclick="deleteDept(' + d.id + ',\'' + safeName + '\')">🗑️</button>') +
+        '</div></td></tr>';
+    }).join('') +
+    '</tbody></table></div>';
+
+  const mob = '<div class="mobile-list mob-only">' +
+    depts.map(d => {
+      const safeName = String(d.name || '').replace(/'/g, "\\'");
+      return '<article class="m-card">' +
+        '<div class="m-card-head"><div style="min-width:0;">' +
+          '<div class="m-card-title">' + escHtml(d.name) + '</div>' +
+          '<div class="m-card-sub">ثبت: ' + escHtml(d.created_at || '—') + '</div>' +
+        '</div></div>' +
+        '<div class="m-card-note"><span class="lbl">توضیحات</span>' +
+          escHtml((d.description || '').trim() || '—') + '</div>' +
+        (window._isViewer ? '' :
+          '<div class="flex-gap" style="margin-top:10px;flex-wrap:wrap;">' +
+            '<button class="btn btn-sm btn-secondary" onclick="openDeptModal(' + d.id + ')">✏️ ویرایش</button>' +
+            '<button class="btn btn-sm btn-danger" onclick="deleteDept(' + d.id + ',\'' + safeName + '\')">🗑️ حذف</button>' +
+          '</div>') +
+      '</article>';
+    }).join('') +
+    '</div>';
+
+  c.innerHTML = '<div class="card"><div class="card-title">🏥 بخش‌های تعریف شده</div>' + desk + mob + '</div>';
 }
 
 let editDeptId = null;
@@ -3106,6 +3168,50 @@ async function renderUsers() {
   const c = document.getElementById('content');
   document.getElementById('topbar-actions').innerHTML =
     `<button class="btn btn-primary" onclick="openUserModal()">➕ کاربر جدید</button>`;
+
+  const desk = `<div class="table-wrap desk-only"><table>
+      <thead><tr>
+        <th>نام کاربری</th><th>نام نمایشی</th><th>نقش</th><th>وضعیت</th><th>آخرین ورود</th><th>عملیات</th>
+      </tr></thead><tbody>
+      ${users.map(u => {
+        const safeUser = String(u.username || '').replace(/'/g, "\\'");
+        return `<tr>
+        <td class="fw-bold">${escHtml(u.username)}</td>
+        <td>${escHtml(u.display_name)}</td>
+        <td>${roleBadge(u.role)}</td>
+        <td>${u.is_active ? '<span class="badge badge-green">✅ فعال</span>' : '<span class="badge badge-red">🚫 غیرفعال</span>'}</td>
+        <td class="text-sm text-muted num">${escHtml(u.last_login || '—')}</td>
+        <td><div class="flex-gap">
+          <button class="btn btn-sm btn-secondary" onclick="openUserModal(${u.id})">✏️ ویرایش</button>
+          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id},'${safeUser}')">🗑️</button>` : ''}
+        </div></td>
+      </tr>`;
+      }).join('')}
+      </tbody></table></div>`;
+
+  const mob = `<div class="mobile-list mob-only">
+    ${users.map(u => {
+      const safeUser = String(u.username || '').replace(/'/g, "\\'");
+      return `<article class="m-card">
+        <div class="m-card-head">
+          <div style="min-width:0;">
+            <div class="m-card-title">${escHtml(u.display_name || u.username)}</div>
+            <div class="m-card-sub">@${escHtml(u.username)}</div>
+          </div>
+          ${u.is_active ? '<span class="badge badge-green">✅ فعال</span>' : '<span class="badge badge-red">🚫 غیرفعال</span>'}
+        </div>
+        <div class="m-card-grid">
+          <div><span class="lbl">نقش</span>${roleBadge(u.role)}</div>
+          <div><span class="lbl">آخرین ورود</span>${escHtml(u.last_login || '—')}</div>
+        </div>
+        <div class="flex-gap" style="margin-top:10px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-secondary" onclick="openUserModal(${u.id})">✏️ ویرایش</button>
+          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id},'${safeUser}')">🗑️ حذف</button>` : ''}
+        </div>
+      </article>`;
+    }).join('')}
+  </div>`;
+
   c.innerHTML = `
   <div class="card mb-4">
     <div class="card-title">📋 لاگ ورود کاربران (آخرین ۲۰۰ مورد)</div>
@@ -3113,22 +3219,8 @@ async function renderUsers() {
   </div>
   <div class="card">
     <div class="card-title">👥 مدیریت کاربران</div>
-    <div class="table-wrap"><table>
-      <thead><tr>
-        <th>نام کاربری</th><th>نام نمایشی</th><th>نقش</th><th>وضعیت</th><th>آخرین ورود</th><th>عملیات</th>
-      </tr></thead><tbody>
-      ${users.map(u => `<tr>
-        <td class="fw-bold">${u.username}</td>
-        <td>${u.display_name}</td>
-        <td>${roleBadge(u.role)}</td>
-        <td>${u.is_active ? '<span class="badge badge-green">✅ فعال</span>' : '<span class="badge badge-red">🚫 غیرفعال</span>'}</td>
-        <td class="text-sm text-muted num">${u.last_login || '—'}</td>
-        <td><div class="flex-gap">
-          <button class="btn btn-sm btn-secondary" onclick="openUserModal(${u.id})">✏️ ویرایش</button>
-          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id},'${u.username}')">🗑️</button>` : ''}
-        </div></td>
-      </tr>`).join('')}
-      </tbody></table></div>
+    ${desk}
+    ${mob}
   </div>`;
   loadLoginLogs();
 }
@@ -3144,15 +3236,30 @@ async function loadLoginLogs() {
   const el = document.getElementById('login-log-section');
   if (!el) return;
   if (!logs.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">هنوز ورودی ثبت نشده</div></div>'; return; }
-  el.innerHTML = `<div class="table-wrap"><table>
-    <thead><tr><th>تاریخ و ساعت</th><th>نام کاربری</th><th>نام نمایشی</th><th>IP</th></tr></thead>
-    <tbody>${logs.map(l=>`<tr>
-      <td class="num text-sm">${l.logged_in_at}</td>
-      <td class="fw-bold">${l.username}</td>
-      <td>${l.display_name}</td>
-      <td class="text-sm text-muted">${l.ip_address}</td>
-    </tr>`).join('')}</tbody>
-  </table></div>`;
+  el.innerHTML = `
+    <div class="table-wrap desk-only"><table>
+      <thead><tr><th>تاریخ و ساعت</th><th>نام کاربری</th><th>نام نمایشی</th><th>IP</th></tr></thead>
+      <tbody>${logs.map(l=>`<tr>
+        <td class="num text-sm">${escHtml(l.logged_in_at)}</td>
+        <td class="fw-bold">${escHtml(l.username)}</td>
+        <td>${escHtml(l.display_name)}</td>
+        <td class="text-sm text-muted">${escHtml(l.ip_address)}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+    <div class="mobile-list mob-only">
+      ${logs.map(l => `<article class="m-card">
+        <div class="m-card-head">
+          <div style="min-width:0;">
+            <div class="m-card-title">${escHtml(l.display_name || l.username)}</div>
+            <div class="m-card-sub">@${escHtml(l.username)}</div>
+          </div>
+          <div class="text-sm text-muted num">${escHtml(l.logged_in_at)}</div>
+        </div>
+        <div class="m-card-grid">
+          <div><span class="lbl">IP</span>${escHtml(l.ip_address || '—')}</div>
+        </div>
+      </article>`).join('')}
+    </div>`;
 }
 
 let editUserId = null;
