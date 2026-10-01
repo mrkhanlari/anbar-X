@@ -224,7 +224,7 @@
     box-shadow: var(--shadow);
     max-width: 100%;
     min-width: 0;
-    overflow: clip;
+    overflow: visible;
   }
   .card-title {
     font-size: 15px; font-weight: 700; margin-bottom: 20px;
@@ -332,8 +332,8 @@
   .col-sku { width: 9%; }
   .col-cat { width: 9%; }
   .col-status { width: 10%; }
-  .col-actions { width: 120px; }
-  .col-actions-wide { width: 156px; }
+  .col-actions { width: 118px; }
+  .col-actions-wide { width: 148px; }
   .row-actions {
     display: inline-flex;
     flex-wrap: nowrap;
@@ -349,9 +349,9 @@
     justify-content: center;
   }
   .row-actions .btn-icon { padding: 4px 6px; }
-  /* جداول دارای ستون عملیات: به‌جای بریدن دکمه، اسکرول داخل کادر */
+  /* ستون عملیات کنار نام (سمت راست RTL) تا زیر لبه چپ مخفی نشود */
   table.table-fit.has-actions {
-    min-width: 980px;
+    min-width: 0;
   }
   table.table-fit td.col-actions,
   table.table-fit th.col-actions,
@@ -1682,13 +1682,13 @@ async function renderWarehouseDetail() {
       : `<div class="table-wrap desk-only"><table class="table-fit has-actions" id="prods-table">
           <thead><tr>
             <th class="col-name">نام کالا</th>
-            <th class="col-sku">کد SKU</th>
-            <th class="col-cat">دسته</th>
+            <th class="col-actions-wide">عملیات</th>
             <th class="col-qty">موجودی</th>
             <th class="col-money">قیمت</th>
             <th class="col-money">ارزش کل</th>
             <th class="col-status">وضعیت</th>
-            <th class="col-actions-wide">عملیات</th>
+            <th class="col-sku">کد SKU</th>
+            <th class="col-cat">دسته</th>
           </tr></thead><tbody>
           ${prods.map(p=>prodRow(p)).join('')}
           </tbody></table></div>
@@ -1717,15 +1717,6 @@ function prodRow(p) {
       <span class="clickable-name" onclick="openProductCard(${p.id})" title="${escHtml(p.name)}">${escHtml(p.name)}</span>
       ${p.description?`<br><span class="text-sm text-muted">${escHtml(p.description)}</span>`:''}
     </td>
-    <td class="col-sku text-muted num">${escHtml(p.sku)||'—'}</td>
-    <td class="col-cat">${escHtml(p.category)||'—'}</td>
-    <td class="col-qty num fw-bold">${fmt(p.quantity)} ${escHtml(p.unit)}</td>
-    <td class="col-money num money-stack">
-      <div title="آخرین خرید">${lastBuy}</div>
-      <div class="muted" title="میانگین هزینه">میانگین: ${avg}</div>
-    </td>
-    <td class="col-money num">${fmtPrice(p.total_value)}</td>
-    <td class="col-status">${whProdStatusBadge(p)}</td>
     <td class="col-actions-wide">
       <div class="row-actions">
         <button class="btn btn-sm btn-primary" title="کارت کالا" onclick="openProductCard(${p.id})">📋</button>
@@ -1734,6 +1725,15 @@ function prodRow(p) {
         ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteProduct(${p.id},'${safeName}')">🗑️</button>`}
       </div>
     </td>
+    <td class="col-qty num fw-bold">${fmt(p.quantity)} ${escHtml(p.unit)}</td>
+    <td class="col-money num money-stack">
+      <div title="آخرین خرید">${lastBuy}</div>
+      <div class="muted" title="میانگین هزینه">میانگین: ${avg}</div>
+    </td>
+    <td class="col-money num">${fmtPrice(p.total_value)}</td>
+    <td class="col-status">${whProdStatusBadge(p)}</td>
+    <td class="col-sku text-muted num">${escHtml(p.sku)||'—'}</td>
+    <td class="col-cat">${escHtml(p.category)||'—'}</td>
   </tr>`;
 }
 
@@ -2046,12 +2046,12 @@ async function loadProdPage(page) {
     <div class="table-wrap desk-only"><table class="table-fit has-actions" id="all-prods-table">
       <thead><tr>
         <th class="col-name">نام کالا</th>
+        <th class="col-actions">عملیات</th>
         <th class="col-name">انبار</th>
         <th class="col-cat">دسته</th>
         <th class="col-qty">موجودی</th>
         <th class="col-money">آخرین خرید</th>
         <th class="col-status">وضعیت</th>
-        <th class="col-actions">عملیات</th>
       </tr></thead><tbody>
       ${res.items.map(p=>allProdRow(p)).join('')}
       </tbody></table></div>
@@ -2065,15 +2065,15 @@ function allProdRow(p) {
   const wh = p.warehouse_name || (state.warehouses.find(w=>w.id===p.warehouse_id)||{name:'—'}).name;
   return `<tr>
     <td class="col-name fw-bold"><span class="clickable-name" onclick="openProductCard(${p.id})" title="${escHtml(p.name)}">${escHtml(p.name)}</span></td>
+    <td class="col-actions"><div class="row-actions">
+      <button class="btn btn-sm btn-primary" title="کارت کالا" onclick="openProductCard(${p.id})">📋</button>
+      ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openProductModal(${p.id})">✏️</button>`}
+    </div></td>
     <td class="col-name text-muted">${escHtml(wh)}</td>
     <td class="col-cat">${escHtml(p.category)||'—'}</td>
     <td class="col-qty num">${fmt(p.quantity)} ${escHtml(p.unit)}</td>
     <td class="col-money num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
     <td class="col-status">${prodStatusBadge(p)}</td>
-    <td class="col-actions"><div class="row-actions">
-      <button class="btn btn-sm btn-primary" title="کارت کالا" onclick="openProductCard(${p.id})">📋</button>
-      ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openProductModal(${p.id})">✏️</button>`}
-    </div></td>
   </tr>`;
 }
 
@@ -2852,16 +2852,16 @@ async function renderDepartments() {
   }
 
   const desk = '<div class="table-wrap desk-only"><table class="table-fit has-actions"><thead><tr>' +
-    '<th class="col-name">نام بخش</th><th class="col-detail">توضیحات</th><th class="col-date">تاریخ ثبت</th><th class="col-actions">عملیات</th></tr></thead><tbody>' +
+    '<th class="col-name">نام بخش</th><th class="col-actions">عملیات</th><th class="col-detail">توضیحات</th><th class="col-date">تاریخ ثبت</th></tr></thead><tbody>' +
     depts.map(d => {
       const safeName = String(d.name || '').replace(/'/g, "\\'");
       return '<tr><td class="col-name fw-bold">' + escHtml(d.name) + '</td>' +
-        '<td class="col-detail text-muted note-cell">' + escHtml(d.description || '—') + '</td>' +
-        '<td class="col-date text-sm num">' + escHtml(d.created_at) + '</td>' +
         '<td class="col-actions"><div class="row-actions">' +
         (window._isViewer ? '' : '<button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openDeptModal(' + d.id + ')">✏️</button>') +
         (window._isViewer ? '' : '<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteDept(' + d.id + ',\'' + safeName + '\')">🗑️</button>') +
-        '</div></td></tr>';
+        '</div></td>' +
+        '<td class="col-detail text-muted note-cell">' + escHtml(d.description || '—') + '</td>' +
+        '<td class="col-date text-sm num">' + escHtml(d.created_at) + '</td></tr>';
     }).join('') +
     '</tbody></table></div>';
 
@@ -3246,18 +3246,18 @@ async function loadDeptReport() {
         : '');
 
     const desk = '<div class="table-wrap desk-only"><table class="table-fit has-actions"><thead><tr>' +
-        '<th class="col-date">تاریخ</th><th class="col-name">کالا</th><th class="col-dept">بخش</th>' +
-        '<th class="col-qty">تعداد</th><th class="col-user">ثبت‌کننده</th><th class="col-note">علت</th><th class="col-actions">عملیات</th>' +
+        '<th class="col-date">تاریخ</th><th class="col-name">کالا</th><th class="col-actions">عملیات</th><th class="col-dept">بخش</th>' +
+        '<th class="col-qty">تعداد</th><th class="col-user">ثبت‌کننده</th><th class="col-note">علت</th>' +
       '</tr></thead><tbody>' +
       txs.map((t) =>
         '<tr><td class="col-date num text-muted qty-stack">' + shortDate(t.created_at) + '</td>' +
         '<td class="col-name"><div class="fw-bold" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(t.product_name) + '</div>' +
           '<div class="text-sm text-muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(t.warehouse_name) + '</div></td>' +
+        '<td class="col-actions">' + actionCell(t) + '</td>' +
         '<td class="col-dept">' + (t.department_name ? '<span class="badge badge-blue">' + escHtml(t.department_name) + '</span>' : '—') + '</td>' +
         '<td class="col-qty num fw-bold val-red">- ' + fmt(t.quantity) + '</td>' +
         '<td class="col-user text-sm">' + escHtml(t.created_by || '—') + '</td>' +
-        '<td class="col-note note-cell">' + noteHtml(t.note) + '</td>' +
-        '<td class="col-actions">' + actionCell(t) + '</td></tr>'
+        '<td class="col-note note-cell">' + noteHtml(t.note) + '</td></tr>'
       ).join('') +
       '</tbody></table></div>';
 
@@ -3419,24 +3419,24 @@ async function renderUsers() {
   const desk = `<div class="table-wrap desk-only"><table class="table-fit has-actions">
       <thead><tr>
         <th class="col-name">نام کاربری</th>
+        <th class="col-actions">عملیات</th>
         <th class="col-name">نام نمایشی</th>
         <th class="col-status">نقش</th>
         <th class="col-status">وضعیت</th>
         <th class="col-date">آخرین ورود</th>
-        <th class="col-actions">عملیات</th>
       </tr></thead><tbody>
       ${users.map(u => {
         const safeUser = String(u.username || '').replace(/'/g, "\\'");
         return `<tr>
         <td class="col-name fw-bold">${escHtml(u.username)}</td>
-        <td class="col-name">${escHtml(u.display_name)}</td>
-        <td class="col-status">${roleBadge(u.role)}</td>
-        <td class="col-status">${u.is_active ? '<span class="badge badge-green">✅ فعال</span>' : '<span class="badge badge-red">🚫 غیرفعال</span>'}</td>
-        <td class="col-date text-sm text-muted num">${escHtml(u.last_login || '—')}</td>
         <td class="col-actions"><div class="row-actions">
           <button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openUserModal(${u.id})">✏️</button>
           ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteUser(${u.id},'${safeUser}')">🗑️</button>` : ''}
         </div></td>
+        <td class="col-name">${escHtml(u.display_name)}</td>
+        <td class="col-status">${roleBadge(u.role)}</td>
+        <td class="col-status">${u.is_active ? '<span class="badge badge-green">✅ فعال</span>' : '<span class="badge badge-red">🚫 غیرفعال</span>'}</td>
+        <td class="col-date text-sm text-muted num">${escHtml(u.last_login || '—')}</td>
       </tr>`;
       }).join('')}
       </tbody></table></div>`;
