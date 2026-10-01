@@ -342,6 +342,32 @@ def require_auth(role=None):
     return decorator
 
 
+def parse_date_arg(value, end_of_day=False):
+    """پارس تاریخ از کوئری‌استرینگ (ISO یا YYYY-MM-DD)"""
+    if not value:
+        return None
+    raw = str(value).strip().replace('Z', '')
+    try:
+        if 'T' in raw:
+            return datetime.fromisoformat(raw)
+        dt = datetime.fromisoformat(raw)
+        if end_of_day:
+            return dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+        return dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    except Exception:
+        return None
+
+
+def apply_created_at_range(query, model=Transaction):
+    start = parse_date_arg(request.args.get('from_date', '').strip(), end_of_day=False)
+    end = parse_date_arg(request.args.get('to_date', '').strip(), end_of_day=True)
+    if start:
+        query = query.filter(model.created_at >= start)
+    if end:
+        query = query.filter(model.created_at <= end)
+    return query, start, end
+
+
 # ═══════════════════════════════════════════════════════════════════
 # AUTH ROUTES
 # ═══════════════════════════════════════════════════════════════════
@@ -805,6 +831,7 @@ def add_transaction(pid):
 @require_auth()
 def get_all_transactions():
     search  = request.args.get('search', '').strip()
+    note_q  = request.args.get('note', '').strip()
     tx_type = request.args.get('type', '').strip()
     wh_id   = request.args.get('warehouse_id', '').strip()
     dept_id = request.args.get('department_id', '').strip()
@@ -822,6 +849,8 @@ def get_all_transactions():
             Transaction.note.ilike(f'%{search}%'),
             Transaction.ref_number.ilike(f'%{search}%'),
         ))
+    if note_q:
+        query = query.filter(Transaction.note.ilike(f'%{note_q}%'))
     if tx_type in ('in', 'out', 'adjust'):
         query = query.filter(Transaction.type == tx_type)
     if wh_id:
@@ -830,6 +859,7 @@ def get_all_transactions():
         query = query.filter(Transaction.department_id == int(dept_id))
     if product_id:
         query = query.filter(Transaction.product_id == int(product_id))
+    query, _, _ = apply_created_at_range(query)
     txs = query.order_by(Transaction.created_at.desc()).limit(500).all()
     return jsonify([t.to_dict() for t in txs])
 
@@ -923,6 +953,7 @@ def reverse_dispatch(tx_id):
 def dispatch_report():
     dept_id   = request.args.get('department_id', '').strip()
     product_q = request.args.get('product', '').strip()
+    note_q    = request.args.get('note', '').strip()
     wh_id     = request.args.get('warehouse_id', '').strip()
     query = (Transaction.query
              .join(Product, Transaction.product_id == Product.id)
@@ -935,6 +966,8 @@ def dispatch_report():
     if dept_id:   query = query.filter(Transaction.department_id == int(dept_id))
     if wh_id:     query = query.filter(Product.warehouse_id == int(wh_id))
     if product_q: query = query.filter(Product.name.ilike(f'%{product_q}%'))
+    if note_q:    query = query.filter(Transaction.note.ilike(f'%{note_q}%'))
+    query, _, _ = apply_created_at_range(query)
     txs = query.order_by(Transaction.created_at.desc()).limit(500).all()
     dept_summary = {}
     for tx in txs:
@@ -993,9 +1026,17 @@ def dashboard():
 def inventory_report():
     wid = request.args.get('warehouse_id')
     status_filter = request.args.get('status')
-    query = Product.query.filter_by(is_active=True)
-    if wid: query = query.filter_by(warehouse_id=int(wid))
-    products = query.all()
+    search = (request.args.get('search') or request.args.get('product') or '').strip()
+    query = Product.query.options(joinedload(Product.warehouse)).filter_by(is_active=True)
+    if wid:
+        query = query.filter_by(warehouse_id=int(wid))
+    if search:
+        query = query.filter(db.or_(
+            Product.name.ilike(f'%{search}%'),
+            Product.sku.ilike(f'%{search}%'),
+            Product.category.ilike(f'%{search}%'),
+        ))
+    products = query.order_by(Product.name.asc()).all()
     product_dicts = [p.to_dict() for p in products]
     if status_filter in ('normal', 'low', 'out'):
         product_dicts = [p for p in product_dicts if p['status'] == status_filter]

@@ -1604,52 +1604,84 @@ async function renderTransactions() {
   const whs = state.warehouses.length ? state.warehouses : await api('GET', '/warehouses');
   state.warehouses = whs;
   const c = document.getElementById('content');
+  const today = todayJalali();
 
   c.innerHTML = `
   <div class="card mb-4">
-    <div class="flex-gap" style="flex-wrap:wrap;gap:12px;">
+    <div class="flex-gap" style="flex-wrap:wrap;gap:12px;align-items:flex-end;">
+      <div class="form-group" style="margin:0;min-width:140px;">
+        <label>از تاریخ</label>
+        <input id="tx-from" placeholder="۱۴۰۴/۰۱/۰۱" dir="ltr" style="text-align:right;" value="${today}"/>
+      </div>
+      <div class="form-group" style="margin:0;min-width:140px;">
+        <label>تا تاریخ</label>
+        <input id="tx-to" placeholder="۱۴۰۴/۱۲/۲۹" dir="ltr" style="text-align:right;" value="${today}"/>
+      </div>
       <div class="search-bar" style="flex:1;min-width:200px;">
         <span class="search-icon">🔍</span>
-        <input id="tx-search" placeholder="جستجو در کالا، توضیحات، مرجع..." oninput="searchTx()" style="width:100%;"/>
+        <input id="tx-search" placeholder="جستجو در کالا، توضیحات، مرجع..." style="width:100%;"
+               onkeydown="if(event.key==='Enter')searchTx()"/>
       </div>
-      <select id="tx-filter-type" onchange="searchTx()" style="width:180px;">
+      <select id="tx-filter-type" style="width:180px;">
         <option value="">همه حرکات</option>
         <option value="in">⬆️ ورود خرید</option>
         <option value="out">⬇️ خروج</option>
         <option value="adjust">📝 اصلاح موجودی</option>
       </select>
-      <select id="tx-filter-wh" onchange="searchTx()" style="width:170px;">
+      <select id="tx-filter-wh" style="width:170px;">
         <option value="">همه انبارها</option>
         ${whs.map(w=>`<option value="${w.id}">${w.name}</option>`).join('')}
       </select>
-      <button class="btn btn-secondary" onclick="searchTx()">🔄 بروزرسانی</button>
+      <button class="btn btn-primary" onclick="searchTx()">🔍 جستجو</button>
     </div>
+    <div class="text-sm text-muted" style="margin-top:10px;">برای کاهش فشار شبکه، نتیجه فقط بعد از زدن «جستجو» لود می‌شود. بازه تاریخ را مشخص کنید.</div>
   </div>
   <div class="card">
     <div class="flex-between mb-4">
-      <div class="card-title" style="margin:0" id="tx-count-title">در حال بارگذاری...</div>
+      <div class="card-title" style="margin:0" id="tx-count-title">آماده جستجو</div>
     </div>
-    <div id="tx-results"><div class="spinner"></div></div>
+    <div id="tx-results"><div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">بازه تاریخ را مشخص کنید و جستجو را بزنید</div></div></div>
   </div>`;
-
-  await searchTx();
 }
 
 async function searchTx() {
-  const search = (document.getElementById('tx-search')||{}).value || '';
-  const type   = (document.getElementById('tx-filter-type')||{}).value || '';
-  const whId   = (document.getElementById('tx-filter-wh')||{}).value || '';
+  const fromStr = (document.getElementById('tx-from')||{}).value || '';
+  const toStr   = (document.getElementById('tx-to')||{}).value || '';
+  const search  = (document.getElementById('tx-search')||{}).value || '';
+  const type    = (document.getElementById('tx-filter-type')||{}).value || '';
+  const whId    = (document.getElementById('tx-filter-wh')||{}).value || '';
+
+  if (!fromStr.trim() || !toStr.trim()) {
+    toast('از تاریخ و تا تاریخ را وارد کنید', 'error');
+    return;
+  }
+  const fromISO = jalaliToISODate(fromStr.trim(), false);
+  const toISO = jalaliToISODate(toStr.trim(), true);
+  if (!fromISO || !toISO) {
+    toast('فرمت تاریخ اشتباه است — مثال: ۱۴۰۴/۰۷/۱۰', 'error');
+    return;
+  }
 
   const params = new URLSearchParams();
+  params.set('from_date', fromISO);
+  params.set('to_date', toISO);
   if (search) params.set('search', search);
   if (type)   params.set('type', type);
   if (whId)   params.set('warehouse_id', whId);
 
-  const txs = await api('GET', `/transactions?${params.toString()}`);
   const title = document.getElementById('tx-count-title');
   const results = document.getElementById('tx-results');
-  if (title) title.textContent = `🔄 تاریخچه حرکات انبار — ${fmt(txs.length)} مورد`;
-  if (results) results.innerHTML = buildTxTable(txs);
+  if (title) title.textContent = 'در حال جستجو...';
+  if (results) results.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    const txs = await api('GET', `/transactions?${params.toString()}`);
+    if (title) title.textContent = `🔄 تاریخچه حرکات انبار — ${fmt(txs.length)} مورد`;
+    if (results) results.innerHTML = buildTxTable(txs);
+  } catch (e) {
+    if (title) title.textContent = 'خطا در جستجو';
+    if (results) results.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">جستجو ناموفق بود</div></div>';
+  }
 }
 
 // ─── Report ──────────────────────────────────────────────────────────────────
@@ -1659,40 +1691,59 @@ async function renderReport() {
   state.warehouses = whs;
   const c = document.getElementById('content');
   c.innerHTML = `<div class="card mb-4">
-    <div class="flex-gap" style="flex-wrap:wrap;">
-      <label class="fw-bold">فیلتر انبار:</label>
-      <select id="rep-wh" onchange="loadReport()" style="width:200px;">
-        <option value="">همه انبارها</option>
-        ${whs.map(w=>`<option value="${w.id}">${w.name}</option>`).join('')}
-      </select>
-      <label class="fw-bold">وضعیت:</label>
-      <select id="rep-status" onchange="loadReport()" style="width:160px;">
-        <option value="">همه وضعیت‌ها</option>
-        <option value="normal">✅ موجود</option>
-        <option value="low">⚠️ کم‌موجود</option>
-        <option value="out">🚫 ناموجود</option>
-      </select>
+    <div class="flex-gap" style="flex-wrap:wrap;align-items:flex-end;gap:12px;">
+      <div class="form-group" style="margin:0;flex:1;min-width:220px;">
+        <label>جستجوی نام کالا</label>
+        <input id="rep-search" placeholder="نام کالا، کد SKU یا دسته..."
+               onkeydown="if(event.key==='Enter')loadReport()"/>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>انبار</label>
+        <select id="rep-wh" style="width:200px;">
+          <option value="">همه انبارها</option>
+          ${whs.map(w=>`<option value="${w.id}">${w.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>وضعیت</label>
+        <select id="rep-status" style="width:160px;">
+          <option value="">همه وضعیت‌ها</option>
+          <option value="normal">✅ موجود</option>
+          <option value="low">⚠️ کم‌موجود</option>
+          <option value="out">🚫 ناموجود</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="loadReport()">🔍 جستجو</button>
       <button class="btn btn-secondary" onclick="printReport()">🖨️ چاپ</button>
       <button class="btn btn-secondary" onclick="exportInventoryExcel()">📥 Excel</button>
     </div>
   </div>
-  <div id="report-content"><div class="spinner"></div></div>`;
-  loadReport();
+  <div id="report-content">
+    <div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">برای مشاهده گزارش، فیلترها را تنظیم و جستجو را بزنید</div></div>
+  </div>`;
 }
 
 async function loadReport() {
   const wid = document.getElementById('rep-wh').value;
   const status = document.getElementById('rep-status').value;
+  const search = (document.getElementById('rep-search') || {}).value || '';
   const params = new URLSearchParams();
   if (wid) params.set('warehouse_id', wid);
   if (status) params.set('status', status);
-  const d = await api('GET', `/report/inventory?${params.toString()}`);
+  if (search.trim()) params.set('search', search.trim());
   const rc = document.getElementById('report-content');
+  if (rc) rc.innerHTML = '<div class="spinner"></div>';
+  const d = await api('GET', `/report/inventory?${params.toString()}`);
+  if (!rc) return;
+  if (!d.products.length) {
+    rc.innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">کالایی با این فیلتر پیدا نشد</div></div>';
+    return;
+  }
   rc.innerHTML = `
   <div class="card" id="printable-report">
     <div class="flex-between mb-4">
       <div class="card-title" style="margin:0">📋 گزارش موجودی — ${d.generated_at}</div>
-      <div class="fw-bold val-blue">ارزش کل: ${fmtPrice(d.total_value)}</div>
+      <div class="fw-bold val-blue">ارزش کل: ${fmtPrice(d.total_value)} · ${fmt(d.products.length)} کالا</div>
     </div>
     <div class="table-wrap"><table>
       <thead><tr>
@@ -1925,6 +1976,12 @@ function todayJalali() {
   return new Date().toLocaleDateString('fa-IR-u-nu-latn', {
     year:'numeric', month:'2-digit', day:'2-digit'
   }).replace(/\//g, '/');
+}
+
+function jalaliToISODate(jStr, endOfDay=false) {
+  const iso = jalaliToISO(jStr);
+  if (!iso) return null;
+  return iso.replace(/T.*/, endOfDay ? 'T23:59:59' : 'T00:00:00');
 }
 
 // Convert Jalali input string to ISO for backend
@@ -2439,63 +2496,96 @@ async function renderDeptReport() {
   ]);
   state.warehouses = whs;
   const c = document.getElementById('content');
+  const today = todayJalali();
 
-  c.innerHTML = '<div class="card mb-4"><div class="flex-gap" style="flex-wrap:wrap;gap:12px;">' +
-    '<div><label class="fw-bold" style="margin-left:6px;">بخش:</label>' +
-      '<select id="dr-dept" onchange="loadDeptReport()" style="width:180px;"><option value="">همه بخش‌ها</option>' +
+  c.innerHTML = '<div class="card mb-4"><div class="flex-gap" style="flex-wrap:wrap;gap:12px;align-items:flex-end;">' +
+    '<div class="form-group" style="margin:0;min-width:140px;"><label>از تاریخ</label>' +
+      '<input id="dr-from" placeholder="۱۴۰۴/۰۱/۰۱" dir="ltr" style="text-align:right;" value="' + today + '"/></div>' +
+    '<div class="form-group" style="margin:0;min-width:140px;"><label>تا تاریخ</label>' +
+      '<input id="dr-to" placeholder="۱۴۰۴/۱۲/۲۹" dir="ltr" style="text-align:right;" value="' + today + '"/></div>' +
+    '<div class="form-group" style="margin:0;"><label>بخش</label>' +
+      '<select id="dr-dept" style="width:180px;"><option value="">همه بخش‌ها</option>' +
         depts.map(d => '<option value="' + d.id + '">' + d.name + '</option>').join('') +
       '</select></div>' +
-    '<div><label class="fw-bold" style="margin-left:6px;">کالا:</label>' +
-      '<input id="dr-prod" placeholder="جستجوی نام کالا..." oninput="loadDeptReport()" style="width:180px;"/></div>' +
-    '<div><label class="fw-bold" style="margin-left:6px;">انبار:</label>' +
-      '<select id="dr-wh" onchange="loadDeptReport()" style="width:160px;"><option value="">همه انبارها</option>' +
+    '<div class="form-group" style="margin:0;"><label>نام کالا</label>' +
+      '<input id="dr-prod" placeholder="جستجوی نام کالا..." style="width:180px;" onkeydown="if(event.key===\'Enter\')loadDeptReport()"/></div>' +
+    '<div class="form-group" style="margin:0;flex:1;min-width:200px;"><label>جستجو در علت‌ها</label>' +
+      '<input id="dr-note" placeholder="کلمه‌ای از علت/توضیح خروج..." style="width:100%;" onkeydown="if(event.key===\'Enter\')loadDeptReport()"/></div>' +
+    '<div class="form-group" style="margin:0;"><label>انبار</label>' +
+      '<select id="dr-wh" style="width:160px;"><option value="">همه انبارها</option>' +
         whs.map(w => '<option value="' + w.id + '">' + w.name + '</option>').join('') +
       '</select></div>' +
-    '<button class="btn btn-secondary" onclick="loadDeptReport()">🔄 بروزرسانی</button>' +
+    '<button class="btn btn-primary" onclick="loadDeptReport()">🔍 جستجو</button>' +
     '<button class="btn btn-secondary" onclick="exportDeptExcel()">📥 Excel</button>' +
-    '</div></div>' +
-    '<div id="dr-results"><div class="spinner"></div></div>';
-
-  loadDeptReport();
+    '</div>' +
+    '<div class="text-sm text-muted" style="margin-top:10px;">نتیجه فقط بعد از زدن «جستجو» لود می‌شود. بازه تاریخ الزامی است.</div>' +
+    '</div>' +
+    '<div id="dr-results"><div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">بازه تاریخ را مشخص کنید و جستجو را بزنید</div></div></div>';
 }
 
 async function loadDeptReport() {
+  const fromStr = (document.getElementById('dr-from') || {}).value || '';
+  const toStr = (document.getElementById('dr-to') || {}).value || '';
   const deptId = (document.getElementById('dr-dept') || {}).value || '';
   const prodSearch = (document.getElementById('dr-prod') || {}).value || '';
+  const noteSearch = (document.getElementById('dr-note') || {}).value || '';
   const whId = (document.getElementById('dr-wh') || {}).value || '';
-  const params = new URLSearchParams({ type: 'out' });
-  if (deptId) params.set('department_id', deptId);
-  if (prodSearch) params.set('search', prodSearch);
-  if (whId) params.set('warehouse_id', whId);
-  const txs = await api('GET', '/transactions?' + params.toString());
-  const el = document.getElementById('dr-results');
-  if (!el) return;
-  if (!txs.length) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">هیچ خروجی یافت نشد</div></div>';
+
+  if (!fromStr.trim() || !toStr.trim()) {
+    toast('از تاریخ و تا تاریخ را وارد کنید', 'error');
     return;
   }
-  const total = txs.reduce((s, t) => s + t.quantity, 0);
-  el.innerHTML = '<div class="card">' +
-    '<div class="flex-between mb-4"><div class="card-title" style="margin:0">📊 خروجی‌ها — ' + txs.length + ' مورد</div>' +
-    '<div class="text-sm text-muted">مجموع: <b>' + fmt(total) + '</b></div></div>' +
-    '<div class="table-wrap"><table><thead><tr>' +
-      '<th>تاریخ</th><th>کالا</th><th>انبار</th><th>بخش مقصد</th><th>تعداد</th><th>ثبت‌کننده</th><th>علت</th><th>عملیات</th>' +
-    '</tr></thead><tbody>' +
-    txs.map((t, i) =>
-      '<tr><td class="num text-sm text-muted" style="white-space:nowrap">' + t.created_at + '</td>' +
-      '<td class="fw-bold">' + t.product_name + '</td>' +
-      '<td class="text-muted">' + t.warehouse_name + '</td>' +
-      '<td>' + (t.department_name ? '<span class="badge badge-blue">' + t.department_name + '</span>' : '—') + '</td>' +
-      '<td class="num fw-bold val-red">- ' + fmt(t.quantity) + '</td>' +
-      '<td class="text-sm">' + (t.created_by || '—') + '</td>' +
-      '<td>' + (t.note ? '<span style="display:flex;align-items:center;gap:6px;"><button class="btn btn-sm btn-secondary" data-note="' + t.note.replace(/"/g,"&quot;") + '" onclick="toggleNote(this)">💬 علت</button><span class="note-text" style="display:none;font-size:12px;color:var(--text2);"></span></span>' : '<span class="text-muted">—</span>') + '</td>' +
-      '<td>' + (t.is_reversed
-        ? '<span class="badge badge-yellow">↩️ بازگشت‌خورده</span>'
-        : (!window._isViewer ? '<button class="btn btn-sm btn-danger" onclick="reverseDispatch(' + t.id + ',\''+t.product_name+'\',\''+t.department_name+'\','+t.quantity+',\''+t.unit_name+'\')" title="بازگشت این خروج">↩️ بازگشت</button>' : '')
-      ) + '</td>' +
-      '</tr>'
-    ).join('') +
-    '</tbody></table></div></div>';
+  const fromISO = jalaliToISODate(fromStr.trim(), false);
+  const toISO = jalaliToISODate(toStr.trim(), true);
+  if (!fromISO || !toISO) {
+    toast('فرمت تاریخ اشتباه است — مثال: ۱۴۰۴/۰۷/۱۰', 'error');
+    return;
+  }
+
+  const params = new URLSearchParams();
+  params.set('from_date', fromISO);
+  params.set('to_date', toISO);
+  if (deptId) params.set('department_id', deptId);
+  if (prodSearch.trim()) params.set('product', prodSearch.trim());
+  if (noteSearch.trim()) params.set('note', noteSearch.trim());
+  if (whId) params.set('warehouse_id', whId);
+
+  const el = document.getElementById('dr-results');
+  if (el) el.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    const d = await api('GET', '/dispatch/report?' + params.toString());
+    const txs = (d && d.transactions) || [];
+    if (!el) return;
+    if (!txs.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">هیچ خروجی با این فیلتر یافت نشد</div></div>';
+      return;
+    }
+    const total = txs.reduce((s, t) => s + t.quantity, 0);
+    el.innerHTML = '<div class="card">' +
+      '<div class="flex-between mb-4"><div class="card-title" style="margin:0">📊 خروجی‌ها — ' + txs.length + ' مورد</div>' +
+      '<div class="text-sm text-muted">مجموع: <b>' + fmt(total) + '</b></div></div>' +
+      '<div class="table-wrap"><table><thead><tr>' +
+        '<th>تاریخ</th><th>کالا</th><th>انبار</th><th>بخش مقصد</th><th>تعداد</th><th>ثبت‌کننده</th><th>علت</th><th>عملیات</th>' +
+      '</tr></thead><tbody>' +
+      txs.map((t) =>
+        '<tr><td class="num text-sm text-muted" style="white-space:nowrap">' + t.created_at + '</td>' +
+        '<td class="fw-bold">' + t.product_name + '</td>' +
+        '<td class="text-muted">' + t.warehouse_name + '</td>' +
+        '<td>' + (t.department_name ? '<span class="badge badge-blue">' + t.department_name + '</span>' : '—') + '</td>' +
+        '<td class="num fw-bold val-red">- ' + fmt(t.quantity) + '</td>' +
+        '<td class="text-sm">' + (t.created_by || '—') + '</td>' +
+        '<td>' + (t.note ? '<span style="display:flex;align-items:center;gap:6px;"><button class="btn btn-sm btn-secondary" data-note="' + t.note.replace(/"/g,"&quot;") + '" onclick="toggleNote(this)">💬 علت</button><span class="note-text" style="display:none;font-size:12px;color:var(--text2);"></span></span>' : '<span class="text-muted">—</span>') + '</td>' +
+        '<td>' + (t.is_reversed
+          ? '<span class="badge badge-yellow">↩️ بازگشت‌خورده</span>'
+          : (!window._isViewer ? '<button class="btn btn-sm btn-danger" onclick="reverseDispatch(' + t.id + ',\''+String(t.product_name||'').replace(/'/g,"\\'")+'\',\''+String(t.department_name||'').replace(/'/g,"\\'")+'\','+t.quantity+',\''+String(t.unit_name||'').replace(/'/g,"\\'")+'\')" title="بازگشت این خروج">↩️ بازگشت</button>' : '')
+        ) + '</td>' +
+        '</tr>'
+      ).join('') +
+      '</tbody></table></div></div>';
+  } catch (e) {
+    if (el) el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">جستجو ناموفق بود</div></div>';
+  }
 }
 
 function showNote(idx, note) {
@@ -2774,9 +2864,11 @@ function downloadExcel(rows, headers, filename) {
 async function exportInventoryExcel() {
   const wid    = (document.getElementById('rep-wh')     || {}).value || '';
   const status = (document.getElementById('rep-status') || {}).value || '';
+  const search = (document.getElementById('rep-search') || {}).value || '';
   const params = new URLSearchParams();
   if (wid)    params.set('warehouse_id', wid);
   if (status) params.set('status', status);
+  if (search.trim()) params.set('search', search.trim());
   const d = await api('GET', `/report/inventory?${params}`);
   if (!d || !d.products.length) { toast('داده‌ای برای خروجی وجود ندارد', 'error'); return; }
 
@@ -2809,12 +2901,22 @@ async function exportInventoryExcel() {
 }
 
 async function exportDeptExcel() {
+  const fromStr = (document.getElementById('dr-from') || {}).value || '';
+  const toStr   = (document.getElementById('dr-to') || {}).value || '';
   const deptId  = (document.getElementById('dr-dept') || {}).value || '';
   const product = (document.getElementById('dr-prod') || {}).value || '';
+  const note    = (document.getElementById('dr-note') || {}).value || '';
   const whId    = (document.getElementById('dr-wh')   || {}).value || '';
+  if (!fromStr.trim() || !toStr.trim()) { toast('ابتدا از/تا تاریخ را مشخص و جستجو کنید', 'error'); return; }
+  const fromISO = jalaliToISODate(fromStr.trim(), false);
+  const toISO = jalaliToISODate(toStr.trim(), true);
+  if (!fromISO || !toISO) { toast('فرمت تاریخ اشتباه است', 'error'); return; }
   const params  = new URLSearchParams();
+  params.set('from_date', fromISO);
+  params.set('to_date', toISO);
   if (deptId)  params.set('department_id', deptId);
   if (product) params.set('product', product);
+  if (note)    params.set('note', note);
   if (whId)    params.set('warehouse_id', whId);
   const d = await api('GET', `/dispatch/report?${params}`);
   if (!d || !d.transactions.length) { toast('داده‌ای برای خروجی وجود ندارد', 'error'); return; }
