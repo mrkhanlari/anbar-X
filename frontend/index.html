@@ -408,9 +408,14 @@
   }
   .filter-bar .filter-actions .btn { min-height: var(--tap); }
 
-  .desk-only { display: block; }
-  .mob-only { display: none; }
-  .mobile-list { display: flex; flex-direction: column; gap: 10px; }
+  /* جداسازی قطعی دسکتاپ/موبایل — mobile-list نباید mob-only را روی دسکتاپ باطل کند */
+  .desk-only { display: block !important; }
+  .mob-only { display: none !important; }
+  .mobile-list {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .mobile-list.mob-only { display: none !important; }
   .m-card {
     background: var(--bg3);
     border: 1px solid var(--border);
@@ -763,6 +768,7 @@
 
     .desk-only { display: none !important; }
     .mob-only { display: block !important; }
+    /* specificity بالاتر از .mob-only تا لیست کارتی درست flex شود */
     .mobile-list.mob-only { display: flex !important; }
 
     .nav-item { min-height: var(--tap); padding: 12px; }
