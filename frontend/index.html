@@ -316,6 +316,23 @@
   .pc-panel.active { display:block; }
   .clickable-name { cursor:pointer; color:var(--accent); }
   .clickable-name:hover { text-decoration:underline; }
+  .note-cell {
+    max-width: 320px;
+    min-width: 140px;
+    white-space: normal !important;
+    word-break: break-word;
+    line-height: 1.55;
+    color: var(--text);
+    font-size: 13px;
+  }
+  .table-wrap table thead th {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--bg2);
+  }
+  .pager {
+    display:flex; justify-content:space-between; align-items:center;
+    gap:12px; flex-wrap:wrap; margin-top:16px;
+  }
 
   /* ── Modal ── */
   .modal-overlay {
@@ -1026,6 +1043,8 @@ let state = {
   productCardTab: 'history',
   txProductId: null,
   txType: 'in',
+  txPage: 1,
+  drPage: 1,
 };
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
@@ -1127,6 +1146,29 @@ function btnDone(btn) {
 
 function fmt(n) { return Number(n||0).toLocaleString('fa-IR'); }
 function fmtPrice(n) { return Number(n||0).toLocaleString('fa-IR') + ' ریال'; }
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+function noteHtml(note) {
+  const text = (note || '').trim();
+  if (!text) return '<span class="text-muted">—</span>';
+  return `<span class="note-cell">${escHtml(text)}</span>`;
+}
+function buildListPager(page, totalPages, total, goFnName) {
+  if (!total) return '';
+  const prevDisabled = page <= 1 ? 'disabled' : '';
+  const nextDisabled = page >= totalPages ? 'disabled' : '';
+  return `<div class="pager">
+    <button class="btn btn-sm btn-secondary" ${prevDisabled} onclick="${goFnName}(${page-1})">← قبلی</button>
+    <div class="text-sm text-muted">صفحه ${fmt(page)} از ${fmt(totalPages)} · مجموع ${fmt(total)} مورد</div>
+    <button class="btn btn-sm btn-secondary" ${nextDisabled} onclick="${goFnName}(${page+1})">بعدی →</button>
+  </div>`;
+}
 
 // ─── Render Pages ────────────────────────────────────────────────────────────
 
@@ -1465,7 +1507,7 @@ function renderProductCardPanel(tab) {
               <td class="num">${t.total_cost!=null?fmtPrice(t.total_cost):'—'}</td>
               <td class="text-sm">${t.ref_number||'—'}</td>
               <td class="text-sm">${t.created_by||'—'}</td>
-              <td class="text-sm">${t.note||'—'}</td>
+              <td class="note-cell">${noteHtml(t.note)}</td>
             </tr>`).join('')}
             </tbody></table></div>`}`;
     return;
@@ -1579,23 +1621,23 @@ function buildTxTable(txs) {
   if (!txs.length) return '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">نتیجه‌ای یافت نشد</div></div>';
   return `<div class="table-wrap"><table id="tx-table">
     <thead><tr>
-      <th>تاریخ</th><th>کالا</th><th>انبار</th><th>نوع حرکت</th><th>قبل</th><th>تغییر</th><th>بعد</th><th>قیمت واحد</th><th>مبلغ</th><th>مرجع</th><th>توضیحات</th>
+      <th>تاریخ</th><th>کالا</th><th>انبار</th><th>نوع حرکت</th><th>قبل</th><th>تغییر</th><th>بعد</th>
+      <th>قیمت واحد</th><th>مبلغ</th><th>مرجع</th><th>بخش</th><th>توضیحات</th><th>ثبت‌کننده</th>
     </tr></thead><tbody>
     ${txs.map(t=>`<tr>
-      <td class="num text-sm text-muted" style="white-space:nowrap">${t.created_at}</td>
-      <td class="fw-bold"><span class="clickable-name" onclick="openProductCard(${t.product_id})">${t.product_name}</span></td>
-      <td class="text-muted">${t.warehouse_name}</td>
+      <td class="num text-sm text-muted" style="white-space:nowrap">${escHtml(t.created_at)}</td>
+      <td class="fw-bold"><span class="clickable-name" onclick="openProductCard(${t.product_id})">${escHtml(t.product_name)}</span></td>
+      <td class="text-muted">${escHtml(t.warehouse_name)}</td>
       <td>${txBadge(t)}</td>
       <td class="num">${fmt(t.before_qty)}</td>
       <td class="num fw-bold">${txChangeCell(t)}</td>
       <td class="num fw-bold">${fmt(t.after_qty)}</td>
       <td class="num">${t.unit_price != null ? fmtPrice(t.unit_price) : '—'}</td>
       <td class="num">${t.total_cost != null ? fmtPrice(t.total_cost) : '—'}</td>
-      <td class="text-sm">${t.ref_number||'—'}</td>
-      <td class="text-sm" style="max-width:200px;">
-        ${t.department_name ? `<span class="badge badge-blue">${t.department_name}</span> ` : ''}
-        ${t.note ? `<span title="${t.note}" style="color:var(--text2);">💬 ${t.note}</span>` : '<span class="text-muted">—</span>'}
-      </td>
+      <td class="text-sm">${escHtml(t.ref_number)||'—'}</td>
+      <td>${t.department_name ? `<span class="badge badge-blue">${escHtml(t.department_name)}</span>` : '<span class="text-muted">—</span>'}</td>
+      <td class="note-cell">${noteHtml(t.note)}</td>
+      <td class="text-sm text-muted">${escHtml(t.created_by)||'—'}</td>
     </tr>`).join('')}
     </tbody></table></div>`;
 }
@@ -1603,6 +1645,7 @@ function buildTxTable(txs) {
 async function renderTransactions() {
   const whs = state.warehouses.length ? state.warehouses : await api('GET', '/warehouses');
   state.warehouses = whs;
+  state.txPage = 1;
   const c = document.getElementById('content');
   const today = todayJalali();
 
@@ -1620,7 +1663,7 @@ async function renderTransactions() {
       <div class="search-bar" style="flex:1;min-width:200px;">
         <span class="search-icon">🔍</span>
         <input id="tx-search" placeholder="جستجو در کالا، توضیحات، مرجع..." style="width:100%;"
-               onkeydown="if(event.key==='Enter')searchTx()"/>
+               onkeydown="if(event.key==='Enter'){state.txPage=1;searchTx()}"/>
       </div>
       <select id="tx-filter-type" style="width:180px;">
         <option value="">همه حرکات</option>
@@ -1630,11 +1673,11 @@ async function renderTransactions() {
       </select>
       <select id="tx-filter-wh" style="width:170px;">
         <option value="">همه انبارها</option>
-        ${whs.map(w=>`<option value="${w.id}">${w.name}</option>`).join('')}
+        ${whs.map(w=>`<option value="${w.id}">${escHtml(w.name)}</option>`).join('')}
       </select>
-      <button class="btn btn-primary" onclick="searchTx()">🔍 جستجو</button>
+      <button class="btn btn-primary" onclick="state.txPage=1;searchTx()">🔍 جستجو</button>
     </div>
-    <div class="text-sm text-muted" style="margin-top:10px;">برای کاهش فشار شبکه، نتیجه فقط بعد از زدن «جستجو» لود می‌شود. بازه تاریخ را مشخص کنید.</div>
+    <div class="text-sm text-muted" style="margin-top:10px;">نتیجه فقط بعد از «جستجو» لود می‌شود. توضیحات هر حرکت کامل نمایش داده می‌شود.</div>
   </div>
   <div class="card">
     <div class="flex-between mb-4">
@@ -1642,6 +1685,12 @@ async function renderTransactions() {
     </div>
     <div id="tx-results"><div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">بازه تاریخ را مشخص کنید و جستجو را بزنید</div></div></div>
   </div>`;
+}
+
+function goTxPage(page) {
+  if (page < 1) return;
+  state.txPage = page;
+  searchTx();
 }
 
 async function searchTx() {
@@ -1662,9 +1711,12 @@ async function searchTx() {
     return;
   }
 
+  const page = state.txPage || 1;
   const params = new URLSearchParams();
   params.set('from_date', fromISO);
   params.set('to_date', toISO);
+  params.set('page', String(page));
+  params.set('per_page', '50');
   if (search) params.set('search', search);
   if (type)   params.set('type', type);
   if (whId)   params.set('warehouse_id', whId);
@@ -1675,9 +1727,15 @@ async function searchTx() {
   if (results) results.innerHTML = '<div class="spinner"></div>';
 
   try {
-    const txs = await api('GET', `/transactions?${params.toString()}`);
-    if (title) title.textContent = `🔄 تاریخچه حرکات انبار — ${fmt(txs.length)} مورد`;
-    if (results) results.innerHTML = buildTxTable(txs);
+    const res = await api('GET', `/transactions?${params.toString()}`);
+    const txs = Array.isArray(res) ? res : (res.items || []);
+    const total = Array.isArray(res) ? txs.length : (res.total || txs.length);
+    const totalPages = Array.isArray(res) ? 1 : (res.total_pages || 1);
+    const curPage = Array.isArray(res) ? 1 : (res.page || 1);
+    if (title) title.textContent = `🔄 تاریخچه حرکات انبار — ${fmt(total)} مورد`;
+    if (results) {
+      results.innerHTML = buildTxTable(txs) + buildListPager(curPage, totalPages, total, 'goTxPage');
+    }
   } catch (e) {
     if (title) title.textContent = 'خطا در جستجو';
     if (results) results.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">جستجو ناموفق بود</div></div>';
@@ -2495,6 +2553,7 @@ async function renderDeptReport() {
     api('GET', '/warehouses'),
   ]);
   state.warehouses = whs;
+  state.drPage = 1;
   const c = document.getElementById('content');
   const today = todayJalali();
 
@@ -2505,22 +2564,28 @@ async function renderDeptReport() {
       '<input id="dr-to" placeholder="۱۴۰۴/۱۲/۲۹" dir="ltr" style="text-align:right;" value="' + today + '"/></div>' +
     '<div class="form-group" style="margin:0;"><label>بخش</label>' +
       '<select id="dr-dept" style="width:180px;"><option value="">همه بخش‌ها</option>' +
-        depts.map(d => '<option value="' + d.id + '">' + d.name + '</option>').join('') +
+        depts.map(d => '<option value="' + d.id + '">' + escHtml(d.name) + '</option>').join('') +
       '</select></div>' +
     '<div class="form-group" style="margin:0;"><label>نام کالا</label>' +
-      '<input id="dr-prod" placeholder="جستجوی نام کالا..." style="width:180px;" onkeydown="if(event.key===\'Enter\')loadDeptReport()"/></div>' +
+      '<input id="dr-prod" placeholder="جستجوی نام کالا..." style="width:180px;" onkeydown="if(event.key===\'Enter\'){state.drPage=1;loadDeptReport()}"/></div>' +
     '<div class="form-group" style="margin:0;flex:1;min-width:200px;"><label>جستجو در علت‌ها</label>' +
-      '<input id="dr-note" placeholder="کلمه‌ای از علت/توضیح خروج..." style="width:100%;" onkeydown="if(event.key===\'Enter\')loadDeptReport()"/></div>' +
+      '<input id="dr-note" placeholder="کلمه‌ای از علت/توضیح خروج..." style="width:100%;" onkeydown="if(event.key===\'Enter\'){state.drPage=1;loadDeptReport()}"/></div>' +
     '<div class="form-group" style="margin:0;"><label>انبار</label>' +
       '<select id="dr-wh" style="width:160px;"><option value="">همه انبارها</option>' +
-        whs.map(w => '<option value="' + w.id + '">' + w.name + '</option>').join('') +
+        whs.map(w => '<option value="' + w.id + '">' + escHtml(w.name) + '</option>').join('') +
       '</select></div>' +
-    '<button class="btn btn-primary" onclick="loadDeptReport()">🔍 جستجو</button>' +
+    '<button class="btn btn-primary" onclick="state.drPage=1;loadDeptReport()">🔍 جستجو</button>' +
     '<button class="btn btn-secondary" onclick="exportDeptExcel()">📥 Excel</button>' +
     '</div>' +
-    '<div class="text-sm text-muted" style="margin-top:10px;">نتیجه فقط بعد از زدن «جستجو» لود می‌شود. بازه تاریخ الزامی است.</div>' +
+    '<div class="text-sm text-muted" style="margin-top:10px;">علت هر خروج مستقیماً در جدول دیده می‌شود. نتیجه فقط بعد از جستجو لود می‌شود.</div>' +
     '</div>' +
     '<div id="dr-results"><div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">بازه تاریخ را مشخص کنید و جستجو را بزنید</div></div></div>';
+}
+
+function goDeptPage(page) {
+  if (page < 1) return;
+  state.drPage = page;
+  loadDeptReport();
 }
 
 async function loadDeptReport() {
@@ -2542,9 +2607,12 @@ async function loadDeptReport() {
     return;
   }
 
+  const page = state.drPage || 1;
   const params = new URLSearchParams();
   params.set('from_date', fromISO);
   params.set('to_date', toISO);
+  params.set('page', String(page));
+  params.set('per_page', '50');
   if (deptId) params.set('department_id', deptId);
   if (prodSearch.trim()) params.set('product', prodSearch.trim());
   if (noteSearch.trim()) params.set('note', noteSearch.trim());
@@ -2555,56 +2623,41 @@ async function loadDeptReport() {
 
   try {
     const d = await api('GET', '/dispatch/report?' + params.toString());
-    const txs = (d && d.transactions) || [];
+    const txs = (d && (d.transactions || d.items)) || [];
     if (!el) return;
     if (!txs.length) {
       el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">هیچ خروجی با این فیلتر یافت نشد</div></div>';
       return;
     }
-    const total = txs.reduce((s, t) => s + t.quantity, 0);
+    const qtySum = txs.reduce((s, t) => s + t.quantity, 0);
+    const total = d.total != null ? d.total : txs.length;
+    const totalPages = d.total_pages || 1;
+    const curPage = d.page || 1;
     el.innerHTML = '<div class="card">' +
-      '<div class="flex-between mb-4"><div class="card-title" style="margin:0">📊 خروجی‌ها — ' + txs.length + ' مورد</div>' +
-      '<div class="text-sm text-muted">مجموع: <b>' + fmt(total) + '</b></div></div>' +
+      '<div class="flex-between mb-4"><div class="card-title" style="margin:0">📊 خروجی‌ها — ' + fmt(total) + ' مورد</div>' +
+      '<div class="text-sm text-muted">مجموع این صفحه: <b>' + fmt(qtySum) + '</b></div></div>' +
       '<div class="table-wrap"><table><thead><tr>' +
         '<th>تاریخ</th><th>کالا</th><th>انبار</th><th>بخش مقصد</th><th>تعداد</th><th>ثبت‌کننده</th><th>علت</th><th>عملیات</th>' +
       '</tr></thead><tbody>' +
       txs.map((t) =>
-        '<tr><td class="num text-sm text-muted" style="white-space:nowrap">' + t.created_at + '</td>' +
-        '<td class="fw-bold">' + t.product_name + '</td>' +
-        '<td class="text-muted">' + t.warehouse_name + '</td>' +
-        '<td>' + (t.department_name ? '<span class="badge badge-blue">' + t.department_name + '</span>' : '—') + '</td>' +
+        '<tr><td class="num text-sm text-muted" style="white-space:nowrap">' + escHtml(t.created_at) + '</td>' +
+        '<td class="fw-bold">' + escHtml(t.product_name) + '</td>' +
+        '<td class="text-muted">' + escHtml(t.warehouse_name) + '</td>' +
+        '<td>' + (t.department_name ? '<span class="badge badge-blue">' + escHtml(t.department_name) + '</span>' : '—') + '</td>' +
         '<td class="num fw-bold val-red">- ' + fmt(t.quantity) + '</td>' +
-        '<td class="text-sm">' + (t.created_by || '—') + '</td>' +
-        '<td>' + (t.note ? '<span style="display:flex;align-items:center;gap:6px;"><button class="btn btn-sm btn-secondary" data-note="' + t.note.replace(/"/g,"&quot;") + '" onclick="toggleNote(this)">💬 علت</button><span class="note-text" style="display:none;font-size:12px;color:var(--text2);"></span></span>' : '<span class="text-muted">—</span>') + '</td>' +
+        '<td class="text-sm">' + escHtml(t.created_by || '—') + '</td>' +
+        '<td class="note-cell">' + noteHtml(t.note) + '</td>' +
         '<td>' + (t.is_reversed
           ? '<span class="badge badge-yellow">↩️ بازگشت‌خورده</span>'
-          : (!window._isViewer ? '<button class="btn btn-sm btn-danger" onclick="reverseDispatch(' + t.id + ',\''+String(t.product_name||'').replace(/'/g,"\\'")+'\',\''+String(t.department_name||'').replace(/'/g,"\\'")+'\','+t.quantity+',\''+String(t.unit_name||'').replace(/'/g,"\\'")+'\')" title="بازگشت این خروج">↩️ بازگشت</button>' : '')
+          : (!window._isViewer ? '<button class="btn btn-sm btn-danger" onclick="reverseDispatch(' + t.id + ',\''+escHtml(t.product_name).replace(/'/g,'')+'\',\''+escHtml(t.department_name||'').replace(/'/g,'')+'\','+t.quantity+',\''+escHtml(t.unit_name||'').replace(/'/g,'')+'\')" title="بازگشت این خروج">↩️ بازگشت</button>' : '')
         ) + '</td>' +
         '</tr>'
       ).join('') +
-      '</tbody></table></div></div>';
+      '</tbody></table></div>' +
+      buildListPager(curPage, totalPages, total, 'goDeptPage') +
+      '</div>';
   } catch (e) {
     if (el) el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">جستجو ناموفق بود</div></div>';
-  }
-}
-
-function showNote(idx, note) {
-  // legacy - kept for compatibility
-}
-
-function toggleNote(btn) {
-  const note = btn.getAttribute('data-note');
-  const span = btn.nextElementSibling;
-  if (!span) return;
-  if (span.style.display === 'none' || span.style.display === '') {
-    span.textContent = note || '—';
-    span.style.display = 'inline';
-    btn.textContent = '💬 بستن';
-    btn.style.background = 'rgba(59,130,246,.2)';
-  } else {
-    span.style.display = 'none';
-    btn.textContent = '💬 علت';
-    btn.style.background = '';
   }
 }
 
@@ -2914,15 +2967,17 @@ async function exportDeptExcel() {
   const params  = new URLSearchParams();
   params.set('from_date', fromISO);
   params.set('to_date', toISO);
+  params.set('page', '1');
+  params.set('per_page', '200');
   if (deptId)  params.set('department_id', deptId);
   if (product) params.set('product', product);
   if (note)    params.set('note', note);
   if (whId)    params.set('warehouse_id', whId);
   const d = await api('GET', `/dispatch/report?${params}`);
-  if (!d || !d.transactions.length) { toast('داده‌ای برای خروجی وجود ندارد', 'error'); return; }
+  const excelTxs = (d && (d.transactions || d.items)) || [];
+  if (!excelTxs.length) { toast('داده‌ای برای خروجی وجود ندارد', 'error'); return; }
 
-  const typeLabel = { in: 'ورود خرید', out: 'خروج', adjust: 'اصلاح موجودی' };
-  const rows = d.transactions.map(t => ({
+  const rows = excelTxs.map(t => ({
     date:        t.created_at,
     product:     t.product_name,
     warehouse:   t.warehouse_name,

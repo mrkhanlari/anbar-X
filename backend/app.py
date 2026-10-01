@@ -368,6 +368,27 @@ def apply_created_at_range(query, model=Transaction):
     return query, start, end
 
 
+def paginate_args(default_per_page=50, max_per_page=200):
+    page = max(1, request.args.get('page', 1, type=int) or 1)
+    per_page = request.args.get('per_page', default_per_page, type=int) or default_per_page
+    per_page = min(max(per_page, 1), max_per_page)
+    return page, per_page
+
+
+def paginated_response(query, serialize):
+    """صفحه‌بندی استاندارد برای لیست‌های بزرگ"""
+    page, per_page = paginate_args()
+    total = query.count()
+    items = query.offset((page - 1) * per_page).limit(per_page).all()
+    return jsonify({
+        'items': [serialize(x) for x in items],
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': max(1, -(-total // per_page)),
+    })
+
+
 # ═══════════════════════════════════════════════════════════════════
 # AUTH ROUTES
 # ═══════════════════════════════════════════════════════════════════
@@ -715,6 +736,7 @@ def product_card(pid):
            .options(joinedload(Transaction.department))
            .filter_by(product_id=pid)
            .order_by(Transaction.created_at.desc(), Transaction.id.desc())
+           .limit(500)
            .all())
 
     total_in = 0.0
@@ -860,8 +882,8 @@ def get_all_transactions():
     if product_id:
         query = query.filter(Transaction.product_id == int(product_id))
     query, _, _ = apply_created_at_range(query)
-    txs = query.order_by(Transaction.created_at.desc()).limit(500).all()
-    return jsonify([t.to_dict() for t in txs])
+    query = query.order_by(Transaction.created_at.desc(), Transaction.id.desc())
+    return paginated_response(query, lambda t: t.to_dict())
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -968,16 +990,47 @@ def dispatch_report():
     if product_q: query = query.filter(Product.name.ilike(f'%{product_q}%'))
     if note_q:    query = query.filter(Transaction.note.ilike(f'%{note_q}%'))
     query, _, _ = apply_created_at_range(query)
-    txs = query.order_by(Transaction.created_at.desc()).limit(500).all()
+
+    from sqlalchemy import func
+    # خلاصه تجمیعی در خود دیتابیس — بدون لود همه ردیف‌ها
+    summary_rows = (
+        query.with_entities(
+            Transaction.department_id,
+            func.count(Transaction.id),
+            func.coalesce(func.sum(Transaction.quantity), 0),
+        )
+        .group_by(Transaction.department_id)
+        .all()
+    )
+    dept_ids = [r[0] for r in summary_rows if r[0]]
+    dept_names = {
+        d.id: d.name
+        for d in Department.query.filter(Department.id.in_(dept_ids)).all()
+    } if dept_ids else {}
     dept_summary = {}
-    for tx in txs:
-        dn = tx.department.name if tx.department else ''
-        if dn not in dept_summary:
-            dept_summary[dn] = {'count': 0, 'items': 0}
-        dept_summary[dn]['count'] += 1
-        dept_summary[dn]['items'] += tx.quantity
+    for dept_id, cnt, items in summary_rows:
+        dn = dept_names.get(dept_id, '')
+        dept_summary[dn] = {'count': int(cnt or 0), 'items': float(items or 0)}
+
+    total = query.order_by(None).count()
+    page, per_page = paginate_args()
+    txs = (query
+           .order_by(Transaction.created_at.desc(), Transaction.id.desc())
+           .offset((page - 1) * per_page)
+           .limit(per_page)
+           .all())
     now_j = jdatetime.datetime.fromgregorian(datetime=now_tehran()).strftime('%Y/%m/%d %H:%M')
-    return jsonify({'generated_at': now_j, 'transactions': [t.to_dict() for t in txs], 'dept_summary': dept_summary})
+    payload = [t.to_dict() for t in txs]
+    return jsonify({
+        'generated_at': now_j,
+        'transactions': payload,
+        'items': payload,
+        'dept_summary': dept_summary,
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': max(1, -(-total // per_page)),
+    })
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1062,6 +1115,13 @@ def migrate():
             ('ALTER TABLE transactions ADD COLUMN unit_price REAL', 'tx.unit_price'),
             ('ALTER TABLE transactions ADD COLUMN total_cost REAL', 'tx.total_cost'),
             ('ALTER TABLE products ADD COLUMN avg_cost REAL DEFAULT 0', 'products.avg_cost'),
+            # ایندکس‌های ترکیبی برای سرعت گزارش‌ها وقتی دیتا زیاد می‌شود
+            ('CREATE INDEX IF NOT EXISTS ix_tx_type_created ON transactions(type, created_at)', 'ix_tx_type_created'),
+            ('CREATE INDEX IF NOT EXISTS ix_tx_dept_created ON transactions(department_id, created_at)', 'ix_tx_dept_created'),
+            ('CREATE INDEX IF NOT EXISTS ix_tx_product_created ON transactions(product_id, created_at)', 'ix_tx_product_created'),
+            ('CREATE INDEX IF NOT EXISTS ix_tx_created_id ON transactions(created_at, id)', 'ix_tx_created_id'),
+            ('CREATE INDEX IF NOT EXISTS ix_products_wh_active ON products(warehouse_id, is_active)', 'ix_products_wh_active'),
+            ('CREATE INDEX IF NOT EXISTS ix_products_active_name ON products(is_active, name)', 'ix_products_active_name'),
         ]:
             try:
                 conn.execute(db.text(sql))
