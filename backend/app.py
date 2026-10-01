@@ -1041,34 +1041,33 @@ def dispatch_report():
 @app.route('/api/dashboard', methods=['GET'])
 @require_auth()
 def dashboard():
-    from sqlalchemy import func, and_
-    # جمع‌بندی‌ها را خود دیتابیس حساب می‌کند — به‌جای لود کردن همه‌ی کالاها در پایتون
-    # (با رشد تعداد کالاها دیگر کند نمی‌شود)
-    low_stock_cond = and_(Product.is_active == True, Product.min_stock > 0,
-                           Product.quantity > 0, Product.quantity <= Product.min_stock)
-    out_stock_cond = and_(Product.is_active == True, Product.quantity <= 0)
+    from sqlalchemy import func
+    warehouse_count = db.session.query(func.count(Warehouse.id)).filter(Warehouse.is_active == True).scalar()
 
-    warehouse_count    = db.session.query(func.count(Warehouse.id)).filter(Warehouse.is_active == True).scalar()
-    product_count      = db.session.query(func.count(Product.id)).filter(Product.is_active == True).scalar()
-    low_stock_count    = db.session.query(func.count(Product.id)).filter(low_stock_cond).scalar()
-    out_of_stock_count = db.session.query(func.count(Product.id)).filter(out_stock_cond).scalar()
-    # ارزش کل بر اساس میانگین موزون (یا آخرین قیمت اگر میانگین نبود)
-    active_products = Product.query.filter_by(is_active=True).all()
+    # آمار و لیست هشدار باید از یک منطق واحد (get_status) بیایند
+    # تا با manual_status و حداقل موجودی ناسازگار نشوند
+    active_products = (Product.query
+                       .options(joinedload(Product.warehouse))
+                       .filter_by(is_active=True)
+                       .order_by(Product.name.asc())
+                       .all())
+    product_count = len(active_products)
     total_value = sum(p.stock_value() for p in active_products)
 
-    low_stock    = Product.query.filter(low_stock_cond).limit(5).all()
-    out_of_stock = Product.query.filter(out_stock_cond).limit(5).all()
-    recent_txs   = (Transaction.query
-                    .options(
-                        joinedload(Transaction.product).joinedload(Product.warehouse),
-                        joinedload(Transaction.department),
-                    )
-                    .order_by(Transaction.created_at.desc()).limit(10).all())
+    low_stock = [p for p in active_products if p.get_status() == 'low']
+    out_of_stock = [p for p in active_products if p.get_status() == 'out']
+
+    recent_txs = (Transaction.query
+                  .options(
+                      joinedload(Transaction.product).joinedload(Product.warehouse),
+                      joinedload(Transaction.department),
+                  )
+                  .order_by(Transaction.created_at.desc()).limit(10).all())
     return jsonify({
         'warehouse_count':   warehouse_count,
         'product_count':     product_count,
-        'low_stock_count':   low_stock_count,
-        'out_of_stock_count': out_of_stock_count,
+        'low_stock_count':   len(low_stock),
+        'out_of_stock_count': len(out_of_stock),
         'total_value':       total_value,
         'low_stock':         [p.to_dict() for p in low_stock],
         'out_of_stock':      [p.to_dict() for p in out_of_stock],
