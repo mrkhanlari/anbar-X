@@ -418,6 +418,21 @@
   .pc-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
   .pc-panel { display:none; }
   .pc-panel.active { display:block; }
+  .pc-hero {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 14px; flex-wrap: wrap;
+  }
+  .pc-hero-main { min-width: 0; flex: 1; }
+  .pc-hero-name { font-size: 22px; font-weight: 800; line-height: 1.35; word-break: break-word; }
+  .pc-hero-meta { font-size: 13px; color: var(--text2); margin-top: 6px; line-height: 1.5; word-break: break-word; }
+  .pc-hero-qty {
+    text-align: left; flex-shrink: 0;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 16px; min-width: 110px;
+  }
+  .pc-hero-qty .n { font-size: 28px; font-weight: 800; color: var(--accent); line-height: 1.1; }
+  .pc-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .pc-stats .stat-card.span-2 { grid-column: span 2; }
   .clickable-name { cursor:pointer; color:var(--accent); }
   .clickable-name:hover { text-decoration:underline; }
   .note-cell {
@@ -709,7 +724,13 @@
 
     .nav-item { min-height: var(--tap); padding: 12px; }
     .pc-tabs { gap: 8px; }
-    .pc-tab { min-height: var(--tap); flex: 1 1 auto; justify-content: center; text-align: center; }
+    .pc-tab { min-height: var(--tap); flex: 1 1 calc(50% - 4px); justify-content: center; text-align: center; }
+    .pc-hero { flex-direction: column; }
+    .pc-hero-qty { width: 100%; text-align: center; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .pc-hero-qty .n { font-size: 24px; }
+    .pc-hero-name { font-size: 18px; }
+    .pc-hero-actions .btn { flex: 1 1 auto; justify-content: center; }
+    .pc-stats .stat-card.span-2 { grid-column: span 1; }
   }
 
   @media (max-width: 480px) {
@@ -718,6 +739,7 @@
     .wh-card-stats { flex-wrap: wrap; gap: 10px; }
     .filter-bar { grid-template-columns: 1fr; }
     .m-card-grid { grid-template-columns: 1fr; }
+    .pc-tab { flex: 1 1 100%; }
   }
 
   @media (hover: none) and (pointer: coarse) {
@@ -1236,28 +1258,45 @@ let state = {
   currentWarehouseId: null,
   currentProductId: null,
   productCardTab: 'history',
+  productCardReturn: null,
   txProductId: null,
   txType: 'in',
   txPage: 1,
   drPage: 1,
+  loginLogLimit: 20,
+  loginLogUserId: 'all',
 };
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
+
+function navLabelForPage(page) {
+  const ret = state.productCardReturn || {};
+  const productCardNav = {
+    products: 'همه کالاها',
+    transactions: 'حرکات انبار',
+    report: 'گزارش موجودی',
+    dept_report: 'گزارش بخش‌ها',
+    dashboard: 'داشبورد',
+    warehouse_detail: 'انبارها',
+    warehouses: 'انبارها',
+  }[ret.page] || 'همه کالاها';
+  return {
+    dashboard: 'داشبورد', warehouses: 'انبارها',
+    products: 'همه کالاها', transactions: 'حرکات انبار', report: 'گزارش موجودی',
+    warehouse_detail: 'انبارها', users: 'کاربران',
+    departments: 'بخش‌ها', dispatch: 'خروج رسمی', dept_report: 'گزارش بخش‌ها',
+    product_card: productCardNav,
+  }[page];
+}
 
 function navigate(page, params={}) {
   // viewer نمیتونه بره به صفحه users
   if (page === 'users' && currentUser && currentUser.role !== 'admin') return;
   state.page = page;
   Object.assign(state, params);
+  const activeLabel = navLabelForPage(page);
   document.querySelectorAll('.nav-item').forEach(el => {
-    el.classList.toggle('active',
-      el.textContent.trim() === {
-        dashboard: 'داشبورد', warehouses: 'انبارها',
-        products: 'همه کالاها', transactions: 'حرکات انبار', report: 'گزارش موجودی',
-        warehouse_detail: 'انبارها', users: 'کاربران',
-        departments: 'بخش‌ها', dispatch: 'خروج رسمی', dept_report: 'گزارش بخش‌ها',
-        product_card: 'انبارها',
-      }[page]);
+    el.classList.toggle('active', el.textContent.trim() === activeLabel);
   });
   closeSidebar();
   renderPage();
@@ -1512,7 +1551,29 @@ function txBadge(tOrType) {
 }
 
 function openProductCard(pid, tab='history') {
-  navigate('product_card', { currentProductId: pid, productCardTab: tab });
+  const fromPage = state.page;
+  navigate('product_card', {
+    currentProductId: pid,
+    productCardTab: tab,
+    productCardReturn: fromPage === 'product_card'
+      ? state.productCardReturn
+      : { page: fromPage, currentWarehouseId: state.currentWarehouseId },
+  });
+}
+
+function backFromProductCard() {
+  const ret = state.productCardReturn || {};
+  if (ret.page && ret.page !== 'product_card') {
+    const params = {};
+    if (ret.currentWarehouseId != null) params.currentWarehouseId = ret.currentWarehouseId;
+    navigate(ret.page, params);
+    return;
+  }
+  if (state.currentWarehouseId) {
+    navigate('warehouse_detail', { currentWarehouseId: state.currentWarehouseId });
+    return;
+  }
+  navigate('products');
 }
 
 // ─── Warehouses ──────────────────────────────────────────────────────────────
@@ -1576,76 +1637,117 @@ async function renderWarehouseDetail() {
     <div class="stat-card"><div class="stat-label">💰 ارزش کل</div><div class="stat-value val-green" style="font-size:18px;">${fmtPrice(totalVal)}</div></div>
   </div>
   <div class="card">
-    <div class="flex-between mb-4">
+    <div class="flex-between mb-4" style="flex-wrap:wrap;gap:10px;">
       <div class="card-title" style="margin:0">کالاهای این انبار</div>
-      <div class="search-bar"><span class="search-icon">🔍</span><input id="prod-search" placeholder="جستجوی کالا..." oninput="filterProds()" style="width:220px;"/></div>
+      <div class="search-bar" style="flex:1;min-width:160px;max-width:280px;">
+        <span class="search-icon">🔍</span>
+        <input id="prod-search" placeholder="جستجوی کالا..." oninput="filterProds()" style="width:100%;"/>
+      </div>
     </div>
     ${prods.length===0
       ? `<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">هنوز کالایی ثبت نشده</div><br>
          <button class="btn btn-primary" onclick="openProductModal(null,${wid})">➕ کالای جدید</button></div>`
-      : `<div class="table-wrap"><table id="prods-table">
+      : `<div class="table-wrap desk-only"><table id="prods-table">
           <thead><tr>
             <th>نام کالا</th><th>کد SKU</th><th>دسته</th>
             <th>موجودی</th><th>آخرین خرید</th><th>میانگین هزینه</th><th>ارزش کل</th><th>وضعیت</th><th>عملیات</th>
           </tr></thead><tbody>
           ${prods.map(p=>prodRow(p)).join('')}
-          </tbody></table></div>`}
+          </tbody></table></div>
+         <div class="mobile-list mob-only" id="prods-mobile">
+          ${prods.map(p=>whProdCard(p)).join('')}
+         </div>`}
   </div>`;
   window._prods = prods;
 }
 
+function whProdStatusBadge(p) {
+  const safeName = String(p.name || '').replace(/'/g, "\\'");
+  if (p.manual_status === 'unavailable' || p.status === 'out')
+    return `<span class="badge badge-red" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal(${p.id},'${safeName}','${p.status}')">🚫 ناموجود</span>`;
+  if (p.manual_status === 'low' || p.status === 'low')
+    return `<span class="badge badge-yellow" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal(${p.id},'${safeName}','${p.status}')">⚠️ کم است</span>`;
+  return `<span class="badge badge-green" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal(${p.id},'${safeName}','${p.status}')">✅ موجود</span>`;
+}
+
 function prodRow(p) {
-  const statusBadge = p.manual_status === 'unavailable' || p.status==='out'
-    ? '<span class="badge badge-red" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal('+p.id+',\''+p.name.replace(/'/g,"\\'")+'\',\''+p.status+'\')">🚫 ناموجود</span>'
-    : p.manual_status === 'low' || p.status==='low'
-    ? '<span class="badge badge-yellow" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal('+p.id+',\''+p.name.replace(/'/g,"\\'")+'\',\''+p.status+'\')">⚠️ کم است</span>'
-    : '<span class="badge badge-green" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal('+p.id+',\''+p.name.replace(/'/g,"\\'")+'\',\''+p.status+'\')">✅ موجود</span>';
+  const safeName = String(p.name || '').replace(/'/g, "\\'");
   return `<tr id="prod-row-${p.id}">
     <td class="fw-bold">
-      <span class="clickable-name" onclick="openProductCard(${p.id})">${p.name}</span>
-      ${p.description?`<br><span class="text-sm text-muted">${p.description}</span>`:''}
+      <span class="clickable-name" onclick="openProductCard(${p.id})">${escHtml(p.name)}</span>
+      ${p.description?`<br><span class="text-sm text-muted">${escHtml(p.description)}</span>`:''}
     </td>
-    <td class="text-muted num">${p.sku||'—'}</td>
-    <td>${p.category||'—'}</td>
-    <td class="num fw-bold">${fmt(p.quantity)} ${p.unit}</td>
+    <td class="text-muted num">${escHtml(p.sku)||'—'}</td>
+    <td>${escHtml(p.category)||'—'}</td>
+    <td class="num fw-bold">${fmt(p.quantity)} ${escHtml(p.unit)}</td>
     <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
     <td class="num text-muted">${p.avg_cost?fmtPrice(p.avg_cost):(p.cost_basis?fmtPrice(p.cost_basis):'—')}</td>
     <td class="num">${fmtPrice(p.total_value)}</td>
-    <td>${statusBadge}</td>
+    <td>${whProdStatusBadge(p)}</td>
     <td>
       <div class="flex-gap">
         <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت</button>
         ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" onclick="openProductCard(${p.id},'in')">⬆️ ورود</button>`}
         ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️</button>`}
-        ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id},'${p.name.replace(/'/g,"\\'")}')">🗑️</button>`}
+        ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id},'${safeName}')">🗑️</button>`}
       </div>
     </td>
   </tr>`;
 }
 
+function whProdCard(p) {
+  const safeName = String(p.name || '').replace(/'/g, "\\'");
+  return `<article class="m-card" id="prod-card-${p.id}">
+    <div class="m-card-head">
+      <div style="min-width:0;">
+        <div class="m-card-title clickable-name" onclick="openProductCard(${p.id})">${escHtml(p.name)}</div>
+        <div class="m-card-sub">${escHtml(p.sku || 'بدون SKU')}${p.category ? ' · ' + escHtml(p.category) : ''}</div>
+      </div>
+      ${whProdStatusBadge(p)}
+    </div>
+    <div class="m-card-grid">
+      <div><span class="lbl">موجودی</span><b>${fmt(p.quantity)} ${escHtml(p.unit||'')}</b></div>
+      <div><span class="lbl">آخرین خرید</span>${p.unit_price?fmtPrice(p.unit_price):'—'}</div>
+      <div><span class="lbl">میانگین هزینه</span>${p.avg_cost?fmtPrice(p.avg_cost):(p.cost_basis?fmtPrice(p.cost_basis):'—')}</div>
+      <div><span class="lbl">ارزش کل</span>${fmtPrice(p.total_value)}</div>
+    </div>
+    <div class="flex-gap" style="margin-top:10px;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت کالا</button>
+      ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" onclick="openProductCard(${p.id},'in')">⬆️ ورود</button>`}
+      ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️ ویرایش</button>`}
+      ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id},'${safeName}')">🗑️</button>`}
+    </div>
+  </article>`;
+}
+
 function filterProds() {
-  const q = document.getElementById('prod-search').value.toLowerCase();
-  const prods = window._prods||[];
+  const q = (document.getElementById('prod-search')?.value || '').toLowerCase();
+  const prods = window._prods || [];
+  const filtered = prods.filter(p =>
+    (p.name || '').toLowerCase().includes(q) ||
+    (p.sku || '').toLowerCase().includes(q) ||
+    (p.category || '').toLowerCase().includes(q)
+  );
   const tbody = document.querySelector('#prods-table tbody');
-  if (!tbody) return;
-  tbody.innerHTML = prods.filter(p=>p.name.toLowerCase().includes(q)||p.sku.toLowerCase().includes(q)||(p.category||'').toLowerCase().includes(q)).map(prodRow).join('');
+  if (tbody) tbody.innerHTML = filtered.map(prodRow).join('');
+  const mob = document.getElementById('prods-mobile');
+  if (mob) mob.innerHTML = filtered.map(whProdCard).join('');
 }
 
 // ─── Product Card (کارت کالا) ────────────────────────────────────────────────
 
 async function renderProductCard() {
   const pid = state.currentProductId;
-  if (!pid) { navigate('warehouses'); return; }
+  if (!pid) { backFromProductCard(); return; }
   const data = await api('GET', `/products/${pid}/card`);
   const p = data.product;
   const s = data.summary;
   const tab = state.productCardTab || 'history';
+  state.currentWarehouseId = p.warehouse_id;
 
-  document.getElementById('page-title').textContent = `📋 ${p.name}`;
+  document.getElementById('page-title').textContent = `📋 کارت کالا`;
   document.getElementById('topbar-actions').innerHTML = `
-    <button class="btn btn-secondary" onclick="navigate('warehouse_detail',{currentWarehouseId:${p.warehouse_id}})">← بازگشت به انبار</button>
-    ${window._isViewer ? '' : `<button class="btn btn-secondary" onclick="openProductModal(${p.id})">✏️ مشخصات</button>`}
-    ${window._isViewer ? '' : `<button class="btn btn-success" onclick="openTxModal(${p.id},'in')">⬆️ ورود خرید</button>`}`;
+    <button class="btn btn-secondary" onclick="backFromProductCard()">← بازگشت</button>`;
 
   const statusBadge = p.status==='out'
     ? '<span class="badge badge-red">🚫 ناموجود</span>'
@@ -1653,37 +1755,49 @@ async function renderProductCard() {
     ? '<span class="badge badge-yellow">⚠️ کم‌موجود</span>'
     : '<span class="badge badge-green">✅ موجود</span>';
 
+  const metaParts = [
+    p.warehouse_name || '',
+    p.sku ? 'SKU: ' + p.sku : '',
+    p.category || '',
+    p.unit ? 'واحد: ' + p.unit : '',
+  ].filter(Boolean).map(escHtml);
+
   document.getElementById('content').innerHTML = `
   <div class="card mb-4">
-    <div class="flex-between" style="flex-wrap:wrap;gap:12px;">
-      <div>
-        <div style="font-size:22px;font-weight:800;">${p.name}</div>
-        <div class="text-sm text-muted" style="margin-top:4px;">
-          ${p.warehouse_name || ''} ${p.sku ? ' · SKU: '+p.sku : ''} ${p.category ? ' · '+p.category : ''} · واحد: ${p.unit}
+    <div class="pc-hero">
+      <div class="pc-hero-main">
+        <div class="pc-hero-name">${escHtml(p.name)}</div>
+        <div class="pc-hero-meta">${metaParts.join(' · ')}</div>
+        <div style="margin-top:10px;">${statusBadge}</div>
+        <div class="pc-hero-actions">
+          ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️ مشخصات</button>`}
+          ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" onclick="openTxModal(${p.id},'in')">⬆️ ورود خرید</button>`}
+          ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger" onclick="openTxModal(${p.id},'out')">⬇️ خروج</button>`}
         </div>
-        <div style="margin-top:8px;">${statusBadge}</div>
       </div>
-      <div style="text-align:left;">
-        <div style="font-size:32px;font-weight:800;color:var(--accent)">${fmt(p.quantity)}</div>
-        <div class="text-sm text-muted">${p.unit} موجودی فعلی</div>
+      <div class="pc-hero-qty">
+        <div>
+          <div class="n num">${fmt(p.quantity)}</div>
+          <div class="text-sm text-muted">${escHtml(p.unit||'')} موجودی فعلی</div>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="stats-grid" style="margin-bottom:20px;">
+  <div class="stats-grid pc-stats" style="margin-bottom:20px;">
     <div class="stat-card"><div class="stat-label">⬆️ مجموع ورود</div><div class="stat-value val-green">${fmt(s.total_in)}</div></div>
     <div class="stat-card"><div class="stat-label">⬇️ مجموع خروج</div><div class="stat-value val-red">${fmt(s.total_out)}</div></div>
     <div class="stat-card"><div class="stat-label">💰 آخرین خرید</div><div class="stat-value val-blue" style="font-size:16px;">${p.unit_price?fmtPrice(p.unit_price):'—'}</div></div>
     <div class="stat-card"><div class="stat-label">📊 میانگین هزینه</div><div class="stat-value val-blue" style="font-size:16px;">${(p.avg_cost||p.cost_basis)?fmtPrice(p.avg_cost||p.cost_basis):'—'}</div></div>
-    <div class="stat-card" style="grid-column:span 2"><div class="stat-label">💎 ارزش موجودی</div><div class="stat-value val-green" style="font-size:20px;">${fmtPrice(s.current_value)}</div></div>
+    <div class="stat-card span-2"><div class="stat-label">💎 ارزش موجودی</div><div class="stat-value val-green" style="font-size:20px;">${fmtPrice(s.current_value)}</div></div>
   </div>
 
   <div class="pc-tabs">
-    <button class="pc-tab ${tab==='history'?'active':''}" onclick="setProductCardTab('history')">📜 تاریخچه حرکات</button>
-    <button class="pc-tab ${tab==='purchases'?'active':''}" onclick="setProductCardTab('purchases')">🛒 گزارش خریدها</button>
-    ${window._isViewer ? '' : `<button class="pc-tab ${tab==='in'?'active':''}" onclick="setProductCardTab('in')">⬆️ ورود خرید</button>`}
+    <button class="pc-tab ${tab==='history'?'active':''}" onclick="setProductCardTab('history')">📜 تاریخچه</button>
+    <button class="pc-tab ${tab==='purchases'?'active':''}" onclick="setProductCardTab('purchases')">🛒 خریدها</button>
+    ${window._isViewer ? '' : `<button class="pc-tab ${tab==='in'?'active':''}" onclick="setProductCardTab('in')">⬆️ ورود</button>`}
     ${window._isViewer ? '' : `<button class="pc-tab ${tab==='out'?'active':''}" onclick="setProductCardTab('out')">⬇️ خروج</button>`}
-    ${window._isViewer ? '' : `<button class="pc-tab ${tab==='adjust'?'active':''}" onclick="setProductCardTab('adjust')">📝 اصلاح موجودی</button>`}
+    ${window._isViewer ? '' : `<button class="pc-tab ${tab==='adjust'?'active':''}" onclick="setProductCardTab('adjust')">📝 اصلاح</button>`}
   </div>
 
   <div class="card">
@@ -1698,11 +1812,11 @@ function setProductCardTab(tab) {
   state.productCardTab = tab;
   document.querySelectorAll('.pc-tab').forEach(el => {
     const map = {
-      history: '📜 تاریخچه حرکات',
-      purchases: '🛒 گزارش خریدها',
-      in: '⬆️ ورود خرید',
+      history: '📜 تاریخچه',
+      purchases: '🛒 خریدها',
+      in: '⬆️ ورود',
       out: '⬇️ خروج',
-      adjust: '📝 اصلاح موجودی',
+      adjust: '📝 اصلاح',
     };
     el.classList.toggle('active', el.textContent.trim() === map[tab]);
   });
@@ -1733,21 +1847,38 @@ function renderProductCardPanel(tab) {
       </div>
       ${purchases.length === 0
         ? '<div class="empty"><div class="empty-icon">🛒</div><div class="empty-text">هنوز ورود خریدی ثبت نشده</div></div>'
-        : `<div class="table-wrap"><table>
+        : `<div class="table-wrap desk-only"><table>
             <thead><tr>
               <th>تاریخ</th><th>نوع</th><th>تعداد</th><th>قیمت واحد</th><th>مبلغ کل</th><th>شماره فاکتور</th><th>ثبت‌کننده</th><th>توضیحات</th>
             </tr></thead><tbody>
             ${purchases.map(t=>`<tr>
-              <td class="num text-sm">${t.created_at}</td>
+              <td class="num text-sm">${escHtml(t.created_at)}</td>
               <td>${txBadge(t)}</td>
-              <td class="num fw-bold">${fmt(t.quantity)} ${t.unit_name||''}</td>
+              <td class="num fw-bold">${fmt(t.quantity)} ${escHtml(t.unit_name||'')}</td>
               <td class="num">${t.unit_price!=null?fmtPrice(t.unit_price):'—'}</td>
               <td class="num">${t.total_cost!=null?fmtPrice(t.total_cost):'—'}</td>
-              <td class="text-sm">${t.ref_number||'—'}</td>
-              <td class="text-sm">${t.created_by||'—'}</td>
+              <td class="text-sm">${escHtml(t.ref_number)||'—'}</td>
+              <td class="text-sm">${escHtml(t.created_by)||'—'}</td>
               <td class="note-cell">${noteHtml(t.note)}</td>
             </tr>`).join('')}
-            </tbody></table></div>`}`;
+            </tbody></table></div>
+           <div class="mobile-list mob-only">
+            ${purchases.map(t => `<article class="m-card">
+              <div class="m-card-head">
+                <div style="min-width:0;">
+                  <div class="m-card-title">${escHtml(t.created_at||'')}</div>
+                  <div class="m-card-sub">${escHtml(t.created_by||'—')}${t.ref_number ? ' · فاکتور ' + escHtml(t.ref_number) : ''}</div>
+                </div>
+                ${txBadge(t)}
+              </div>
+              <div class="m-card-grid">
+                <div><span class="lbl">تعداد</span><b>${fmt(t.quantity)} ${escHtml(t.unit_name||'')}</b></div>
+                <div><span class="lbl">قیمت واحد</span>${t.unit_price!=null?fmtPrice(t.unit_price):'—'}</div>
+                <div><span class="lbl">مبلغ کل</span>${t.total_cost!=null?fmtPrice(t.total_cost):'—'}</div>
+              </div>
+              ${t.note ? `<div class="m-card-note"><span class="lbl">توضیحات</span>${noteHtml(t.note)}</div>` : ''}
+            </article>`).join('')}
+           </div>`}`;
     return;
   }
 
@@ -1757,7 +1888,59 @@ function renderProductCardPanel(tab) {
     <div class="flex-between mb-4">
       <div class="card-title" style="margin:0">📜 همه حرکات این کالا — ${fmt(moves.length)} مورد</div>
     </div>
-    ${buildTxTable(moves)}`;
+    ${buildProductCardMoves(moves)}`;
+}
+
+function buildProductCardMoves(txs) {
+  if (!txs.length) return '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">هنوز حرکتی ثبت نشده</div></div>';
+
+  const desk = `<div class="table-wrap desk-only"><table class="table-fit">
+    <thead><tr>
+      <th class="col-date">تاریخ</th>
+      <th class="col-type">نوع حرکت</th>
+      <th class="col-qty">موجودی</th>
+      <th class="col-money">قیمت / مبلغ</th>
+      <th class="col-detail">بخش / توضیحات</th>
+      <th class="col-user">ثبت‌کننده</th>
+    </tr></thead><tbody>
+    ${txs.map(t=>`<tr>
+      <td class="col-date num text-muted qty-stack">${shortDate(t.created_at)}</td>
+      <td class="col-type">${txBadge(t)}</td>
+      <td class="col-qty num qty-stack">
+        <div class="muted">${fmt(t.before_qty)} → ${fmt(t.after_qty)}</div>
+        <div class="fw-bold">${txChangeCell(t)}</div>
+      </td>
+      <td class="col-money num money-stack">
+        <div>${t.unit_price != null ? fmtPrice(t.unit_price) : '—'}</div>
+        <div class="muted">${t.total_cost != null ? fmtPrice(t.total_cost) : '—'}</div>
+      </td>
+      <td class="col-detail">${txDetailCell(t)}</td>
+      <td class="col-user text-sm text-muted">${escHtml(t.created_by)||'—'}</td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+
+  const mob = `<div class="mobile-list mob-only">
+    ${txs.map(t => `
+      <article class="m-card">
+        <div class="m-card-head">
+          <div style="min-width:0;">
+            <div class="m-card-title">${escHtml(t.created_at||'')}</div>
+            <div class="m-card-sub">${escHtml(t.created_by)||'—'}</div>
+          </div>
+          <div>${txBadge(t)}</div>
+        </div>
+        <div class="m-card-grid">
+          <div><span class="lbl">موجودی</span><b>${fmt(t.before_qty)} → ${fmt(t.after_qty)}</b> <span>${txChangeCell(t)}</span></div>
+          <div><span class="lbl">قیمت / مبلغ</span>${t.unit_price!=null?fmtPrice(t.unit_price):'—'}<br><span class="text-muted">${t.total_cost!=null?fmtPrice(t.total_cost):'—'}</span></div>
+        </div>
+        <div class="m-card-note">
+          <span class="lbl">بخش / توضیحات</span>
+          ${txDetailCell(t)}
+        </div>
+      </article>`).join('')}
+  </div>`;
+
+  return desk + mob;
 }
 
 // ─── All Products ─────────────────────────────────────────────────────────────
@@ -3165,9 +3348,13 @@ async function saveChangePassword() {
 
 async function renderUsers() {
   const users = await api('GET', '/users');
+  window._usersList = users;
   const c = document.getElementById('content');
   document.getElementById('topbar-actions').innerHTML =
     `<button class="btn btn-primary" onclick="openUserModal()">➕ کاربر جدید</button>`;
+
+  const limit = state.loginLogLimit || 20;
+  const userId = state.loginLogUserId || 'all';
 
   const desk = `<div class="table-wrap desk-only"><table>
       <thead><tr>
@@ -3214,13 +3401,33 @@ async function renderUsers() {
 
   c.innerHTML = `
   <div class="card mb-4">
-    <div class="card-title">📋 لاگ ورود کاربران (آخرین ۲۰۰ مورد)</div>
-    <div id="login-log-section"><div class="spinner"></div></div>
-  </div>
-  <div class="card">
     <div class="card-title">👥 مدیریت کاربران</div>
     ${desk}
     ${mob}
+  </div>
+  <div class="card">
+    <div class="flex-between mb-4" style="flex-wrap:wrap;gap:12px;">
+      <div class="card-title" style="margin:0">📋 لاگ ورود کاربران</div>
+    </div>
+    <div class="filter-bar mb-4">
+      <div class="form-group">
+        <label>تعداد موارد اخیر</label>
+        <select id="login-log-limit" onchange="onLoginLogFilterChange()">
+          ${[10, 20, 50, 100].map(n => `<option value="${n}" ${n===limit?'selected':''}>آخرین ${fmt(n)} مورد</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>فیلتر کاربر</label>
+        <select id="login-log-user" onchange="onLoginLogFilterChange()">
+          <option value="all" ${userId==='all'?'selected':''}>همه کاربران</option>
+          ${users.map(u => `<option value="${u.id}" ${String(userId)===String(u.id)?'selected':''}>${escHtml(u.display_name || u.username)} (@${escHtml(u.username)})</option>`).join('')}
+        </select>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-secondary" onclick="loadLoginLogs()">🔄 بروزرسانی</button>
+      </div>
+    </div>
+    <div id="login-log-section"><div class="spinner"></div></div>
   </div>`;
   loadLoginLogs();
 }
@@ -3231,12 +3438,29 @@ function roleBadge(role) {
   return '<span class="badge" style="background:var(--bg3);color:var(--text2);">👁 بازدیدکننده</span>';
 }
 
+function onLoginLogFilterChange() {
+  const limitEl = document.getElementById('login-log-limit');
+  const userEl = document.getElementById('login-log-user');
+  if (limitEl) state.loginLogLimit = parseInt(limitEl.value, 10) || 20;
+  if (userEl) state.loginLogUserId = userEl.value || 'all';
+  loadLoginLogs();
+}
+
 async function loadLoginLogs() {
-  const logs = await api('GET', '/login-logs');
   const el = document.getElementById('login-log-section');
   if (!el) return;
-  if (!logs.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">هنوز ورودی ثبت نشده</div></div>'; return; }
+  el.innerHTML = '<div class="spinner"></div>';
+  const limit = state.loginLogLimit || 20;
+  const userId = state.loginLogUserId || 'all';
+  const params = new URLSearchParams({ limit });
+  if (userId && userId !== 'all') params.set('user_id', userId);
+  const logs = await api('GET', `/login-logs?${params.toString()}`);
+  if (!logs.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">ورودی‌ای با این فیلتر یافت نشد</div></div>';
+    return;
+  }
   el.innerHTML = `
+    <div class="text-sm text-muted mb-4">نمایش ${fmt(logs.length)} مورد اخیر</div>
     <div class="table-wrap desk-only"><table>
       <thead><tr><th>تاریخ و ساعت</th><th>نام کاربری</th><th>نام نمایشی</th><th>IP</th></tr></thead>
       <tbody>${logs.map(l=>`<tr>

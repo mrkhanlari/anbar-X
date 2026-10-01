@@ -528,12 +528,26 @@ def delete_user(uid):
 @app.route('/api/login-logs', methods=['GET'])
 @require_auth('admin')
 def get_all_login_logs():
-    logs = LoginLog.query.options(joinedload(LoginLog.user)).order_by(LoginLog.logged_in_at.desc()).limit(200).all()
+    try:
+        limit = int(request.args.get('limit', 20))
+    except (TypeError, ValueError):
+        limit = 20
+    limit = max(1, min(limit, 200))
+
+    user_id = request.args.get('user_id')
+    q = LoginLog.query.options(joinedload(LoginLog.user)).order_by(LoginLog.logged_in_at.desc())
+    if user_id not in (None, '', 'all'):
+        try:
+            q = q.filter(LoginLog.user_id == int(user_id))
+        except (TypeError, ValueError):
+            pass
+    logs = q.limit(limit).all()
     result = []
     for log in logs:
         jdt = jdatetime.datetime.fromgregorian(datetime=log.logged_in_at)
         result.append({
             'id': log.id,
+            'user_id': log.user_id,
             'username': log.user.username if log.user else '',
             'display_name': (log.user.display_name or log.user.username) if log.user else '',
             'logged_in_at': jdt.strftime('%Y/%m/%d %H:%M'),
