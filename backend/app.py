@@ -130,7 +130,7 @@ class Warehouse(db.Model):
             'is_active': self.is_active,
             'product_count': len(active_products),
             'total_items': sum(p.quantity for p in active_products),
-            'total_value': sum(p.quantity * (p.unit_price or 0) for p in active_products),
+            'total_value': sum(p.stock_value() for p in active_products),
         }
 
 
@@ -162,7 +162,8 @@ class Product(db.Model):
     category      = db.Column(db.String(100))
     quantity      = db.Column(db.Float, default=0)
     unit          = db.Column(db.String(50), default='عدد')
-    unit_price    = db.Column(db.Float, default=0)
+    unit_price    = db.Column(db.Float, default=0)   # آخرین قیمت خرید
+    avg_cost      = db.Column(db.Float, default=0)   # میانگین موزون هزینه
     min_stock     = db.Column(db.Float, default=0)
     description   = db.Column(db.Text)
     created_at    = db.Column(db.DateTime, default=now_tehran)
@@ -170,6 +171,29 @@ class Product(db.Model):
     is_active     = db.Column(db.Boolean, default=True, index=True)
     manual_status = db.Column(db.String(20), default=None)
     transactions  = db.relationship('Transaction', backref='product', lazy=True, cascade='all, delete-orphan')
+
+    def cost_basis(self):
+        """قیمت مبنای ارزش‌گذاری: میانگین موزون، وگرنه آخرین قیمت خرید"""
+        if self.avg_cost and self.avg_cost > 0:
+            return self.avg_cost
+        return self.unit_price or 0
+
+    def stock_value(self):
+        return (self.quantity or 0) * self.cost_basis()
+
+    def apply_purchase_cost(self, qty, unit_price, before_qty):
+        """به‌روزرسانی آخرین قیمت و میانگین موزون بعد از ورود خرید"""
+        price = float(unit_price or 0)
+        qty = float(qty or 0)
+        before = max(float(before_qty or 0), 0)
+        if qty <= 0:
+            return
+        self.unit_price = price
+        old_avg = self.avg_cost if self.avg_cost and self.avg_cost > 0 else (self.unit_price or 0)
+        if before <= 0 or old_avg <= 0:
+            self.avg_cost = price
+        else:
+            self.avg_cost = ((before * old_avg) + (qty * price)) / (before + qty)
 
     def get_status(self):
         if self.manual_status == 'unavailable': return 'out'
@@ -182,15 +206,19 @@ class Product(db.Model):
     def to_dict(self):
         jdt_c = jdatetime.datetime.fromgregorian(datetime=self.created_at)
         jdt_u = jdatetime.datetime.fromgregorian(datetime=self.updated_at)
+        cost = self.cost_basis()
         return {
             'id': self.id,
             'warehouse_id': self.warehouse_id,
+            'warehouse_name': self.warehouse.name if self.warehouse else '',
             'name': self.name,
             'sku': self.sku or '',
             'category': self.category or '',
             'quantity': self.quantity,
             'unit': self.unit,
             'unit_price': self.unit_price or 0,
+            'avg_cost': self.avg_cost or 0,
+            'cost_basis': cost,
             'min_stock': self.min_stock or 0,
             'description': self.description or '',
             'created_at': jdt_c.strftime('%Y/%m/%d'),
@@ -198,7 +226,7 @@ class Product(db.Model):
             'is_active': self.is_active,
             'status': self.get_status(),
             'manual_status': self.manual_status or '',
-            'total_value': self.quantity * (self.unit_price or 0),
+            'total_value': self.stock_value(),
         }
 
 
@@ -211,6 +239,8 @@ class Transaction(db.Model):
     quantity      = db.Column(db.Float, nullable=False)
     before_qty    = db.Column(db.Float)
     after_qty     = db.Column(db.Float)
+    unit_price    = db.Column(db.Float)   # قیمت واحد این حرکت (برای ورود = قیمت خرید)
+    total_cost    = db.Column(db.Float)   # مبلغ کل این حرکت
     note          = db.Column(db.Text)
     ref_number    = db.Column(db.String(100))
     created_at    = db.Column(db.DateTime, default=now_tehran, index=True)
@@ -219,19 +249,59 @@ class Transaction(db.Model):
     reversed_by_id= db.Column(db.Integer, db.ForeignKey('transactions.id'), nullable=True)
     department    = db.relationship('Department', backref='transactions')
 
+    def movement_meta(self):
+        """برچسب شفاف برای گزارش‌ها — بدون کلمه مبهم «تنظیم»"""
+        if self.type == 'in':
+            if self.reversed_by_id:
+                return 'return', '↩️ بازگشت به انبار'
+            note = (self.note or '').strip()
+            if note == 'موجودی اولیه':
+                return 'initial', '📦 موجودی اولیه'
+            return 'purchase', '⬆️ ورود خرید'
+        if self.type == 'out':
+            if self.department_id:
+                if self.is_reversed:
+                    return 'dispatch_reversed', '⬇️ خروج به بخش (بازگشت‌خورده)'
+                return 'dispatch', '⬇️ خروج به بخش'
+            return 'issue', '⬇️ خروج از انبار'
+        before = self.before_qty if self.before_qty is not None else 0
+        after = self.after_qty if self.after_qty is not None else self.quantity
+        delta = (after or 0) - (before or 0)
+        if delta > 0:
+            return 'correction_up', '📈 افزایش موجودی'
+        if delta < 0:
+            return 'correction_down', '📉 کاهش موجودی'
+        return 'correction', '📝 ثبت موجودی'
+
+    def signed_delta(self):
+        if self.type == 'in':
+            return self.quantity
+        if self.type == 'out':
+            return -self.quantity
+        before = self.before_qty if self.before_qty is not None else 0
+        after = self.after_qty if self.after_qty is not None else self.quantity
+        return (after or 0) - (before or 0)
+
     def to_dict(self):
         jdt = jdatetime.datetime.fromgregorian(datetime=self.created_at)
+        kind, label = self.movement_meta()
         return {
             'id': self.id,
             'product_id': self.product_id,
             'product_name': self.product.name if self.product else '',
+            'warehouse_id': self.product.warehouse_id if self.product else None,
             'warehouse_name': self.product.warehouse.name if self.product and self.product.warehouse else '',
             'department_id': self.department_id,
             'department_name': self.department.name if self.department else '',
             'type': self.type,
+            'movement_kind': kind,
+            'movement_label': label,
             'quantity': self.quantity,
+            'delta': self.signed_delta(),
             'before_qty': self.before_qty,
             'after_qty': self.after_qty,
+            'unit_price': self.unit_price if self.unit_price is not None else None,
+            'total_cost': self.total_cost if self.total_cost is not None else None,
             'note': self.note or '',
             'ref_number': self.ref_number or '',
             'created_at': jdt.strftime('%Y/%m/%d %H:%M'),
@@ -518,7 +588,10 @@ def delete_department(did):
 @app.route('/api/warehouses/<int:wid>/products', methods=['GET'])
 @require_auth()
 def get_products(wid):
-    prods = Product.query.filter_by(warehouse_id=wid, is_active=True).order_by(Product.id.desc()).all()
+    prods = (Product.query
+             .options(joinedload(Product.warehouse))
+             .filter_by(warehouse_id=wid, is_active=True)
+             .order_by(Product.id.desc()).all())
     return jsonify([p.to_dict() for p in prods])
 
 @app.route('/api/products', methods=['GET'])
@@ -528,7 +601,7 @@ def get_all_products():
     page = max(1, request.args.get('page', 1, type=int))
     per_page = min(max(request.args.get('per_page', 50, type=int), 1), 200)
 
-    query = Product.query.filter_by(is_active=True)
+    query = Product.query.options(joinedload(Product.warehouse)).filter_by(is_active=True)
     if search:
         query = query.filter(Product.name.ilike(f'%{search}%'))
     query = query.order_by(Product.id.desc())
@@ -541,60 +614,44 @@ def get_all_products():
         'total': total,
         'page': page,
         'per_page': per_page,
-        'total_pages': max(1, -(-total // per_page)),  # سقف تقسیم بدون import اضافه
+        'total_pages': max(1, -(-total // per_page)),
     })
 
 @app.route('/api/products/<int:pid>', methods=['GET'])
 @require_auth()
 def get_product(pid):
-    p = Product.query.get_or_404(pid)
+    p = Product.query.options(joinedload(Product.warehouse)).get_or_404(pid)
     return jsonify(p.to_dict())
 
 @app.route('/api/products', methods=['POST'])
 @require_auth('operator')
 def create_product():
+    """تعریف کالا فقط — موجودی و خرید از طریق ورود جدا ثبت می‌شود"""
     data = request.json or {}
-    user = get_current_user()
     if not data.get('name') or not data.get('warehouse_id'):
         return jsonify({'error': 'نام کالا و انبار الزامی است'}), 400
     p = Product(
         warehouse_id=data['warehouse_id'], name=data['name'],
         sku=data.get('sku', ''), category=data.get('category', ''),
-        quantity=float(data.get('quantity', 0)), unit=data.get('unit', 'عدد'),
-        unit_price=float(data.get('unit_price', 0)), min_stock=float(data.get('min_stock', 0)),
+        quantity=0, unit=data.get('unit', 'عدد'),
+        unit_price=0, avg_cost=0,
+        min_stock=float(data.get('min_stock', 0) or 0),
         description=data.get('description', ''),
     )
     db.session.add(p)
-    db.session.flush()
-    if p.quantity > 0:
-        db.session.add(Transaction(
-            product_id=p.id, type='in', quantity=p.quantity,
-            before_qty=0, after_qty=p.quantity, note='موجودی اولیه',
-            created_by=user.display_name or user.username,
-        ))
     db.session.commit()
     return jsonify(p.to_dict()), 201
 
 @app.route('/api/products/<int:pid>', methods=['PUT'])
 @require_auth('operator')
 def update_product(pid):
+    """ویرایش مشخصات کالا — تغییر موجودی از این مسیر مجاز نیست"""
     p = Product.query.get_or_404(pid)
-    user = get_current_user()
     data = request.json or {}
-    for f in ['name', 'sku', 'category', 'unit', 'unit_price', 'min_stock', 'description']:
-        if f in data: setattr(p, f, data[f])
-    if 'quantity' in data:
-        new_qty = float(data['quantity'])
-        if new_qty != p.quantity:
-            before = p.quantity
-            p.quantity = new_qty
-            note = (data.get('note') or '').strip() or 'ویرایش مستقیم موجودی'
-            db.session.add(Transaction(
-                product_id=pid, type='adjust', quantity=new_qty,
-                before_qty=before, after_qty=new_qty, note=note,
-                ref_number=data.get('ref_number', ''),
-                created_by=user.display_name or user.username,
-            ))
+    for f in ['name', 'sku', 'category', 'unit', 'min_stock', 'description']:
+        if f in data:
+            setattr(p, f, data[f])
+    # قیمت واحد فقط از ورود خرید به‌روز می‌شود؛ اگر صریح فرستاده شد نادیده بگیر مگر admin path جدا
     p.updated_at = now_tehran()
     db.session.commit()
     return jsonify(p.to_dict())
@@ -621,6 +678,56 @@ def set_product_status(pid):
     return jsonify(p.to_dict())
 
 
+@app.route('/api/products/<int:pid>/card', methods=['GET'])
+@require_auth()
+def product_card(pid):
+    """کارت کامل کالا: مشخصات + حرکات + گزارش خریدها"""
+    p = Product.query.options(
+        joinedload(Product.warehouse),
+    ).get_or_404(pid)
+    txs = (Transaction.query
+           .options(joinedload(Transaction.department))
+           .filter_by(product_id=pid)
+           .order_by(Transaction.created_at.desc(), Transaction.id.desc())
+           .all())
+
+    total_in = 0.0
+    total_out = 0.0
+    purchase_qty = 0.0
+    purchase_cost = 0.0
+    purchases = []
+
+    for tx in txs:
+        delta = tx.signed_delta()
+        if delta > 0:
+            total_in += delta
+        elif delta < 0:
+            total_out += abs(delta)
+        kind, _ = tx.movement_meta()
+        if kind in ('purchase', 'initial') and tx.type == 'in':
+            up = tx.unit_price if tx.unit_price is not None else (p.unit_price or 0)
+            cost = tx.total_cost if tx.total_cost is not None else (tx.quantity * (up or 0))
+            purchase_qty += tx.quantity
+            purchase_cost += cost or 0
+            purchases.append(tx.to_dict())
+
+    return jsonify({
+        'product': p.to_dict(),
+        'summary': {
+            'total_in': total_in,
+            'total_out': total_out,
+            'purchase_count': len(purchases),
+            'purchase_qty': purchase_qty,
+            'purchase_cost': purchase_cost,
+            'avg_purchase_price': (purchase_cost / purchase_qty) if purchase_qty else 0,
+            'current_value': p.stock_value(),
+            'movement_count': len(txs),
+        },
+        'purchases': purchases,
+        'movements': [t.to_dict() for t in txs],
+    })
+
+
 # ═══════════════════════════════════════════════════════════════════
 # TRANSACTION ROUTES
 # ═══════════════════════════════════════════════════════════════════
@@ -632,33 +739,61 @@ def add_transaction(pid):
     user = get_current_user()
     data = request.json or {}
     tx_type = data.get('type')
-    qty = float(data.get('quantity', 0))
+    qty = float(data.get('quantity', 0) or 0)
     if tx_type not in ('in', 'out', 'adjust'):
-        return jsonify({'error': 'نوع تراکنش نامعتبر'}), 400
+        return jsonify({'error': 'نوع حرکت نامعتبر'}), 400
     if qty <= 0:
         return jsonify({'error': 'مقدار باید بیشتر از صفر باشد'}), 400
+
     before = p.quantity
+    unit_price = data.get('unit_price', None)
+    if unit_price is not None and unit_price != '':
+        unit_price = float(unit_price)
+    else:
+        unit_price = None
+
     if tx_type == 'in':
+        if unit_price is None:
+            return jsonify({'error': 'برای ورود کالا، قیمت خرید این محموله الزامی است'}), 400
+        if unit_price < 0:
+            return jsonify({'error': 'قیمت نمی‌تواند منفی باشد'}), 400
+        p.apply_purchase_cost(qty, unit_price, before)
         p.quantity += qty
+        total_cost = qty * unit_price
     elif tx_type == 'out':
         if p.quantity < qty:
             return jsonify({'error': 'موجودی کافی نیست'}), 400
+        cost = p.cost_basis()
+        unit_price = cost
+        total_cost = qty * cost
         p.quantity -= qty
     else:
-        p.quantity = qty
+        # اصلاح موجودی — مقدار واردشده = موجودی جدید
+        new_qty = qty
+        delta = new_qty - before
+        cost = p.cost_basis()
+        unit_price = cost if cost else None
+        total_cost = abs(delta) * cost if cost and delta != 0 else None
+        p.quantity = new_qty
+
     manual_status = data.get('manual_status')
     if manual_status in ('available', 'unavailable', 'low'):
         p.manual_status = manual_status
     elif manual_status is None:
         p.manual_status = None
     p.updated_at = now_tehran()
+
     tx_date = now_tehran()
     if data.get('custom_date'):
-        try: tx_date = datetime.fromisoformat(data['custom_date'])
-        except: pass
+        try:
+            tx_date = datetime.fromisoformat(data['custom_date'])
+        except Exception:
+            pass
+
     tx = Transaction(
         product_id=pid, type=tx_type, quantity=qty,
         before_qty=before, after_qty=p.quantity,
+        unit_price=unit_price, total_cost=total_cost,
         note=data.get('note', ''), ref_number=data.get('ref_number', ''),
         created_by=user.display_name or user.username, created_at=tx_date,
     )
@@ -673,6 +808,7 @@ def get_all_transactions():
     tx_type = request.args.get('type', '').strip()
     wh_id   = request.args.get('warehouse_id', '').strip()
     dept_id = request.args.get('department_id', '').strip()
+    product_id = request.args.get('product_id', '').strip()
 
     query = (Transaction.query
              .join(Product, Transaction.product_id == Product.id)
@@ -692,6 +828,8 @@ def get_all_transactions():
         query = query.filter(Product.warehouse_id == int(wh_id))
     if dept_id:
         query = query.filter(Transaction.department_id == int(dept_id))
+    if product_id:
+        query = query.filter(Transaction.product_id == int(product_id))
     txs = query.order_by(Transaction.created_at.desc()).limit(500).all()
     return jsonify([t.to_dict() for t in txs])
 
@@ -720,12 +858,14 @@ def create_dispatch():
     if product.quantity < quantity:
         return jsonify({'error': f'موجودی کافی نیست (موجودی: {product.quantity} {product.unit})'}), 400
     before = product.quantity
+    cost = product.cost_basis()
     product.quantity -= quantity
     product.updated_at = now_tehran()
     tx = Transaction(
         product_id=product_id, department_id=department_id,
         type='out', quantity=quantity,
         before_qty=before, after_qty=product.quantity,
+        unit_price=cost, total_cost=quantity * cost,
         note=note, created_by=user.display_name or user.username,
     )
     db.session.add(tx)
@@ -745,10 +885,13 @@ def reverse_dispatch(tx_id):
 
     product = Product.query.get_or_404(tx.product_id)
 
-    # ثبت تراکنش بازگشت
     before = product.quantity
     product.quantity += tx.quantity
     product.updated_at = now_tehran()
+
+    # بازگشت با همان قیمت خروج (هزینه برگشتی)
+    unit_price = tx.unit_price if tx.unit_price is not None else product.cost_basis()
+    total_cost = tx.total_cost if tx.total_cost is not None else (tx.quantity * (unit_price or 0))
 
     reverse_tx = Transaction(
         product_id    = tx.product_id,
@@ -757,13 +900,14 @@ def reverse_dispatch(tx_id):
         quantity      = tx.quantity,
         before_qty    = before,
         after_qty     = product.quantity,
+        unit_price    = unit_price,
+        total_cost    = total_cost,
         note          = f'بازگشت خروج رسمی (شناسه تراکنش: {tx_id})',
         created_by    = user.display_name or user.username,
         reversed_by_id= tx_id,
     )
     db.session.add(reverse_tx)
 
-    # علامت‌گذاری تراکنش اصلی
     tx.is_reversed = True
     db.session.commit()
 
@@ -821,8 +965,9 @@ def dashboard():
     product_count      = db.session.query(func.count(Product.id)).filter(Product.is_active == True).scalar()
     low_stock_count    = db.session.query(func.count(Product.id)).filter(low_stock_cond).scalar()
     out_of_stock_count = db.session.query(func.count(Product.id)).filter(out_stock_cond).scalar()
-    total_value        = db.session.query(func.sum(Product.quantity * func.coalesce(Product.unit_price, 0))) \
-                            .filter(Product.is_active == True).scalar() or 0
+    # ارزش کل بر اساس میانگین موزون (یا آخرین قیمت اگر میانگین نبود)
+    active_products = Product.query.filter_by(is_active=True).all()
+    total_value = sum(p.stock_value() for p in active_products)
 
     low_stock    = Product.query.filter(low_stock_cond).limit(5).all()
     out_of_stock = Product.query.filter(out_stock_cond).limit(5).all()
@@ -858,7 +1003,7 @@ def inventory_report():
     return jsonify({
         'generated_at': now_j,
         'products': product_dicts,
-        'total_value': sum(p['quantity'] * p['unit_price'] for p in product_dicts),
+        'total_value': sum(p['total_value'] for p in product_dicts),
     })
 
 
@@ -867,20 +1012,83 @@ def inventory_report():
 # ═══════════════════════════════════════════════════════════════════
 
 def migrate():
-    """اضافه کردن ستون‌های جدید به دیتابیس قدیمی"""
+    """اضافه کردن ستون‌های جدید و مهاجرت نرم دیتای قدیمی"""
     with db.engine.connect() as conn:
         for sql, msg in [
             ('ALTER TABLE transactions ADD COLUMN department_id INTEGER REFERENCES departments(id)', 'department_id'),
             ('ALTER TABLE transactions ADD COLUMN is_reversed BOOLEAN DEFAULT 0', 'is_reversed'),
             ('ALTER TABLE transactions ADD COLUMN reversed_by_id INTEGER', 'reversed_by_id'),
+            ('ALTER TABLE transactions ADD COLUMN unit_price REAL', 'tx.unit_price'),
+            ('ALTER TABLE transactions ADD COLUMN total_cost REAL', 'tx.total_cost'),
+            ('ALTER TABLE products ADD COLUMN avg_cost REAL DEFAULT 0', 'products.avg_cost'),
         ]:
             try:
                 conn.execute(db.text(sql))
                 conn.commit()
-                print(f'[MIGRATE] {msg} added to transactions')
+                print(f'[MIGRATE] {msg} added')
             except Exception:
                 pass  # قبلاً اضافه شده
 
+    # مهاجرت یک‌باره دیتا: قیمت‌های قدیمی را روی حرکات و میانگین کالا بنشان
+    try:
+        _backfill_ledger_from_legacy()
+    except Exception as e:
+        print(f'[MIGRATE] backfill skipped: {e}')
+        db.session.rollback()
+
+
+def _backfill_ledger_from_legacy():
+    """
+    دیتای قبلی را با منطق جدید هم‌راستا می‌کند بدون از دست رفتن موجودی:
+    - avg_cost کالا از unit_price فعلی پر می‌شود اگر خالی باشد
+    - ورودهای بدون قیمت، قیمت کالای همان زمان (فعلی) را می‌گیرند
+    - خروج‌های بدون قیمت، با cost_basis کالا پر می‌شوند
+    """
+    flag_path = os.path.join(data_dir, '.ledger_backfill_v1')
+    if os.path.exists(flag_path):
+        return
+
+    products = Product.query.all()
+    updated_products = 0
+    updated_txs = 0
+
+    for p in products:
+        changed = False
+        if (not p.avg_cost or p.avg_cost <= 0) and (p.unit_price or 0) > 0:
+            p.avg_cost = p.unit_price
+            changed = True
+        if changed:
+            updated_products += 1
+
+        cost = p.cost_basis()
+        for tx in Transaction.query.filter_by(product_id=p.id).all():
+            if tx.unit_price is not None and tx.total_cost is not None:
+                continue
+            if tx.type == 'in':
+                price = cost if cost > 0 else (p.unit_price or 0)
+                tx.unit_price = price
+                tx.total_cost = (tx.quantity or 0) * price
+                updated_txs += 1
+            elif tx.type == 'out':
+                price = cost if cost > 0 else (p.unit_price or 0)
+                tx.unit_price = price
+                tx.total_cost = (tx.quantity or 0) * price
+                updated_txs += 1
+            else:
+                # اصلاح موجودی — قیمت مبنا برای گزارش ارزش
+                price = cost if cost > 0 else None
+                if price is not None:
+                    before = tx.before_qty if tx.before_qty is not None else 0
+                    after = tx.after_qty if tx.after_qty is not None else tx.quantity
+                    delta = abs((after or 0) - (before or 0))
+                    tx.unit_price = price
+                    tx.total_cost = delta * price
+                    updated_txs += 1
+
+    db.session.commit()
+    with open(flag_path, 'w', encoding='utf-8') as f:
+        f.write(f'products={updated_products};txs={updated_txs}\n')
+    print(f'[MIGRATE] ledger backfill done: products={updated_products}, txs={updated_txs}')
 def init_admin():
     if User.query.count() == 0:
         admin_user = os.environ.get('ADMIN_USERNAME', 'admin')

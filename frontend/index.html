@@ -302,6 +302,20 @@
   .badge-in     { background: rgba(34,197,94,.15);  color: var(--green); }
   .badge-out    { background: rgba(239,68,68,.15);  color: var(--red); }
   .badge-adjust { background: rgba(59,130,246,.15); color: var(--accent); }
+  .badge-return { background: rgba(168,85,247,.15); color: #a855f7; }
+  .badge-corr-up { background: rgba(34,197,94,.12); color: var(--green); }
+  .badge-corr-down { background: rgba(239,68,68,.12); color: var(--red); }
+
+  .pc-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px; }
+  .pc-tab {
+    border:1px solid var(--border); background:var(--bg2); color:var(--text2);
+    padding:8px 14px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:600;
+  }
+  .pc-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .pc-panel { display:none; }
+  .pc-panel.active { display:block; }
+  .clickable-name { cursor:pointer; color:var(--accent); }
+  .clickable-name:hover { text-decoration:underline; }
 
   /* ── Modal ── */
   .modal-overlay {
@@ -619,7 +633,7 @@
     <div class="nav-section">
       <div class="nav-label">گزارشات</div>
       <div class="nav-item" onclick="navigate('transactions')">
-        <span class="icon">🔄</span> تراکنش‌ها
+        <span class="icon">🔄</span> حرکات انبار
       </div>
       <div class="nav-item" onclick="navigate('dept_report')">
         <span class="icon">📊</span> گزارش بخش‌ها
@@ -751,23 +765,12 @@
         <input id="prod-cat" placeholder="مثلاً: الکترونیک"/>
       </div>
       <div class="form-group">
-        <label>موجودی</label>
-        <input id="prod-qty" type="number" min="0" placeholder="0"/>
-        <span id="prod-qty-hint" style="display:none;font-size:11px;color:var(--yellow);margin-top:4px;">
-          ⚠️ تغییر موجودی یک تراکنش تنظیم خودکار ثبت می‌کند
-        </span>
-      </div>
-      <div class="form-group">
         <label>واحد</label>
         <select id="prod-unit">
           <option>عدد</option><option>دستگاه</option><option>کیلوگرم</option>
           <option>متر</option><option>لیتر</option><option>جعبه</option>
           <option>بسته</option><option>رول</option><option>جفت</option>
         </select>
-      </div>
-      <div class="form-group">
-        <label>قیمت واحد (ریال)</label>
-        <input id="prod-price" type="number" min="0" placeholder="0"/>
       </div>
       <div class="form-group">
         <label>حداقل موجودی (هشدار)</label>
@@ -777,13 +780,24 @@
         <label>انبار *</label>
         <select id="prod-wh"></select>
       </div>
+      <div class="form-group full" id="prod-stock-info" style="display:none;">
+        <div class="card" style="margin:0;padding:12px 14px;background:var(--bg3);">
+          <div class="text-sm text-muted">موجودی و قیمت فقط از طریق «ورود خرید» / «خروج» در کارت کالا تغییر می‌کند</div>
+          <div style="margin-top:8px;display:flex;gap:18px;flex-wrap:wrap;">
+            <div><span class="text-sm text-muted">موجودی فعلی:</span> <b id="prod-qty-ro">—</b></div>
+            <div><span class="text-sm text-muted">آخرین قیمت خرید:</span> <b id="prod-price-ro">—</b></div>
+            <div><span class="text-sm text-muted">میانگین هزینه:</span> <b id="prod-avg-ro">—</b></div>
+          </div>
+        </div>
+      </div>
       <div class="form-group full">
         <label>توضیحات کالا</label>
         <textarea id="prod-desc" placeholder="توضیح اختیاری..."></textarea>
       </div>
-      <div class="form-group full" id="prod-edit-note-group" style="display:none;">
-        <label style="color:var(--yellow);">💬 دلیل تغییر موجودی (ثبت در تراکنش)</label>
-        <input id="prod-edit-note" placeholder="مثلاً: اصلاح موجودی پس از انبارگردانی..."/>
+      <div class="form-group full" id="prod-create-hint" style="display:none;">
+        <div class="text-sm" style="color:var(--yellow);">
+          ℹ️ بعد از تعریف کالا، از کارت کالا «ورود خرید» بزنید تا تعداد، قیمت و تاریخ این خرید ثبت شود.
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -826,21 +840,25 @@
     </div>
     <div id="modal-tx-product-info" class="card" style="margin-bottom:20px;padding:16px;"></div>
     <div class="tx-tabs" id="tx-type-tabs">
-      <button class="tx-tab" onclick="setTxType('in')"  id="tab-in">⬆️ ورود کالا</button>
-      <button class="tx-tab" onclick="setTxType('out')" id="tab-out">⬇️ خروج کالا</button>
-      <button class="tx-tab" onclick="setTxType('adjust')" id="tab-adj">⚖️ تنظیم موجودی</button>
+      <button class="tx-tab" onclick="setTxType('in')"  id="tab-in">⬆️ ورود خرید</button>
+      <button class="tx-tab" onclick="setTxType('out')" id="tab-out">⬇️ خروج از انبار</button>
+      <button class="tx-tab" onclick="setTxType('adjust')" id="tab-adj">📝 اصلاح موجودی</button>
     </div>
     <div class="form-grid">
       <div class="form-group">
         <label id="tx-qty-label">مقدار *</label>
         <input id="tx-qty" type="number" min="0.01" step="0.01" placeholder="0"/>
       </div>
+      <div class="form-group" id="tx-price-group">
+        <label id="tx-price-label">قیمت خرید این محموله (ریال) *</label>
+        <input id="tx-price" type="number" min="0" step="1" placeholder="مثلاً 1500000"/>
+      </div>
       <div class="form-group">
         <label>تاریخ شمسی *</label>
         <input id="tx-date" placeholder="۱۴۰۴/۰۳/۲۲" dir="ltr" style="text-align:right;"/>
       </div>
       <div class="form-group">
-        <label>شماره مرجع</label>
+        <label>شماره مرجع / فاکتور</label>
         <input id="tx-ref" placeholder="شماره فاکتور یا سند..."/>
       </div>
       <div class="form-group">
@@ -854,7 +872,12 @@
       </div>
       <div class="form-group full">
         <label>توضیحات</label>
-        <textarea id="tx-note" placeholder="دلیل یا توضیح تراکنش..." style="min-height:60px;"></textarea>
+        <textarea id="tx-note" placeholder="تأمین‌کننده، دلیل خروج، یا توضیح اصلاح موجودی..." style="min-height:60px;"></textarea>
+      </div>
+      <div class="form-group full" id="tx-adjust-hint" style="display:none;">
+        <div class="text-sm" style="color:var(--yellow);">
+          برای اصلاح، «موجودی واقعی شمارش‌شده» را وارد کنید. سیستم خودش افزایش یا کاهش را ثبت می‌کند.
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -999,6 +1022,8 @@ let state = {
   editWarehouseId: null,
   editProductId: null,
   currentWarehouseId: null,
+  currentProductId: null,
+  productCardTab: 'history',
   txProductId: null,
   txType: 'in',
 };
@@ -1014,9 +1039,10 @@ function navigate(page, params={}) {
     el.classList.toggle('active',
       el.textContent.trim() === {
         dashboard: 'داشبورد', warehouses: 'انبارها',
-        products: 'همه کالاها', transactions: 'تراکنش‌ها', report: 'گزارش موجودی',
+        products: 'همه کالاها', transactions: 'حرکات انبار', report: 'گزارش موجودی',
         warehouse_detail: 'انبارها', users: 'کاربران',
         departments: 'بخش‌ها', dispatch: 'خروج رسمی', dept_report: 'گزارش بخش‌ها',
+        product_card: 'انبارها',
       }[page]);
   });
   closeSidebar();
@@ -1110,9 +1136,10 @@ async function renderPage() {
   document.getElementById('topbar-actions').innerHTML = '';
   const titles = {
     dashboard: 'داشبورد', warehouses: 'مدیریت انبارها',
-    products: 'همه کالاها', transactions: 'تراکنش‌ها', report: 'گزارش موجودی',
+    products: 'همه کالاها', transactions: 'حرکات انبار', report: 'گزارش موجودی',
     warehouse_detail: '', users: 'مدیریت کاربران',
     departments: 'مدیریت بخش‌ها', dispatch: 'خروج رسمی کالا', dept_report: 'گزارش بخش‌ها',
+    product_card: 'کارت کالا',
   };
   document.getElementById('page-title').textContent = titles[state.page] || '';
 
@@ -1120,6 +1147,7 @@ async function renderPage() {
     if      (state.page === 'dashboard')        await renderDashboard();
     else if (state.page === 'warehouses')       await renderWarehouses();
     else if (state.page === 'warehouse_detail') await renderWarehouseDetail();
+    else if (state.page === 'product_card')     await renderProductCard();
     else if (state.page === 'products')         await renderAllProducts();
     else if (state.page === 'transactions')     await renderTransactions();
     else if (state.page === 'report')           await renderReport();
@@ -1164,16 +1192,16 @@ async function renderDashboard() {
            </tbody></table></div>`}
     </div>
     <div class="card">
-      <div class="card-title">🔄 آخرین تراکنش‌ها</div>
+      <div class="card-title">🔄 آخرین حرکات انبار</div>
       ${d.recent_transactions.length === 0
-        ? '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">تراکنشی ثبت نشده</div></div>'
+        ? '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">حرکتی ثبت نشده</div></div>'
         : `<div class="table-wrap"><table><thead><tr>
-            <th>کالا</th><th>نوع</th><th>مقدار</th><th>تاریخ</th>
+            <th>کالا</th><th>نوع حرکت</th><th>مقدار</th><th>تاریخ</th>
            </tr></thead><tbody>
            ${d.recent_transactions.map(t=>`<tr>
-             <td>${t.product_name}</td>
-             <td>${txBadge(t.type)}</td>
-             <td class="num">${fmt(t.quantity)}</td>
+             <td><span class="clickable-name" onclick="openProductCard(${t.product_id})">${t.product_name}</span></td>
+             <td>${txBadge(t)}</td>
+             <td class="num">${fmt(Math.abs(t.delta != null ? t.delta : t.quantity))}</td>
              <td class="text-sm text-muted num">${t.created_at}</td>
            </tr>`).join('')}
            </tbody></table></div>`}
@@ -1181,10 +1209,30 @@ async function renderDashboard() {
   </div>`;
 }
 
-function txBadge(type) {
-  if (type==='in')     return '<span class="badge badge-in">⬆️ ورود</span>';
-  if (type==='out')    return '<span class="badge badge-out">⬇️ خروج</span>';
-  return '<span class="badge badge-adjust">⚖️ تنظیم</span>';
+function txBadge(tOrType) {
+  // پشتیبانی از آبجکت تراکنش جدید و type رشته‌ای قدیمی
+  if (tOrType && typeof tOrType === 'object') {
+    const kind = tOrType.movement_kind || tOrType.type;
+    const label = tOrType.movement_label || '';
+    if (kind === 'purchase' || kind === 'initial' || tOrType.type === 'in')
+      return `<span class="badge badge-in">${label || '⬆️ ورود خرید'}</span>`;
+    if (kind === 'return')
+      return `<span class="badge badge-return">${label || '↩️ بازگشت به انبار'}</span>`;
+    if (kind === 'dispatch' || kind === 'dispatch_reversed' || kind === 'issue' || tOrType.type === 'out')
+      return `<span class="badge badge-out">${label || '⬇️ خروج'}</span>`;
+    if (kind === 'correction_up')
+      return `<span class="badge badge-corr-up">${label || '📈 افزایش موجودی'}</span>`;
+    if (kind === 'correction_down')
+      return `<span class="badge badge-corr-down">${label || '📉 کاهش موجودی'}</span>`;
+    return `<span class="badge badge-adjust">${label || '📝 اصلاح موجودی'}</span>`;
+  }
+  if (tOrType === 'in')  return '<span class="badge badge-in">⬆️ ورود خرید</span>';
+  if (tOrType === 'out') return '<span class="badge badge-out">⬇️ خروج</span>';
+  return '<span class="badge badge-adjust">📝 اصلاح موجودی</span>';
+}
+
+function openProductCard(pid, tab='history') {
+  navigate('product_card', { currentProductId: pid, productCardTab: tab });
 }
 
 // ─── Warehouses ──────────────────────────────────────────────────────────────
@@ -1258,7 +1306,7 @@ async function renderWarehouseDetail() {
       : `<div class="table-wrap"><table id="prods-table">
           <thead><tr>
             <th>نام کالا</th><th>کد SKU</th><th>دسته</th>
-            <th>موجودی</th><th>قیمت واحد</th><th>ارزش کل</th><th>وضعیت</th><th>عملیات</th>
+            <th>موجودی</th><th>آخرین خرید</th><th>میانگین هزینه</th><th>ارزش کل</th><th>وضعیت</th><th>عملیات</th>
           </tr></thead><tbody>
           ${prods.map(p=>prodRow(p)).join('')}
           </tbody></table></div>`}
@@ -1268,23 +1316,28 @@ async function renderWarehouseDetail() {
 
 function prodRow(p) {
   const statusBadge = p.manual_status === 'unavailable' || p.status==='out'
-    ? '<span class="badge badge-red" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal('+p.id+',\''+p.name+'\',\''+p.status+'\')">🚫 ناموجود</span>'
+    ? '<span class="badge badge-red" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal('+p.id+',\''+p.name.replace(/'/g,"\\'")+'\',\''+p.status+'\')">🚫 ناموجود</span>'
     : p.manual_status === 'low' || p.status==='low'
-    ? '<span class="badge badge-yellow" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal('+p.id+',\''+p.name+'\',\''+p.status+'\')">⚠️ کم است</span>'
-    : '<span class="badge badge-green" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal('+p.id+',\''+p.name+'\',\''+p.status+'\')">✅ موجود</span>';
+    ? '<span class="badge badge-yellow" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal('+p.id+',\''+p.name.replace(/'/g,"\\'")+'\',\''+p.status+'\')">⚠️ کم است</span>'
+    : '<span class="badge badge-green" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal('+p.id+',\''+p.name.replace(/'/g,"\\'")+'\',\''+p.status+'\')">✅ موجود</span>';
   return `<tr id="prod-row-${p.id}">
-    <td class="fw-bold">${p.name}${p.description?`<br><span class="text-sm text-muted">${p.description}</span>`:''}</td>
+    <td class="fw-bold">
+      <span class="clickable-name" onclick="openProductCard(${p.id})">${p.name}</span>
+      ${p.description?`<br><span class="text-sm text-muted">${p.description}</span>`:''}
+    </td>
     <td class="text-muted num">${p.sku||'—'}</td>
     <td>${p.category||'—'}</td>
     <td class="num fw-bold">${fmt(p.quantity)} ${p.unit}</td>
     <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
+    <td class="num text-muted">${p.avg_cost?fmtPrice(p.avg_cost):(p.cost_basis?fmtPrice(p.cost_basis):'—')}</td>
     <td class="num">${fmtPrice(p.total_value)}</td>
     <td>${statusBadge}</td>
     <td>
       <div class="flex-gap">
-        ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" onclick="openTxModal(${p.id})">🔄 ثبت</button>`}
+        <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت</button>
+        ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" onclick="openProductCard(${p.id},'in')">⬆️ ورود</button>`}
         ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️</button>`}
-        ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id},'${p.name}')">🗑️</button>`}
+        ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id},'${p.name.replace(/'/g,"\\'")}')">🗑️</button>`}
       </div>
     </td>
   </tr>`;
@@ -1296,6 +1349,135 @@ function filterProds() {
   const tbody = document.querySelector('#prods-table tbody');
   if (!tbody) return;
   tbody.innerHTML = prods.filter(p=>p.name.toLowerCase().includes(q)||p.sku.toLowerCase().includes(q)||(p.category||'').toLowerCase().includes(q)).map(prodRow).join('');
+}
+
+// ─── Product Card (کارت کالا) ────────────────────────────────────────────────
+
+async function renderProductCard() {
+  const pid = state.currentProductId;
+  if (!pid) { navigate('warehouses'); return; }
+  const data = await api('GET', `/products/${pid}/card`);
+  const p = data.product;
+  const s = data.summary;
+  const tab = state.productCardTab || 'history';
+
+  document.getElementById('page-title').textContent = `📋 ${p.name}`;
+  document.getElementById('topbar-actions').innerHTML = `
+    <button class="btn btn-secondary" onclick="navigate('warehouse_detail',{currentWarehouseId:${p.warehouse_id}})">← بازگشت به انبار</button>
+    ${window._isViewer ? '' : `<button class="btn btn-secondary" onclick="openProductModal(${p.id})">✏️ مشخصات</button>`}
+    ${window._isViewer ? '' : `<button class="btn btn-success" onclick="openTxModal(${p.id},'in')">⬆️ ورود خرید</button>`}`;
+
+  const statusBadge = p.status==='out'
+    ? '<span class="badge badge-red">🚫 ناموجود</span>'
+    : p.status==='low'
+    ? '<span class="badge badge-yellow">⚠️ کم‌موجود</span>'
+    : '<span class="badge badge-green">✅ موجود</span>';
+
+  document.getElementById('content').innerHTML = `
+  <div class="card mb-4">
+    <div class="flex-between" style="flex-wrap:wrap;gap:12px;">
+      <div>
+        <div style="font-size:22px;font-weight:800;">${p.name}</div>
+        <div class="text-sm text-muted" style="margin-top:4px;">
+          ${p.warehouse_name || ''} ${p.sku ? ' · SKU: '+p.sku : ''} ${p.category ? ' · '+p.category : ''} · واحد: ${p.unit}
+        </div>
+        <div style="margin-top:8px;">${statusBadge}</div>
+      </div>
+      <div style="text-align:left;">
+        <div style="font-size:32px;font-weight:800;color:var(--accent)">${fmt(p.quantity)}</div>
+        <div class="text-sm text-muted">${p.unit} موجودی فعلی</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-grid" style="margin-bottom:20px;">
+    <div class="stat-card"><div class="stat-label">⬆️ مجموع ورود</div><div class="stat-value val-green">${fmt(s.total_in)}</div></div>
+    <div class="stat-card"><div class="stat-label">⬇️ مجموع خروج</div><div class="stat-value val-red">${fmt(s.total_out)}</div></div>
+    <div class="stat-card"><div class="stat-label">💰 آخرین خرید</div><div class="stat-value val-blue" style="font-size:16px;">${p.unit_price?fmtPrice(p.unit_price):'—'}</div></div>
+    <div class="stat-card"><div class="stat-label">📊 میانگین هزینه</div><div class="stat-value val-blue" style="font-size:16px;">${(p.avg_cost||p.cost_basis)?fmtPrice(p.avg_cost||p.cost_basis):'—'}</div></div>
+    <div class="stat-card" style="grid-column:span 2"><div class="stat-label">💎 ارزش موجودی</div><div class="stat-value val-green" style="font-size:20px;">${fmtPrice(s.current_value)}</div></div>
+  </div>
+
+  <div class="pc-tabs">
+    <button class="pc-tab ${tab==='history'?'active':''}" onclick="setProductCardTab('history')">📜 تاریخچه حرکات</button>
+    <button class="pc-tab ${tab==='purchases'?'active':''}" onclick="setProductCardTab('purchases')">🛒 گزارش خریدها</button>
+    ${window._isViewer ? '' : `<button class="pc-tab ${tab==='in'?'active':''}" onclick="setProductCardTab('in')">⬆️ ورود خرید</button>`}
+    ${window._isViewer ? '' : `<button class="pc-tab ${tab==='out'?'active':''}" onclick="setProductCardTab('out')">⬇️ خروج</button>`}
+    ${window._isViewer ? '' : `<button class="pc-tab ${tab==='adjust'?'active':''}" onclick="setProductCardTab('adjust')">📝 اصلاح موجودی</button>`}
+  </div>
+
+  <div class="card">
+    <div id="pc-panel"></div>
+  </div>`;
+
+  window._productCardData = data;
+  renderProductCardPanel(tab);
+}
+
+function setProductCardTab(tab) {
+  state.productCardTab = tab;
+  document.querySelectorAll('.pc-tab').forEach(el => {
+    const map = {
+      history: '📜 تاریخچه حرکات',
+      purchases: '🛒 گزارش خریدها',
+      in: '⬆️ ورود خرید',
+      out: '⬇️ خروج',
+      adjust: '📝 اصلاح موجودی',
+    };
+    el.classList.toggle('active', el.textContent.trim() === map[tab]);
+  });
+  if (tab === 'in' || tab === 'out' || tab === 'adjust') {
+    openTxModal(state.currentProductId, tab);
+    // تب تاریخچه را بعد از بستن مودال نگه می‌داریم ولی پنل فعلی را هم نشان بده
+    renderProductCardPanel(tab === 'in' ? 'purchases' : 'history');
+    return;
+  }
+  renderProductCardPanel(tab);
+}
+
+function renderProductCardPanel(tab) {
+  const panel = document.getElementById('pc-panel');
+  const data = window._productCardData;
+  if (!panel || !data) return;
+
+  if (tab === 'purchases') {
+    const purchases = data.purchases || [];
+    const s = data.summary;
+    panel.innerHTML = `
+      <div class="flex-between mb-4" style="flex-wrap:wrap;gap:10px;">
+        <div class="card-title" style="margin:0">🛒 گزارش خریدهای این کالا</div>
+        <div class="text-sm text-muted">
+          ${fmt(s.purchase_count)} خرید · جمع تعداد: ${fmt(s.purchase_qty)} · جمع مبلغ: ${fmtPrice(s.purchase_cost)}
+          ${s.avg_purchase_price ? ' · میانگین: '+fmtPrice(s.avg_purchase_price) : ''}
+        </div>
+      </div>
+      ${purchases.length === 0
+        ? '<div class="empty"><div class="empty-icon">🛒</div><div class="empty-text">هنوز ورود خریدی ثبت نشده</div></div>'
+        : `<div class="table-wrap"><table>
+            <thead><tr>
+              <th>تاریخ</th><th>نوع</th><th>تعداد</th><th>قیمت واحد</th><th>مبلغ کل</th><th>شماره فاکتور</th><th>ثبت‌کننده</th><th>توضیحات</th>
+            </tr></thead><tbody>
+            ${purchases.map(t=>`<tr>
+              <td class="num text-sm">${t.created_at}</td>
+              <td>${txBadge(t)}</td>
+              <td class="num fw-bold">${fmt(t.quantity)} ${t.unit_name||''}</td>
+              <td class="num">${t.unit_price!=null?fmtPrice(t.unit_price):'—'}</td>
+              <td class="num">${t.total_cost!=null?fmtPrice(t.total_cost):'—'}</td>
+              <td class="text-sm">${t.ref_number||'—'}</td>
+              <td class="text-sm">${t.created_by||'—'}</td>
+              <td class="text-sm">${t.note||'—'}</td>
+            </tr>`).join('')}
+            </tbody></table></div>`}`;
+    return;
+  }
+
+  // history (default)
+  const moves = data.movements || [];
+  panel.innerHTML = `
+    <div class="flex-between mb-4">
+      <div class="card-title" style="margin:0">📜 همه حرکات این کالا — ${fmt(moves.length)} مورد</div>
+    </div>
+    ${buildTxTable(moves)}`;
 }
 
 // ─── All Products ─────────────────────────────────────────────────────────────
@@ -1346,7 +1528,7 @@ async function loadProdPage(page) {
   }
   body.innerHTML = `<div class="table-wrap"><table id="all-prods-table">
     <thead><tr>
-      <th>نام کالا</th><th>انبار</th><th>دسته</th><th>موجودی</th><th>قیمت</th><th>وضعیت</th><th>عملیات</th>
+      <th>نام کالا</th><th>انبار</th><th>دسته</th><th>موجودی</th><th>آخرین خرید</th><th>وضعیت</th><th>عملیات</th>
     </tr></thead><tbody>
     ${res.items.map(p=>allProdRow(p)).join('')}
     </tbody></table></div>
@@ -1355,15 +1537,15 @@ async function loadProdPage(page) {
 
 function allProdRow(p) {
   return `<tr>
-    <td class="fw-bold">${p.name}</td>
-    <td class="text-muted">${(state.warehouses.find(w=>w.id===p.warehouse_id)||{name:'—'}).name}</td>
+    <td class="fw-bold"><span class="clickable-name" onclick="openProductCard(${p.id})">${p.name}</span></td>
+    <td class="text-muted">${p.warehouse_name || (state.warehouses.find(w=>w.id===p.warehouse_id)||{name:'—'}).name}</td>
     <td>${p.category||'—'}</td>
     <td class="num">${fmt(p.quantity)} ${p.unit}</td>
     <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
     <td>${p.status==='out'?'<span class="badge badge-red">🚫 تمام شد</span>':p.status==='low'?'<span class="badge badge-yellow">⚠️ کم</span>':'<span class="badge badge-green">✅ موجود</span>'}</td>
     <td><div class="flex-gap">
-      <button class="btn btn-sm btn-success" onclick="openTxModal(${p.id})">🔄</button>
-      <button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️</button>
+      <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت</button>
+      ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️</button>`}
     </div></td>
   </tr>`;
 }
@@ -1382,27 +1564,36 @@ function buildPager(page, totalPages) {
 // ─── Transactions ────────────────────────────────────────────────────────────
 
 function txChangeCell(t) {
-  if (t.type === 'adjust') return `<span class="val-blue">= ${fmt(t.quantity)}</span>`;
-  if (t.type === 'in')  return `<span class="val-green">+ ${fmt(t.quantity)}</span>`;
-  return `<span class="val-red">- ${fmt(t.quantity)}</span>`;
+  const delta = (t.delta != null) ? t.delta : (t.type === 'in' ? t.quantity : t.type === 'out' ? -t.quantity : 0);
+  if (t.type === 'adjust') {
+    const d = (t.after_qty != null && t.before_qty != null) ? (t.after_qty - t.before_qty) : delta;
+    if (d > 0) return `<span class="val-green">+ ${fmt(d)}</span>`;
+    if (d < 0) return `<span class="val-red">- ${fmt(Math.abs(d))}</span>`;
+    return `<span class="val-blue">${fmt(t.quantity)}</span>`;
+  }
+  if (delta >= 0) return `<span class="val-green">+ ${fmt(Math.abs(delta))}</span>`;
+  return `<span class="val-red">- ${fmt(Math.abs(delta))}</span>`;
 }
 
 function buildTxTable(txs) {
   if (!txs.length) return '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">نتیجه‌ای یافت نشد</div></div>';
   return `<div class="table-wrap"><table id="tx-table">
     <thead><tr>
-      <th>تاریخ</th><th>کالا</th><th>انبار</th><th>نوع</th><th>قبل</th><th>تغییر</th><th>بعد</th><th>مرجع</th><th>توضیحات</th>
+      <th>تاریخ</th><th>کالا</th><th>انبار</th><th>نوع حرکت</th><th>قبل</th><th>تغییر</th><th>بعد</th><th>قیمت واحد</th><th>مبلغ</th><th>مرجع</th><th>توضیحات</th>
     </tr></thead><tbody>
     ${txs.map(t=>`<tr>
       <td class="num text-sm text-muted" style="white-space:nowrap">${t.created_at}</td>
-      <td class="fw-bold">${t.product_name}</td>
+      <td class="fw-bold"><span class="clickable-name" onclick="openProductCard(${t.product_id})">${t.product_name}</span></td>
       <td class="text-muted">${t.warehouse_name}</td>
-      <td>${txBadge(t.type)}</td>
+      <td>${txBadge(t)}</td>
       <td class="num">${fmt(t.before_qty)}</td>
       <td class="num fw-bold">${txChangeCell(t)}</td>
       <td class="num fw-bold">${fmt(t.after_qty)}</td>
+      <td class="num">${t.unit_price != null ? fmtPrice(t.unit_price) : '—'}</td>
+      <td class="num">${t.total_cost != null ? fmtPrice(t.total_cost) : '—'}</td>
       <td class="text-sm">${t.ref_number||'—'}</td>
       <td class="text-sm" style="max-width:200px;">
+        ${t.department_name ? `<span class="badge badge-blue">${t.department_name}</span> ` : ''}
         ${t.note ? `<span title="${t.note}" style="color:var(--text2);">💬 ${t.note}</span>` : '<span class="text-muted">—</span>'}
       </td>
     </tr>`).join('')}
@@ -1421,11 +1612,11 @@ async function renderTransactions() {
         <span class="search-icon">🔍</span>
         <input id="tx-search" placeholder="جستجو در کالا، توضیحات، مرجع..." oninput="searchTx()" style="width:100%;"/>
       </div>
-      <select id="tx-filter-type" onchange="searchTx()" style="width:150px;">
-        <option value="">همه انواع</option>
-        <option value="in">⬆️ ورود</option>
+      <select id="tx-filter-type" onchange="searchTx()" style="width:180px;">
+        <option value="">همه حرکات</option>
+        <option value="in">⬆️ ورود خرید</option>
         <option value="out">⬇️ خروج</option>
-        <option value="adjust">⚖️ تنظیم</option>
+        <option value="adjust">📝 اصلاح موجودی</option>
       </select>
       <select id="tx-filter-wh" onchange="searchTx()" style="width:170px;">
         <option value="">همه انبارها</option>
@@ -1457,7 +1648,7 @@ async function searchTx() {
   const txs = await api('GET', `/transactions?${params.toString()}`);
   const title = document.getElementById('tx-count-title');
   const results = document.getElementById('tx-results');
-  if (title) title.textContent = `🔄 تاریخچه تراکنش‌ها — ${fmt(txs.length)} مورد`;
+  if (title) title.textContent = `🔄 تاریخچه حرکات انبار — ${fmt(txs.length)} مورد`;
   if (results) results.innerHTML = buildTxTable(txs);
 }
 
@@ -1505,16 +1696,17 @@ async function loadReport() {
     </div>
     <div class="table-wrap"><table>
       <thead><tr>
-        <th>#</th><th>نام کالا</th><th>کد</th><th>دسته</th><th>موجودی</th><th>واحد</th><th>قیمت واحد</th><th>ارزش کل</th><th>آخرین بروزرسانی</th><th>وضعیت</th>
+        <th>#</th><th>نام کالا</th><th>کد</th><th>دسته</th><th>موجودی</th><th>واحد</th><th>آخرین خرید</th><th>میانگین هزینه</th><th>ارزش کل</th><th>آخرین بروزرسانی</th><th>وضعیت</th>
       </tr></thead><tbody>
       ${d.products.map((p,i)=>`<tr>
         <td class="text-muted">${i+1}</td>
-        <td class="fw-bold">${p.name}</td>
+        <td class="fw-bold"><span class="clickable-name" onclick="openProductCard(${p.id})">${p.name}</span></td>
         <td class="num text-muted">${p.sku||'—'}</td>
         <td>${p.category||'—'}</td>
         <td class="num fw-bold">${fmt(p.quantity)}</td>
         <td>${p.unit}</td>
         <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
+        <td class="num">${(p.avg_cost||p.cost_basis)?fmtPrice(p.avg_cost||p.cost_basis):'—'}</td>
         <td class="num">${fmtPrice(p.total_value)}</td>
         <td class="text-sm text-muted num">${p.updated_at}</td>
         <td>${p.status==='out'?'<span class="badge badge-red">🚫 تمام</span>':p.status==='low'?'<span class="badge badge-yellow">⚠️ کم</span>':'<span class="badge badge-green">✅ موجود</span>'}</td>
@@ -1640,7 +1832,6 @@ async function deleteWarehouse(id, name) {
 async function openProductModal(id=null, whId=null) {
   state.editProductId = id;
 
-  // ریست دکمه ذخیره — جلوگیری از ماندن در حالت «در حال ذخیره»
   const saveBtn = document.querySelector('#modal-product .btn-primary');
   if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ذخیره'; }
 
@@ -1650,39 +1841,35 @@ async function openProductModal(id=null, whId=null) {
   const sel = document.getElementById('prod-wh');
   sel.innerHTML = whs.map(w=>`<option value="${w.id}">${w.name}</option>`).join('');
 
-  document.getElementById('modal-prod-title').textContent = id ? 'ویرایش کالا' : 'کالای جدید';
+  document.getElementById('modal-prod-title').textContent = id ? 'ویرایش مشخصات کالا' : 'تعریف کالای جدید';
+  const stockInfo = document.getElementById('prod-stock-info');
+  const createHint = document.getElementById('prod-create-hint');
+
   if (id) {
-    // فقط یک کالا را بگیر — نه همه کالاها (سریع‌تر)
     const p = await api('GET', `/products/${id}`);
     if (p) {
       document.getElementById('prod-name').value = p.name;
       document.getElementById('prod-sku').value = p.sku||'';
       document.getElementById('prod-cat').value = p.category||'';
-      document.getElementById('prod-qty').value = p.quantity;
       document.getElementById('prod-unit').value = p.unit;
-      document.getElementById('prod-price').value = p.unit_price||0;
       document.getElementById('prod-min').value = p.min_stock||0;
       document.getElementById('prod-desc').value = p.description||'';
       sel.value = p.warehouse_id;
+      document.getElementById('prod-qty-ro').textContent = `${fmt(p.quantity)} ${p.unit}`;
+      document.getElementById('prod-price-ro').textContent = p.unit_price ? fmtPrice(p.unit_price) : '—';
+      document.getElementById('prod-avg-ro').textContent = (p.avg_cost || p.cost_basis) ? fmtPrice(p.avg_cost || p.cost_basis) : '—';
     }
     document.getElementById('prod-wh-group').style.display = 'none';
-    const qtyHint = document.getElementById('prod-qty-hint');
-    if (qtyHint) qtyHint.style.display = 'block';
-    const editNoteGroup = document.getElementById('prod-edit-note-group');
-    if (editNoteGroup) editNoteGroup.style.display = 'flex';
-    document.getElementById('prod-edit-note').value = '';
+    if (stockInfo) stockInfo.style.display = 'flex';
+    if (createHint) createHint.style.display = 'none';
   } else {
     ['prod-name','prod-sku','prod-cat','prod-desc'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('prod-qty').value = 0;
-    document.getElementById('prod-price').value = 0;
     document.getElementById('prod-min').value = 0;
     document.getElementById('prod-unit').value = 'عدد';
     if (whId) sel.value = whId;
     document.getElementById('prod-wh-group').style.display = 'flex';
-    const qtyHint2 = document.getElementById('prod-qty-hint');
-    if (qtyHint2) qtyHint2.style.display = 'none';
-    const editNoteGroup2 = document.getElementById('prod-edit-note-group');
-    if (editNoteGroup2) editNoteGroup2.style.display = 'none';
+    if (stockInfo) stockInfo.style.display = 'none';
+    if (createHint) createHint.style.display = 'flex';
   }
   openModal('modal-product');
 }
@@ -1690,7 +1877,6 @@ async function openProductModal(id=null, whId=null) {
 async function saveProduct() {
   const name = document.getElementById('prod-name').value.trim();
   if (!name) { toast('نام کالا را وارد کنید', 'error'); return; }
-  // جلوگیری از ثبت دوباره
   const saveBtn = document.querySelector('#modal-product .btn-primary');
   if (saveBtn && saveBtn.disabled) return;
   btnLoading(saveBtn, 'در حال ذخیره...');
@@ -1698,24 +1884,26 @@ async function saveProduct() {
     const body = {
       name, sku: document.getElementById('prod-sku').value,
       category: document.getElementById('prod-cat').value,
-      quantity: parseFloat(document.getElementById('prod-qty').value)||0,
       unit: document.getElementById('prod-unit').value,
-      unit_price: parseFloat(document.getElementById('prod-price').value)||0,
       min_stock: parseFloat(document.getElementById('prod-min').value)||0,
       description: document.getElementById('prod-desc').value,
       warehouse_id: parseInt(document.getElementById('prod-wh').value),
     };
     if (state.editProductId) {
-      body.quantity = parseFloat(document.getElementById('prod-qty').value) || 0;
-      body.note = document.getElementById('prod-edit-note').value || '';
       await api('PUT', `/products/${state.editProductId}`, body);
-      toast('کالا ویرایش شد ✏️');
+      toast('مشخصات کالا ذخیره شد ✏️');
+      closeModal('modal-product');
+      await renderPage();
     } else {
-      await api('POST', '/products', body);
-      toast('کالای جدید ثبت شد 📦');
+      const created = await api('POST', '/products', body);
+      toast('کالا تعریف شد — حالا ورود خرید را ثبت کنید 📦');
+      closeModal('modal-product');
+      if (created && created.id) {
+        openProductCard(created.id, 'in');
+      } else {
+        await renderPage();
+      }
     }
-    closeModal('modal-product');
-    await renderPage();
   } catch(e) {
     // خطا قبلاً در api() نمایش داده شده
   } finally {
@@ -1763,7 +1951,7 @@ function jalaliToISO(jStr) {
   return `${gy}-${String(gm+1).padStart(2,'0')}-${String(gDayNo+1).padStart(2,'0')}T12:00:00`;
 }
 
-async function openTxModal(prodId) {
+async function openTxModal(prodId, preferType='in') {
   state.txProductId = prodId;
   const p = await api('GET', `/products/${prodId}`);
   if (!p) return;
@@ -1774,6 +1962,7 @@ async function openTxModal(prodId) {
         <div class="fw-bold" style="font-size:16px;">${p.name}</div>
         <div class="text-sm text-muted">${p.sku?'SKU: '+p.sku+' | ':''}${p.category||''}</div>
         <div style="margin-top:6px;">${statusLabel}</div>
+        <div class="text-sm text-muted" style="margin-top:4px;">آخرین خرید: ${p.unit_price?fmtPrice(p.unit_price):'—'} | میانگین: ${(p.avg_cost||p.cost_basis)?fmtPrice(p.avg_cost||p.cost_basis):'—'}</div>
       </div>
       <div style="text-align:center">
         <div style="font-size:28px;font-weight:800;color:var(--accent)">${fmt(p.quantity)}</div>
@@ -1781,11 +1970,12 @@ async function openTxModal(prodId) {
       </div>
     </div>`;
   document.getElementById('tx-qty').value = '';
+  document.getElementById('tx-price').value = p.unit_price || '';
   document.getElementById('tx-ref').value = '';
   document.getElementById('tx-note').value = '';
   document.getElementById('tx-date').value = todayJalali();
   document.getElementById('tx-status').value = 'auto';
-  setTxType('in');
+  setTxType(preferType || 'in');
   openModal('modal-tx');
 }
 
@@ -1793,16 +1983,22 @@ function setTxType(type) {
   state.txType = type;
   ['in','out','adjust'].forEach(t => {
     const tab = document.getElementById('tab-'+t);
+    if (!tab) return;
     tab.className = 'tx-tab' + (t===type ? ` active-${t==='adjust'?'adj':t}` : '');
   });
-  const labels = { in:'مقدار ورودی *', out:'مقدار خروجی *', adjust:'موجودی جدید *' };
-  const btns = { in:'✅ ثبت ورود', out:'✅ ثبت خروج', adjust:'✅ تنظیم موجودی' };
+  const labels = { in:'مقدار ورودی *', out:'مقدار خروجی *', adjust:'موجودی واقعی شمارش‌شده *' };
+  const btns = { in:'✅ ثبت ورود خرید', out:'✅ ثبت خروج', adjust:'✅ ثبت اصلاح موجودی' };
   document.getElementById('tx-qty-label').textContent = labels[type];
   const txBtn = document.getElementById('btn-save-tx');
   txBtn.textContent = btns[type];
-  txBtn.disabled = false;  // ریست وضعیت disabled هنگام تغییر نوع
+  txBtn.disabled = false;
   document.getElementById('modal-tx-title').textContent =
-    type==='in' ? '⬆️ ورود کالا' : type==='out' ? '⬇️ خروج کالا' : '⚖️ تنظیم موجودی';
+    type==='in' ? '⬆️ ورود خرید' : type==='out' ? '⬇️ خروج از انبار' : '📝 اصلاح موجودی';
+
+  const priceGroup = document.getElementById('tx-price-group');
+  const adjustHint = document.getElementById('tx-adjust-hint');
+  if (priceGroup) priceGroup.style.display = type === 'in' ? 'flex' : 'none';
+  if (adjustHint) adjustHint.style.display = type === 'adjust' ? 'flex' : 'none';
 }
 
 async function saveTx() {
@@ -1813,21 +2009,28 @@ async function saveTx() {
   const isoDate = jalaliToISO(dateStr);
   if (!isoDate) { toast('فرمت تاریخ اشتباه است — مثال: ۱۴۰۴/۰۳/۲۲', 'error'); return; }
 
+  const payload = {
+    type: state.txType,
+    quantity: qty,
+    note: document.getElementById('tx-note').value,
+    ref_number: document.getElementById('tx-ref').value,
+    custom_date: isoDate,
+    manual_status: document.getElementById('tx-status').value === 'auto' ? null : document.getElementById('tx-status').value,
+  };
+
+  if (state.txType === 'in') {
+    const price = parseFloat(document.getElementById('tx-price').value);
+    if (isNaN(price) || price < 0) { toast('قیمت خرید این محموله را وارد کنید', 'error'); return; }
+    payload.unit_price = price;
+  }
+
   const btn = document.getElementById('btn-save-tx');
   if (btn.disabled) return;
   btnLoading(btn, 'در حال ثبت...');
 
   try {
-    const manualStatus = document.getElementById('tx-status').value;
-    await api('POST', `/products/${state.txProductId}/transactions`, {
-      type: state.txType,
-      quantity: qty,
-      note: document.getElementById('tx-note').value,
-      ref_number: document.getElementById('tx-ref').value,
-      custom_date: isoDate,
-      manual_status: manualStatus === 'auto' ? null : manualStatus,
-    });
-    const msgs = { in: 'ورود کالا ثبت شد ⬆️', out: 'خروج کالا ثبت شد ⬇️', adjust: 'موجودی تنظیم شد ⚖️' };
+    await api('POST', `/products/${state.txProductId}/transactions`, payload);
+    const msgs = { in: 'ورود خرید ثبت شد ⬆️', out: 'خروج ثبت شد ⬇️', adjust: 'اصلاح موجودی ثبت شد 📝' };
     toast(msgs[state.txType]);
     closeModal('modal-tx');
     await renderPage();
@@ -2572,6 +2775,7 @@ async function exportInventoryExcel() {
     quantity:   p.quantity,
     unit:       p.unit,
     unit_price: p.unit_price || 0,
+    avg_cost:   p.avg_cost || p.cost_basis || 0,
     total_value: p.total_value || 0,
     min_stock:  p.min_stock || 0,
     status:     statusLabel[p.status] || '',
@@ -2581,7 +2785,8 @@ async function exportInventoryExcel() {
   const headers = {
     name: 'نام کالا', sku: 'کد SKU', category: 'دسته‌بندی',
     quantity: 'موجودی', unit: 'واحد',
-    unit_price: 'قیمت واحد (ریال)', total_value: 'ارزش کل (ریال)',
+    unit_price: 'آخرین قیمت خرید (ریال)', avg_cost: 'میانگین هزینه (ریال)',
+    total_value: 'ارزش کل (ریال)',
     min_stock: 'حداقل موجودی', status: 'وضعیت', updated_at: 'آخرین بروزرسانی',
   };
 
@@ -2601,7 +2806,7 @@ async function exportDeptExcel() {
   const d = await api('GET', `/dispatch/report?${params}`);
   if (!d || !d.transactions.length) { toast('داده‌ای برای خروجی وجود ندارد', 'error'); return; }
 
-  const typeLabel = { in: 'ورود', out: 'خروج', adjust: 'تنظیم' };
+  const typeLabel = { in: 'ورود خرید', out: 'خروج', adjust: 'اصلاح موجودی' };
   const rows = d.transactions.map(t => ({
     date:        t.created_at,
     product:     t.product_name,
