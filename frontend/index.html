@@ -224,7 +224,7 @@
     box-shadow: var(--shadow);
     max-width: 100%;
     min-width: 0;
-    overflow: hidden;
+    overflow: clip;
   }
   .card-title {
     font-size: 15px; font-weight: 700; margin-bottom: 20px;
@@ -306,7 +306,7 @@
   tbody tr:hover td { background: var(--bg3); }
   tbody tr:last-child td { border-bottom: none; }
 
-  /* جدول فشرده برای حرکات — داخل کادر می‌ماند */
+  /* جدول فشرده — داخل کادر می‌ماند */
   table.table-fit {
     min-width: 0;
     width: 100%;
@@ -329,6 +329,37 @@
   .col-note { width: 18%; }
   .col-detail { width: 26%; }
   .col-user { width: 10%; }
+  .col-sku { width: 9%; }
+  .col-cat { width: 9%; }
+  .col-status { width: 10%; }
+  .col-actions { width: 120px; }
+  .col-actions-wide { width: 156px; }
+  .row-actions {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    align-items: center;
+    justify-content: flex-start;
+  }
+  .row-actions .btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 4px 6px;
+    min-width: 30px;
+    justify-content: center;
+  }
+  .row-actions .btn-icon { padding: 4px 6px; }
+  /* جداول دارای ستون عملیات: به‌جای بریدن دکمه، اسکرول داخل کادر */
+  table.table-fit.has-actions {
+    min-width: 980px;
+  }
+  table.table-fit td.col-actions,
+  table.table-fit th.col-actions,
+  table.table-fit td.col-actions-wide,
+  table.table-fit th.col-actions-wide {
+    white-space: nowrap;
+    vertical-align: middle;
+  }
   .qty-stack { line-height: 1.35; }
   .qty-stack .muted { color: var(--text2); font-size: 11px; }
   .money-stack { line-height: 1.35; }
@@ -751,6 +782,7 @@
   .separator { height: 1px; background: var(--border); margin: 8px 12px; }
   .flex-between { display: flex; justify-content: space-between; align-items: center; }
   .flex-gap { display: flex; gap: 10px; align-items: center; }
+  .flex-gap.wrap { flex-wrap: wrap; }
   .mt-4  { margin-top: 16px; }
   .mb-4  { margin-bottom: 16px; }
   .text-sm { font-size: 13px; }
@@ -1647,10 +1679,16 @@ async function renderWarehouseDetail() {
     ${prods.length===0
       ? `<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">هنوز کالایی ثبت نشده</div><br>
          <button class="btn btn-primary" onclick="openProductModal(null,${wid})">➕ کالای جدید</button></div>`
-      : `<div class="table-wrap desk-only"><table id="prods-table">
+      : `<div class="table-wrap desk-only"><table class="table-fit has-actions" id="prods-table">
           <thead><tr>
-            <th>نام کالا</th><th>کد SKU</th><th>دسته</th>
-            <th>موجودی</th><th>آخرین خرید</th><th>میانگین هزینه</th><th>ارزش کل</th><th>وضعیت</th><th>عملیات</th>
+            <th class="col-name">نام کالا</th>
+            <th class="col-sku">کد SKU</th>
+            <th class="col-cat">دسته</th>
+            <th class="col-qty">موجودی</th>
+            <th class="col-money">قیمت</th>
+            <th class="col-money">ارزش کل</th>
+            <th class="col-status">وضعیت</th>
+            <th class="col-actions-wide">عملیات</th>
           </tr></thead><tbody>
           ${prods.map(p=>prodRow(p)).join('')}
           </tbody></table></div>
@@ -1672,24 +1710,28 @@ function whProdStatusBadge(p) {
 
 function prodRow(p) {
   const safeName = String(p.name || '').replace(/'/g, "\\'");
+  const lastBuy = p.unit_price ? fmtPrice(p.unit_price) : '—';
+  const avg = p.avg_cost ? fmtPrice(p.avg_cost) : (p.cost_basis ? fmtPrice(p.cost_basis) : '—');
   return `<tr id="prod-row-${p.id}">
-    <td class="fw-bold">
-      <span class="clickable-name" onclick="openProductCard(${p.id})">${escHtml(p.name)}</span>
+    <td class="col-name fw-bold">
+      <span class="clickable-name" onclick="openProductCard(${p.id})" title="${escHtml(p.name)}">${escHtml(p.name)}</span>
       ${p.description?`<br><span class="text-sm text-muted">${escHtml(p.description)}</span>`:''}
     </td>
-    <td class="text-muted num">${escHtml(p.sku)||'—'}</td>
-    <td>${escHtml(p.category)||'—'}</td>
-    <td class="num fw-bold">${fmt(p.quantity)} ${escHtml(p.unit)}</td>
-    <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
-    <td class="num text-muted">${p.avg_cost?fmtPrice(p.avg_cost):(p.cost_basis?fmtPrice(p.cost_basis):'—')}</td>
-    <td class="num">${fmtPrice(p.total_value)}</td>
-    <td>${whProdStatusBadge(p)}</td>
-    <td>
-      <div class="flex-gap">
-        <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت</button>
-        ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" onclick="openProductCard(${p.id},'in')">⬆️ ورود</button>`}
-        ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️</button>`}
-        ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id},'${safeName}')">🗑️</button>`}
+    <td class="col-sku text-muted num">${escHtml(p.sku)||'—'}</td>
+    <td class="col-cat">${escHtml(p.category)||'—'}</td>
+    <td class="col-qty num fw-bold">${fmt(p.quantity)} ${escHtml(p.unit)}</td>
+    <td class="col-money num money-stack">
+      <div title="آخرین خرید">${lastBuy}</div>
+      <div class="muted" title="میانگین هزینه">میانگین: ${avg}</div>
+    </td>
+    <td class="col-money num">${fmtPrice(p.total_value)}</td>
+    <td class="col-status">${whProdStatusBadge(p)}</td>
+    <td class="col-actions-wide">
+      <div class="row-actions">
+        <button class="btn btn-sm btn-primary" title="کارت کالا" onclick="openProductCard(${p.id})">📋</button>
+        ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" title="ورود خرید" onclick="openProductCard(${p.id},'in')">⬆️</button>`}
+        ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openProductModal(${p.id})">✏️</button>`}
+        ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteProduct(${p.id},'${safeName}')">🗑️</button>`}
       </div>
     </td>
   </tr>`;
@@ -1847,9 +1889,11 @@ function renderProductCardPanel(tab) {
       </div>
       ${purchases.length === 0
         ? '<div class="empty"><div class="empty-icon">🛒</div><div class="empty-text">هنوز ورود خریدی ثبت نشده</div></div>'
-        : `<div class="table-wrap desk-only"><table>
+        : `<div class="table-wrap desk-only"><table class="table-fit">
             <thead><tr>
-              <th>تاریخ</th><th>نوع</th><th>تعداد</th><th>قیمت واحد</th><th>مبلغ کل</th><th>شماره فاکتور</th><th>ثبت‌کننده</th><th>توضیحات</th>
+              <th class="col-date">تاریخ</th><th class="col-type">نوع</th><th class="col-qty">تعداد</th>
+              <th class="col-money">قیمت واحد</th><th class="col-money">مبلغ کل</th>
+              <th class="col-sku">شماره فاکتور</th><th class="col-user">ثبت‌کننده</th><th class="col-note">توضیحات</th>
             </tr></thead><tbody>
             ${purchases.map(t=>`<tr>
               <td class="num text-sm">${escHtml(t.created_at)}</td>
@@ -1999,9 +2043,15 @@ async function loadProdPage(page) {
     return;
   }
   body.innerHTML = `
-    <div class="table-wrap desk-only"><table id="all-prods-table">
+    <div class="table-wrap desk-only"><table class="table-fit has-actions" id="all-prods-table">
       <thead><tr>
-        <th>نام کالا</th><th>انبار</th><th>دسته</th><th>موجودی</th><th>آخرین خرید</th><th>وضعیت</th><th>عملیات</th>
+        <th class="col-name">نام کالا</th>
+        <th class="col-name">انبار</th>
+        <th class="col-cat">دسته</th>
+        <th class="col-qty">موجودی</th>
+        <th class="col-money">آخرین خرید</th>
+        <th class="col-status">وضعیت</th>
+        <th class="col-actions">عملیات</th>
       </tr></thead><tbody>
       ${res.items.map(p=>allProdRow(p)).join('')}
       </tbody></table></div>
@@ -2014,15 +2064,15 @@ async function loadProdPage(page) {
 function allProdRow(p) {
   const wh = p.warehouse_name || (state.warehouses.find(w=>w.id===p.warehouse_id)||{name:'—'}).name;
   return `<tr>
-    <td class="fw-bold"><span class="clickable-name" onclick="openProductCard(${p.id})">${escHtml(p.name)}</span></td>
-    <td class="text-muted">${escHtml(wh)}</td>
-    <td>${escHtml(p.category)||'—'}</td>
-    <td class="num">${fmt(p.quantity)} ${escHtml(p.unit)}</td>
-    <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
-    <td>${prodStatusBadge(p)}</td>
-    <td><div class="flex-gap">
-      <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت</button>
-      ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️</button>`}
+    <td class="col-name fw-bold"><span class="clickable-name" onclick="openProductCard(${p.id})" title="${escHtml(p.name)}">${escHtml(p.name)}</span></td>
+    <td class="col-name text-muted">${escHtml(wh)}</td>
+    <td class="col-cat">${escHtml(p.category)||'—'}</td>
+    <td class="col-qty num">${fmt(p.quantity)} ${escHtml(p.unit)}</td>
+    <td class="col-money num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
+    <td class="col-status">${prodStatusBadge(p)}</td>
+    <td class="col-actions"><div class="row-actions">
+      <button class="btn btn-sm btn-primary" title="کارت کالا" onclick="openProductCard(${p.id})">📋</button>
+      ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openProductModal(${p.id})">✏️</button>`}
     </div></td>
   </tr>`;
 }
@@ -2316,22 +2366,31 @@ async function loadReport() {
       <div class="card-title" style="margin:0">📋 گزارش موجودی — ${d.generated_at}</div>
       <div class="fw-bold val-blue">ارزش کل: ${fmtPrice(d.total_value)} · ${fmt(d.products.length)} کالا</div>
     </div>
-    <div class="table-wrap"><table>
+    <div class="table-wrap"><table class="table-fit">
       <thead><tr>
-        <th>#</th><th>نام کالا</th><th>کد</th><th>دسته</th><th>موجودی</th><th>واحد</th><th>آخرین خرید</th><th>میانگین هزینه</th><th>ارزش کل</th><th>آخرین بروزرسانی</th><th>وضعیت</th>
+        <th style="width:4%">#</th>
+        <th class="col-name">نام کالا</th>
+        <th class="col-sku">کد</th>
+        <th class="col-cat">دسته</th>
+        <th class="col-qty">موجودی</th>
+        <th class="col-money">قیمت</th>
+        <th class="col-money">ارزش کل</th>
+        <th class="col-date">بروزرسانی</th>
+        <th class="col-status">وضعیت</th>
       </tr></thead><tbody>
       ${d.products.map((p,i)=>`<tr>
         <td class="text-muted">${i+1}</td>
-        <td class="fw-bold"><span class="clickable-name" onclick="openProductCard(${p.id})">${p.name}</span></td>
-        <td class="num text-muted">${p.sku||'—'}</td>
-        <td>${p.category||'—'}</td>
-        <td class="num fw-bold">${fmt(p.quantity)}</td>
-        <td>${p.unit}</td>
-        <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
-        <td class="num">${(p.avg_cost||p.cost_basis)?fmtPrice(p.avg_cost||p.cost_basis):'—'}</td>
-        <td class="num">${fmtPrice(p.total_value)}</td>
-        <td class="text-sm text-muted num">${p.updated_at}</td>
-        <td>${p.status==='out'?'<span class="badge badge-red">🚫 تمام</span>':p.status==='low'?'<span class="badge badge-yellow">⚠️ کم</span>':'<span class="badge badge-green">✅ موجود</span>'}</td>
+        <td class="col-name fw-bold"><span class="clickable-name" onclick="openProductCard(${p.id})" title="${escHtml(p.name)}">${escHtml(p.name)}</span></td>
+        <td class="col-sku num text-muted">${escHtml(p.sku)||'—'}</td>
+        <td class="col-cat">${escHtml(p.category)||'—'}</td>
+        <td class="col-qty num fw-bold">${fmt(p.quantity)} ${escHtml(p.unit||'')}</td>
+        <td class="col-money num money-stack">
+          <div title="آخرین خرید">${p.unit_price?fmtPrice(p.unit_price):'—'}</div>
+          <div class="muted" title="میانگین هزینه">${(p.avg_cost||p.cost_basis)?fmtPrice(p.avg_cost||p.cost_basis):'—'}</div>
+        </td>
+        <td class="col-money num">${fmtPrice(p.total_value)}</td>
+        <td class="col-date text-sm text-muted num">${escHtml(p.updated_at||'')}</td>
+        <td class="col-status">${p.status==='out'?'<span class="badge badge-red">🚫 تمام</span>':p.status==='low'?'<span class="badge badge-yellow">⚠️ کم</span>':'<span class="badge badge-green">✅ موجود</span>'}</td>
       </tr>`).join('')}
       </tbody></table></div></div>`;
 }
@@ -2792,15 +2851,16 @@ async function renderDepartments() {
     return;
   }
 
-  const desk = '<div class="table-wrap desk-only"><table><thead><tr>' +
-    '<th>نام بخش</th><th>توضیحات</th><th>تاریخ ثبت</th><th>عملیات</th></tr></thead><tbody>' +
+  const desk = '<div class="table-wrap desk-only"><table class="table-fit has-actions"><thead><tr>' +
+    '<th class="col-name">نام بخش</th><th class="col-detail">توضیحات</th><th class="col-date">تاریخ ثبت</th><th class="col-actions">عملیات</th></tr></thead><tbody>' +
     depts.map(d => {
       const safeName = String(d.name || '').replace(/'/g, "\\'");
-      return '<tr><td class="fw-bold">' + escHtml(d.name) + '</td>' +
-        '<td class="text-muted note-cell">' + escHtml(d.description || '—') + '</td>' +
-        '<td class="text-sm num">' + escHtml(d.created_at) + '</td><td><div class="flex-gap">' +
-        (window._isViewer ? '' : '<button class="btn btn-sm btn-secondary" onclick="openDeptModal(' + d.id + ')">✏️</button>') +
-        (window._isViewer ? '' : '<button class="btn btn-sm btn-danger" onclick="deleteDept(' + d.id + ',\'' + safeName + '\')">🗑️</button>') +
+      return '<tr><td class="col-name fw-bold">' + escHtml(d.name) + '</td>' +
+        '<td class="col-detail text-muted note-cell">' + escHtml(d.description || '—') + '</td>' +
+        '<td class="col-date text-sm num">' + escHtml(d.created_at) + '</td>' +
+        '<td class="col-actions"><div class="row-actions">' +
+        (window._isViewer ? '' : '<button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openDeptModal(' + d.id + ')">✏️</button>') +
+        (window._isViewer ? '' : '<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteDept(' + d.id + ',\'' + safeName + '\')">🗑️</button>') +
         '</div></td></tr>';
     }).join('') +
     '</tbody></table></div>';
@@ -3182,12 +3242,12 @@ async function loadDeptReport() {
     const actionCell = (t) => t.is_reversed
       ? '<span class="badge badge-yellow">↩️ بازگشت‌خورده</span>'
       : (!window._isViewer
-        ? '<button class="btn btn-sm btn-danger" onclick="reverseDispatch(' + t.id + ',\'' + String(t.product_name||'').replace(/'/g,'') + '\',\'' + String(t.department_name||'').replace(/'/g,'') + '\',' + t.quantity + ',\'' + String(t.unit_name||'').replace(/'/g,'') + '\')">↩️ بازگشت</button>'
+        ? '<div class="row-actions"><button class="btn btn-sm btn-danger" title="بازگشت به انبار" onclick="reverseDispatch(' + t.id + ',\'' + String(t.product_name||'').replace(/'/g,'') + '\',\'' + String(t.department_name||'').replace(/'/g,'') + '\',' + t.quantity + ',\'' + String(t.unit_name||'').replace(/'/g,'') + '\')">↩️</button></div>'
         : '');
 
-    const desk = '<div class="table-wrap desk-only"><table class="table-fit"><thead><tr>' +
+    const desk = '<div class="table-wrap desk-only"><table class="table-fit has-actions"><thead><tr>' +
         '<th class="col-date">تاریخ</th><th class="col-name">کالا</th><th class="col-dept">بخش</th>' +
-        '<th class="col-qty">تعداد</th><th class="col-user">ثبت‌کننده</th><th class="col-note">علت</th><th style="width:10%">عملیات</th>' +
+        '<th class="col-qty">تعداد</th><th class="col-user">ثبت‌کننده</th><th class="col-note">علت</th><th class="col-actions">عملیات</th>' +
       '</tr></thead><tbody>' +
       txs.map((t) =>
         '<tr><td class="col-date num text-muted qty-stack">' + shortDate(t.created_at) + '</td>' +
@@ -3197,7 +3257,7 @@ async function loadDeptReport() {
         '<td class="col-qty num fw-bold val-red">- ' + fmt(t.quantity) + '</td>' +
         '<td class="col-user text-sm">' + escHtml(t.created_by || '—') + '</td>' +
         '<td class="col-note note-cell">' + noteHtml(t.note) + '</td>' +
-        '<td>' + actionCell(t) + '</td></tr>'
+        '<td class="col-actions">' + actionCell(t) + '</td></tr>'
       ).join('') +
       '</tbody></table></div>';
 
@@ -3356,21 +3416,26 @@ async function renderUsers() {
   const limit = state.loginLogLimit || 20;
   const userId = state.loginLogUserId || 'all';
 
-  const desk = `<div class="table-wrap desk-only"><table>
+  const desk = `<div class="table-wrap desk-only"><table class="table-fit has-actions">
       <thead><tr>
-        <th>نام کاربری</th><th>نام نمایشی</th><th>نقش</th><th>وضعیت</th><th>آخرین ورود</th><th>عملیات</th>
+        <th class="col-name">نام کاربری</th>
+        <th class="col-name">نام نمایشی</th>
+        <th class="col-status">نقش</th>
+        <th class="col-status">وضعیت</th>
+        <th class="col-date">آخرین ورود</th>
+        <th class="col-actions">عملیات</th>
       </tr></thead><tbody>
       ${users.map(u => {
         const safeUser = String(u.username || '').replace(/'/g, "\\'");
         return `<tr>
-        <td class="fw-bold">${escHtml(u.username)}</td>
-        <td>${escHtml(u.display_name)}</td>
-        <td>${roleBadge(u.role)}</td>
-        <td>${u.is_active ? '<span class="badge badge-green">✅ فعال</span>' : '<span class="badge badge-red">🚫 غیرفعال</span>'}</td>
-        <td class="text-sm text-muted num">${escHtml(u.last_login || '—')}</td>
-        <td><div class="flex-gap">
-          <button class="btn btn-sm btn-secondary" onclick="openUserModal(${u.id})">✏️ ویرایش</button>
-          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id},'${safeUser}')">🗑️</button>` : ''}
+        <td class="col-name fw-bold">${escHtml(u.username)}</td>
+        <td class="col-name">${escHtml(u.display_name)}</td>
+        <td class="col-status">${roleBadge(u.role)}</td>
+        <td class="col-status">${u.is_active ? '<span class="badge badge-green">✅ فعال</span>' : '<span class="badge badge-red">🚫 غیرفعال</span>'}</td>
+        <td class="col-date text-sm text-muted num">${escHtml(u.last_login || '—')}</td>
+        <td class="col-actions"><div class="row-actions">
+          <button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openUserModal(${u.id})">✏️</button>
+          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteUser(${u.id},'${safeUser}')">🗑️</button>` : ''}
         </div></td>
       </tr>`;
       }).join('')}
