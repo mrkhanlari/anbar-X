@@ -286,6 +286,7 @@
     -webkit-overflow-scrolling: touch;
     border-radius: 10px;
     overscroll-behavior-x: contain;
+    padding-inline: 2px;
   }
   .card > .table-wrap,
   .card .table-wrap {
@@ -332,26 +333,28 @@
   .col-sku { width: 9%; }
   .col-cat { width: 9%; }
   .col-status { width: 10%; }
-  .col-actions { width: 104px; }
-  .col-actions-wide { width: 168px; }
+  .col-actions { width: 112px; }
+  .col-actions-wide { width: 188px; }
   .row-actions {
     display: inline-flex;
     flex-wrap: nowrap;
-    gap: 5px;
+    gap: 6px;
     align-items: center;
     justify-content: flex-start;
-    width: max-content;
-    max-width: none;
   }
   .row-actions .btn {
     flex: 0 0 auto;
-    white-space: nowrap;
-    padding: 5px 7px;
-    min-width: 32px;
+    width: 36px;
+    height: 34px;
+    min-width: 36px;
+    padding: 0;
     justify-content: center;
+    align-items: center;
+    font-size: 15px;
+    line-height: 1;
     overflow: visible;
   }
-  .row-actions .btn-icon { padding: 5px 7px; }
+  .row-actions .btn-icon { padding: 0; }
   /* ستون عملیات کنار نام (سمت راست RTL) تا زیر لبه چپ مخفی نشود */
   table.table-fit.has-actions {
     min-width: 0;
@@ -363,7 +366,7 @@
     white-space: nowrap;
     vertical-align: middle;
     overflow: visible;
-    padding-left: 10px;
+    padding-left: 12px;
     padding-right: 8px;
   }
   .qty-stack { line-height: 1.35; }
@@ -1635,7 +1638,7 @@ async function renderWarehouses() {
     <div class="wh-card" onclick="navigate('warehouse_detail',{currentWarehouseId:${w.id}})">
       ${window._isViewer ? '' : `<div class="wh-card-actions">
         <button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="event.stopPropagation();openWarehouseModal(${w.id})">✏️</button>
-        <button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="event.stopPropagation();deleteWarehouse(${w.id},'${w.name}')">🗑️</button>
+        <button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="event.stopPropagation();deleteWarehouse(${w.id},'${w.name}')">🗑</button>
       </div>`}
       <div class="wh-card-name">${w.name}</div>
       <div class="wh-card-loc">${w.location ? '📍 '+w.location : '📍 مکان ثبت نشده'}</div>
@@ -1728,7 +1731,7 @@ function prodRow(p) {
         <button class="btn btn-sm btn-primary" title="کارت کالا" onclick="openProductCard(${p.id})">📋</button>
         ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" title="ورود خرید" onclick="openProductCard(${p.id},'in')">⬆️</button>`}
         ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openProductModal(${p.id})">✏️</button>`}
-        ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteProduct(${p.id},'${safeName}')">🗑️</button>`}
+        ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteProduct(${p.id},'${safeName}')">🗑</button>`}
       </div>
     </td>
     <td class="col-qty num fw-bold">${fmt(p.quantity)} ${escHtml(p.unit)}</td>
@@ -1763,7 +1766,7 @@ function whProdCard(p) {
       <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت کالا</button>
       ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" onclick="openProductCard(${p.id},'in')">⬆️ ورود</button>`}
       ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️ ویرایش</button>`}
-      ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id},'${safeName}')">🗑️</button>`}
+      ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id},'${safeName}')">🗑</button>`}
     </div>
   </article>`;
 }
@@ -2510,7 +2513,7 @@ async function saveWarehouse() {
 async function deleteWarehouse(id, name) {
   if (!confirm(`آیا از حذف انبار "${name}" مطمئن هستید؟`)) return;
   await api('DELETE', `/warehouses/${id}`);
-  toast('انبار حذف شد 🗑️');
+  toast('انبار حذف شد 🗑');
   renderPage();
 }
 
@@ -2601,7 +2604,7 @@ async function saveProduct() {
 async function deleteProduct(id, name) {
   if (!confirm(`آیا از حذف کالای "${name}" مطمئن هستید؟`)) return;
   await api('DELETE', `/products/${id}`);
-  toast('کالا حذف شد 🗑️');
+  toast('کالا حذف شد 🗑');
   renderPage();
 }
 
@@ -2864,7 +2867,7 @@ async function renderDepartments() {
       return '<tr><td class="col-name fw-bold">' + escHtml(d.name) + '</td>' +
         '<td class="col-actions"><div class="row-actions">' +
         (window._isViewer ? '' : '<button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openDeptModal(' + d.id + ')">✏️</button>') +
-        (window._isViewer ? '' : '<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteDept(' + d.id + ',\'' + safeName + '\')">🗑️</button>') +
+        (window._isViewer ? '' : '<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteDept(' + d.id + ',\'' + safeName + '\')">🗑</button>') +
         '</div></td>' +
         '<td class="col-detail text-muted note-cell">' + escHtml(d.description || '—') + '</td>' +
         '<td class="col-date text-sm num">' + escHtml(d.created_at) + '</td></tr>';
@@ -2884,7 +2887,7 @@ async function renderDepartments() {
         (window._isViewer ? '' :
           '<div class="flex-gap" style="margin-top:10px;flex-wrap:wrap;">' +
             '<button class="btn btn-sm btn-secondary" onclick="openDeptModal(' + d.id + ')">✏️ ویرایش</button>' +
-            '<button class="btn btn-sm btn-danger" onclick="deleteDept(' + d.id + ',\'' + safeName + '\')">🗑️ حذف</button>' +
+            '<button class="btn btn-sm btn-danger" onclick="deleteDept(' + d.id + ',\'' + safeName + '\')">🗑 حذف</button>' +
           '</div>') +
       '</article>';
     }).join('') +
@@ -2938,7 +2941,7 @@ async function saveDept() {
 async function deleteDept(id, name) {
   if (!confirm('آیا از حذف بخش "' + name + '" مطمئن هستید؟')) return;
   await api('DELETE', '/departments/' + id);
-  toast('بخش حذف شد 🗑️');
+  toast('بخش حذف شد 🗑');
   renderPage();
 }
 
@@ -3437,7 +3440,7 @@ async function renderUsers() {
         <td class="col-name fw-bold">${escHtml(u.username)}</td>
         <td class="col-actions"><div class="row-actions">
           <button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openUserModal(${u.id})">✏️</button>
-          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteUser(${u.id},'${safeUser}')">🗑️</button>` : ''}
+          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteUser(${u.id},'${safeUser}')">🗑</button>` : ''}
         </div></td>
         <td class="col-name">${escHtml(u.display_name)}</td>
         <td class="col-status">${roleBadge(u.role)}</td>
@@ -3464,7 +3467,7 @@ async function renderUsers() {
         </div>
         <div class="flex-gap" style="margin-top:10px;flex-wrap:wrap;">
           <button class="btn btn-sm btn-secondary" onclick="openUserModal(${u.id})">✏️ ویرایش</button>
-          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id},'${safeUser}')">🗑️ حذف</button>` : ''}
+          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id},'${safeUser}')">🗑 حذف</button>` : ''}
         </div>
       </article>`;
     }).join('')}
@@ -3616,7 +3619,7 @@ async function saveUser() {
 async function deleteUser(id, username) {
   if (!confirm(`آیا از حذف کاربر "${username}" مطمئن هستید؟`)) return;
   await api('DELETE', `/users/${id}`);
-  toast('کاربر حذف شد 🗑️');
+  toast('کاربر حذف شد 🗑');
   renderPage();
 }
 
