@@ -2,7 +2,9 @@
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#0f1117"/>
+<meta name="color-scheme" content="dark light"/>
 <title>انبارگردان | سیستم مدیریت انبار</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap');
@@ -22,6 +24,11 @@
     --text3:     #475569;
     --card-r:    14px;
     --shadow:    0 4px 24px rgba(0,0,0,.4);
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --tap: 44px;
   }
 
   html[data-theme="light"] {
@@ -217,6 +224,7 @@
     box-shadow: var(--shadow);
     max-width: 100%;
     min-width: 0;
+    overflow: hidden;
   }
   .card-title {
     font-size: 15px; font-weight: 700; margin-bottom: 20px;
@@ -274,9 +282,17 @@
   .table-wrap {
     overflow-x: auto;
     max-width: 100%;
+    width: 100%;
     -webkit-overflow-scrolling: touch;
+    border-radius: 10px;
+    overscroll-behavior-x: contain;
   }
-  table { width: 100%; min-width: 600px; border-collapse: collapse; }
+  .card > .table-wrap,
+  .card .table-wrap {
+    margin-inline: 0;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  table:not(.table-fit) { min-width: 560px; }
   thead th {
     padding: 12px 16px; text-align: right;
     font-size: 12px; font-weight: 600; color: var(--text2);
@@ -289,6 +305,76 @@
   }
   tbody tr:hover td { background: var(--bg3); }
   tbody tr:last-child td { border-bottom: none; }
+
+  /* جدول فشرده برای حرکات — داخل کادر می‌ماند */
+  table.table-fit {
+    min-width: 0;
+    width: 100%;
+    table-layout: fixed;
+  }
+  table.table-fit thead th,
+  table.table-fit tbody td {
+    padding: 8px 8px;
+    font-size: 12px;
+    vertical-align: top;
+  }
+  table.table-fit .badge { font-size: 11px; padding: 2px 7px; white-space: nowrap; }
+  table.table-fit .clickable-name { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .col-date { width: 9%; white-space: nowrap; }
+  .col-name { width: 14%; }
+  .col-type { width: 12%; }
+  .col-qty  { width: 11%; }
+  .col-money{ width: 12%; }
+  .col-ref  { width: 8%; }
+  .col-dept { width: 8%; }
+  .col-note { width: 16%; }
+  .col-user { width: 10%; }
+  .qty-stack { line-height: 1.35; }
+  .qty-stack .muted { color: var(--text2); font-size: 11px; }
+  .money-stack { line-height: 1.35; }
+  .money-stack .muted { color: var(--text2); font-size: 11px; }
+
+  .filter-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    align-items: end;
+  }
+  .filter-bar .form-group { margin: 0; min-width: 0; }
+  .filter-bar .search-bar { min-width: 0; width: 100%; }
+  .filter-bar .filter-actions {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: end;
+  }
+  .filter-bar .filter-actions .btn { min-height: var(--tap); }
+
+  .desk-only { display: block; }
+  .mob-only { display: none; }
+  .mobile-list { display: flex; flex-direction: column; gap: 10px; }
+  .m-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .m-card-head {
+    display: flex; justify-content: space-between; gap: 10px;
+    align-items: flex-start; margin-bottom: 8px;
+  }
+  .m-card-title { font-weight: 700; font-size: 14px; line-height: 1.4; }
+  .m-card-sub { color: var(--text2); font-size: 12px; margin-top: 2px; }
+  .m-card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+    font-size: 12px;
+  }
+  .m-card-grid .lbl { color: var(--text2); display: block; margin-bottom: 2px; }
+  .m-card-note {
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 13px; line-height: 1.5;
+    word-break: break-word;
+  }
 
   /* ── Badge ── */
   .badge {
@@ -317,13 +403,14 @@
   .clickable-name { cursor:pointer; color:var(--accent); }
   .clickable-name:hover { text-decoration:underline; }
   .note-cell {
-    max-width: 320px;
-    min-width: 140px;
+    max-width: none;
+    min-width: 0;
     white-space: normal !important;
+    overflow-wrap: anywhere;
     word-break: break-word;
-    line-height: 1.55;
+    line-height: 1.45;
     color: var(--text);
-    font-size: 13px;
+    font-size: 12px;
   }
   .table-wrap table thead th {
     position: sticky; top: 0; z-index: 2;
@@ -333,6 +420,7 @@
     display:flex; justify-content:space-between; align-items:center;
     gap:12px; flex-wrap:wrap; margin-top:16px;
   }
+  .pager .btn { min-height: var(--tap); min-width: var(--tap); }
 
   /* ── Modal ── */
   .modal-overlay {
@@ -482,22 +570,36 @@
   .sidebar-overlay.show { display: block; }
 
   /* ── Responsive ── */
+  @media (max-width: 1100px) {
+    table.table-fit { font-size: 11px; }
+    table.table-fit thead th, table.table-fit tbody td { padding: 7px 6px; }
+  }
+
   @media (max-width: 768px) {
-    .mobile-menu-btn { display: flex; }
+    .mobile-menu-btn { display: flex; min-width: var(--tap); min-height: var(--tap); }
 
     #sidebar {
       transform: translateX(100%);
-      width: 78vw; max-width: 280px;
+      width: min(86vw, 300px);
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
       box-shadow: -8px 0 30px rgba(0,0,0,.3);
     }
     #sidebar.open { transform: translateX(0); }
     #main { margin-right: 0; }
 
-    #topbar { padding: 0 14px; gap: 10px; flex-wrap: wrap; height: auto; min-height: 56px; padding-top: 8px; padding-bottom: 8px; }
+    #topbar {
+      padding: 8px max(14px, var(--safe-left)) 8px max(14px, var(--safe-right));
+      gap: 10px; flex-wrap: wrap; height: auto; min-height: 56px;
+      padding-top: max(8px, var(--safe-top));
+      position: sticky; top: 0; z-index: 50;
+    }
     .page-title { font-size: 15px; }
-    .topbar-actions { flex-wrap: wrap; gap: 6px; }
-    .topbar-actions .btn { font-size: 12px; padding: 7px 12px; }
-    #content { padding: 14px; }
+    .topbar-actions { flex-wrap: wrap; gap: 6px; width: 100%; }
+    .topbar-actions .btn { font-size: 12px; padding: 10px 12px; min-height: var(--tap); flex: 1 1 auto; justify-content: center; }
+    #content {
+      padding: 12px max(12px, var(--safe-left)) calc(18px + var(--safe-bottom)) max(12px, var(--safe-right));
+    }
 
     .form-grid { grid-template-columns: 1fr; }
     .grid-2, .grid-3 { grid-template-columns: 1fr; }
@@ -507,28 +609,60 @@
 
     .wh-grid { grid-template-columns: 1fr; }
 
-    .modal { width: 94vw; padding: 18px; }
-    .modal-footer { flex-wrap: wrap; }
-    .modal-footer .btn { flex: 1; justify-content: center; }
+    .modal {
+      width: 100%; max-width: 100vw; max-height: 92dvh;
+      border-radius: 16px 16px 0 0; padding: 18px;
+      margin-top: auto;
+    }
+    .modal-overlay.open { align-items: flex-end; }
+    .modal-footer { flex-wrap: wrap; gap: 8px; }
+    .modal-footer .btn { flex: 1; justify-content: center; min-height: var(--tap); }
 
-    table { font-size: 13px; }
+    table:not(.table-fit) { font-size: 13px; }
     thead th, tbody td { padding: 9px 8px; }
 
-    .card { padding: 16px; }
+    .card { padding: 14px; border-radius: 12px; overflow: hidden; }
 
     .tx-tabs { flex-wrap: wrap; }
-    .tx-tab { flex: 1; min-width: 90px; text-align: center; }
+    .tx-tab { flex: 1; min-width: 90px; text-align: center; min-height: var(--tap); }
 
-    #toast-container { left: 12px; right: 12px; bottom: 12px; }
+    #toast-container {
+      left: max(12px, var(--safe-left));
+      right: max(12px, var(--safe-right));
+      bottom: max(12px, var(--safe-bottom));
+    }
     .toast { max-width: 100%; }
 
-    .search-bar input { width: 100% !important; }
+    .search-bar input { width: 100% !important; min-height: var(--tap); }
+    input, select, textarea, .btn { font-size: 16px; } /* جلوگیری از zoom iOS */
+    input, select { min-height: var(--tap); }
+
+    .filter-bar { grid-template-columns: 1fr 1fr; }
+    .filter-bar .span-2 { grid-column: 1 / -1; }
+    .filter-bar .filter-actions { grid-column: 1 / -1; }
+    .filter-bar .filter-actions .btn { flex: 1; }
+
+    .desk-only { display: none !important; }
+    .mob-only { display: block !important; }
+    .mobile-list.mob-only { display: flex !important; }
+
+    .nav-item { min-height: var(--tap); padding: 12px; }
+    .pc-tabs { gap: 8px; }
+    .pc-tab { min-height: var(--tap); flex: 1 1 auto; justify-content: center; text-align: center; }
   }
 
   @media (max-width: 480px) {
     .stats-grid { grid-template-columns: 1fr 1fr; }
     .logo-text { font-size: 16px; }
     .wh-card-stats { flex-wrap: wrap; gap: 10px; }
+    .filter-bar { grid-template-columns: 1fr; }
+    .m-card-grid { grid-template-columns: 1fr; }
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    .btn:hover { transform: none; }
+    .nav-item:hover { background: transparent; }
+    .nav-item.active:hover { background: rgba(59,130,246,.15); }
   }
 
   .separator { height: 1px; background: var(--border); margin: 8px 12px; }
@@ -1170,6 +1304,45 @@ function buildListPager(page, totalPages, total, goFnName) {
   </div>`;
 }
 
+/** Enter در دسکتاپ: برو فیلد بعدی؛ اگر آخر بود جستجو کن */
+function bindFilterEnterNav(rootEl, onSubmit) {
+  if (!rootEl || typeof onSubmit !== 'function') return;
+  const fields = [...rootEl.querySelectorAll('input:not([type="hidden"]):not([disabled]), select:not([disabled])')];
+  fields.forEach((el, idx) => {
+    el.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      // فقط دسکتاپ/کیبورد فیزیکی — روی موبایل Enter همان رفتار بومی
+      if (window.matchMedia('(max-width: 768px)').matches) {
+        if (idx >= fields.length - 1) {
+          e.preventDefault();
+          onSubmit();
+        }
+        return;
+      }
+      e.preventDefault();
+      const next = fields[idx + 1];
+      if (next) {
+        next.focus();
+        if (next.tagName === 'SELECT') {
+          try { next.showPicker && next.showPicker(); } catch (_) {}
+        } else if (typeof next.select === 'function') {
+          next.select();
+        }
+      } else {
+        onSubmit();
+      }
+    });
+  });
+}
+
+function shortDate(s) {
+  // "1404/07/10 12:30" → دو خط فشرده
+  const t = String(s || '');
+  const parts = t.split(/\s+/);
+  if (parts.length >= 2) return `${escHtml(parts[0])}<br><span class="muted">${escHtml(parts[1])}</span>`;
+  return escHtml(t);
+}
+
 // ─── Render Pages ────────────────────────────────────────────────────────────
 
 async function renderPage() {
@@ -1619,27 +1792,63 @@ function txChangeCell(t) {
 
 function buildTxTable(txs) {
   if (!txs.length) return '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">نتیجه‌ای یافت نشد</div></div>';
-  return `<div class="table-wrap"><table id="tx-table">
+
+  const desk = `<div class="table-wrap desk-only"><table class="table-fit" id="tx-table">
     <thead><tr>
-      <th>تاریخ</th><th>کالا</th><th>انبار</th><th>نوع حرکت</th><th>قبل</th><th>تغییر</th><th>بعد</th>
-      <th>قیمت واحد</th><th>مبلغ</th><th>مرجع</th><th>بخش</th><th>توضیحات</th><th>ثبت‌کننده</th>
+      <th class="col-date">تاریخ</th>
+      <th class="col-name">کالا</th>
+      <th class="col-type">نوع حرکت</th>
+      <th class="col-qty">موجودی</th>
+      <th class="col-money">قیمت / مبلغ</th>
+      <th class="col-ref">مرجع</th>
+      <th class="col-dept">بخش</th>
+      <th class="col-note">توضیحات</th>
+      <th class="col-user">ثبت‌کننده</th>
     </tr></thead><tbody>
     ${txs.map(t=>`<tr>
-      <td class="num text-sm text-muted" style="white-space:nowrap">${escHtml(t.created_at)}</td>
-      <td class="fw-bold"><span class="clickable-name" onclick="openProductCard(${t.product_id})">${escHtml(t.product_name)}</span></td>
-      <td class="text-muted">${escHtml(t.warehouse_name)}</td>
-      <td>${txBadge(t)}</td>
-      <td class="num">${fmt(t.before_qty)}</td>
-      <td class="num fw-bold">${txChangeCell(t)}</td>
-      <td class="num fw-bold">${fmt(t.after_qty)}</td>
-      <td class="num">${t.unit_price != null ? fmtPrice(t.unit_price) : '—'}</td>
-      <td class="num">${t.total_cost != null ? fmtPrice(t.total_cost) : '—'}</td>
-      <td class="text-sm">${escHtml(t.ref_number)||'—'}</td>
-      <td>${t.department_name ? `<span class="badge badge-blue">${escHtml(t.department_name)}</span>` : '<span class="text-muted">—</span>'}</td>
-      <td class="note-cell">${noteHtml(t.note)}</td>
-      <td class="text-sm text-muted">${escHtml(t.created_by)||'—'}</td>
+      <td class="col-date num text-muted qty-stack">${shortDate(t.created_at)}</td>
+      <td class="col-name">
+        <span class="clickable-name fw-bold" onclick="openProductCard(${t.product_id})" title="${escHtml(t.product_name)}">${escHtml(t.product_name)}</span>
+        <div class="text-sm text-muted" style="margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(t.warehouse_name||'')}</div>
+      </td>
+      <td class="col-type">${txBadge(t)}</td>
+      <td class="col-qty num qty-stack">
+        <div class="muted">${fmt(t.before_qty)} → ${fmt(t.after_qty)}</div>
+        <div class="fw-bold">${txChangeCell(t)}</div>
+      </td>
+      <td class="col-money num money-stack">
+        <div>${t.unit_price != null ? fmtPrice(t.unit_price) : '—'}</div>
+        <div class="muted">${t.total_cost != null ? fmtPrice(t.total_cost) : '—'}</div>
+      </td>
+      <td class="col-ref text-sm" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(t.ref_number||'')}">${escHtml(t.ref_number)||'—'}</td>
+      <td class="col-dept">${t.department_name ? `<span class="badge badge-blue" title="${escHtml(t.department_name)}">${escHtml(t.department_name)}</span>` : '<span class="text-muted">—</span>'}</td>
+      <td class="col-note note-cell">${noteHtml(t.note)}</td>
+      <td class="col-user text-sm text-muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(t.created_by)||'—'}</td>
     </tr>`).join('')}
     </tbody></table></div>`;
+
+  const mob = `<div class="mobile-list mob-only">
+    ${txs.map(t => `
+      <article class="m-card">
+        <div class="m-card-head">
+          <div style="min-width:0;">
+            <div class="m-card-title clickable-name" onclick="openProductCard(${t.product_id})">${escHtml(t.product_name)}</div>
+            <div class="m-card-sub">${escHtml(t.warehouse_name||'')} · ${escHtml(t.created_at||'')}</div>
+          </div>
+          <div>${txBadge(t)}</div>
+        </div>
+        <div class="m-card-grid">
+          <div><span class="lbl">موجودی</span><b>${fmt(t.before_qty)} → ${fmt(t.after_qty)}</b> <span>${txChangeCell(t)}</span></div>
+          <div><span class="lbl">قیمت / مبلغ</span>${t.unit_price!=null?fmtPrice(t.unit_price):'—'}<br><span class="text-muted">${t.total_cost!=null?fmtPrice(t.total_cost):'—'}</span></div>
+          <div><span class="lbl">بخش</span>${t.department_name?escHtml(t.department_name):'—'}</div>
+          <div><span class="lbl">مرجع</span>${escHtml(t.ref_number)||'—'}</div>
+          <div><span class="lbl">ثبت‌کننده</span>${escHtml(t.created_by)||'—'}</div>
+        </div>
+        ${(t.note||'').trim() ? `<div class="m-card-note"><span class="lbl">توضیحات</span>${escHtml(t.note)}</div>` : ''}
+      </article>`).join('')}
+  </div>`;
+
+  return desk + mob;
 }
 
 async function renderTransactions() {
@@ -1650,34 +1859,44 @@ async function renderTransactions() {
   const today = todayJalali();
 
   c.innerHTML = `
-  <div class="card mb-4">
-    <div class="flex-gap" style="flex-wrap:wrap;gap:12px;align-items:flex-end;">
-      <div class="form-group" style="margin:0;min-width:140px;">
+  <div class="card mb-4" id="tx-filter-card">
+    <div class="filter-bar">
+      <div class="form-group">
         <label>از تاریخ</label>
         <input id="tx-from" placeholder="۱۴۰۴/۰۱/۰۱" dir="ltr" style="text-align:right;" value="${today}"/>
       </div>
-      <div class="form-group" style="margin:0;min-width:140px;">
+      <div class="form-group">
         <label>تا تاریخ</label>
         <input id="tx-to" placeholder="۱۴۰۴/۱۲/۲۹" dir="ltr" style="text-align:right;" value="${today}"/>
       </div>
-      <div class="search-bar" style="flex:1;min-width:200px;">
-        <span class="search-icon">🔍</span>
-        <input id="tx-search" placeholder="جستجو در کالا، توضیحات، مرجع..." style="width:100%;"
-               onkeydown="if(event.key==='Enter'){state.txPage=1;searchTx()}"/>
+      <div class="form-group span-2">
+        <label>جستجو</label>
+        <div class="search-bar">
+          <span class="search-icon">🔍</span>
+          <input id="tx-search" placeholder="کالا، توضیحات، مرجع..." style="width:100%;"/>
+        </div>
       </div>
-      <select id="tx-filter-type" style="width:180px;">
-        <option value="">همه حرکات</option>
-        <option value="in">⬆️ ورود خرید</option>
-        <option value="out">⬇️ خروج</option>
-        <option value="adjust">📝 اصلاح موجودی</option>
-      </select>
-      <select id="tx-filter-wh" style="width:170px;">
-        <option value="">همه انبارها</option>
-        ${whs.map(w=>`<option value="${w.id}">${escHtml(w.name)}</option>`).join('')}
-      </select>
-      <button class="btn btn-primary" onclick="state.txPage=1;searchTx()">🔍 جستجو</button>
+      <div class="form-group">
+        <label>نوع حرکت</label>
+        <select id="tx-filter-type">
+          <option value="">همه حرکات</option>
+          <option value="in">⬆️ ورود خرید</option>
+          <option value="out">⬇️ خروج</option>
+          <option value="adjust">📝 اصلاح موجودی</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>انبار</label>
+        <select id="tx-filter-wh">
+          <option value="">همه انبارها</option>
+          ${whs.map(w=>`<option value="${w.id}">${escHtml(w.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-primary" onclick="state.txPage=1;searchTx()">🔍 جستجو</button>
+      </div>
     </div>
-    <div class="text-sm text-muted" style="margin-top:10px;">نتیجه فقط بعد از «جستجو» لود می‌شود. توضیحات هر حرکت کامل نمایش داده می‌شود.</div>
+    <div class="text-sm text-muted" style="margin-top:10px;">Enter = فیلد بعدی · در آخرین فیلد = جستجو</div>
   </div>
   <div class="card">
     <div class="flex-between mb-4">
@@ -1685,6 +1904,8 @@ async function renderTransactions() {
     </div>
     <div id="tx-results"><div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">بازه تاریخ را مشخص کنید و جستجو را بزنید</div></div></div>
   </div>`;
+
+  bindFilterEnterNav(document.getElementById('tx-filter-card'), () => { state.txPage = 1; searchTx(); });
 }
 
 function goTxPage(page) {
@@ -1748,37 +1969,39 @@ async function renderReport() {
   const whs = await api('GET', '/warehouses');
   state.warehouses = whs;
   const c = document.getElementById('content');
-  c.innerHTML = `<div class="card mb-4">
-    <div class="flex-gap" style="flex-wrap:wrap;align-items:flex-end;gap:12px;">
-      <div class="form-group" style="margin:0;flex:1;min-width:220px;">
+  c.innerHTML = `<div class="card mb-4" id="rep-filter-card">
+    <div class="filter-bar">
+      <div class="form-group span-2">
         <label>جستجوی نام کالا</label>
-        <input id="rep-search" placeholder="نام کالا، کد SKU یا دسته..."
-               onkeydown="if(event.key==='Enter')loadReport()"/>
+        <input id="rep-search" placeholder="نام کالا، کد SKU یا دسته..."/>
       </div>
-      <div class="form-group" style="margin:0;">
+      <div class="form-group">
         <label>انبار</label>
-        <select id="rep-wh" style="width:200px;">
+        <select id="rep-wh">
           <option value="">همه انبارها</option>
-          ${whs.map(w=>`<option value="${w.id}">${w.name}</option>`).join('')}
+          ${whs.map(w=>`<option value="${w.id}">${escHtml(w.name)}</option>`).join('')}
         </select>
       </div>
-      <div class="form-group" style="margin:0;">
+      <div class="form-group">
         <label>وضعیت</label>
-        <select id="rep-status" style="width:160px;">
+        <select id="rep-status">
           <option value="">همه وضعیت‌ها</option>
           <option value="normal">✅ موجود</option>
           <option value="low">⚠️ کم‌موجود</option>
           <option value="out">🚫 ناموجود</option>
         </select>
       </div>
-      <button class="btn btn-primary" onclick="loadReport()">🔍 جستجو</button>
-      <button class="btn btn-secondary" onclick="printReport()">🖨️ چاپ</button>
-      <button class="btn btn-secondary" onclick="exportInventoryExcel()">📥 Excel</button>
+      <div class="filter-actions">
+        <button class="btn btn-primary" onclick="loadReport()">🔍 جستجو</button>
+        <button class="btn btn-secondary" onclick="printReport()">🖨️ چاپ</button>
+        <button class="btn btn-secondary" onclick="exportInventoryExcel()">📥 Excel</button>
+      </div>
     </div>
   </div>
   <div id="report-content">
     <div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">برای مشاهده گزارش، فیلترها را تنظیم و جستجو را بزنید</div></div>
   </div>`;
+  bindFilterEnterNav(document.getElementById('rep-filter-card'), loadReport);
 }
 
 async function loadReport() {
@@ -2557,29 +2780,34 @@ async function renderDeptReport() {
   const c = document.getElementById('content');
   const today = todayJalali();
 
-  c.innerHTML = '<div class="card mb-4"><div class="flex-gap" style="flex-wrap:wrap;gap:12px;align-items:flex-end;">' +
-    '<div class="form-group" style="margin:0;min-width:140px;"><label>از تاریخ</label>' +
-      '<input id="dr-from" placeholder="۱۴۰۴/۰۱/۰۱" dir="ltr" style="text-align:right;" value="' + today + '"/></div>' +
-    '<div class="form-group" style="margin:0;min-width:140px;"><label>تا تاریخ</label>' +
-      '<input id="dr-to" placeholder="۱۴۰۴/۱۲/۲۹" dir="ltr" style="text-align:right;" value="' + today + '"/></div>' +
-    '<div class="form-group" style="margin:0;"><label>بخش</label>' +
-      '<select id="dr-dept" style="width:180px;"><option value="">همه بخش‌ها</option>' +
-        depts.map(d => '<option value="' + d.id + '">' + escHtml(d.name) + '</option>').join('') +
-      '</select></div>' +
-    '<div class="form-group" style="margin:0;"><label>نام کالا</label>' +
-      '<input id="dr-prod" placeholder="جستجوی نام کالا..." style="width:180px;" onkeydown="if(event.key===\'Enter\'){state.drPage=1;loadDeptReport()}"/></div>' +
-    '<div class="form-group" style="margin:0;flex:1;min-width:200px;"><label>جستجو در علت‌ها</label>' +
-      '<input id="dr-note" placeholder="کلمه‌ای از علت/توضیح خروج..." style="width:100%;" onkeydown="if(event.key===\'Enter\'){state.drPage=1;loadDeptReport()}"/></div>' +
-    '<div class="form-group" style="margin:0;"><label>انبار</label>' +
-      '<select id="dr-wh" style="width:160px;"><option value="">همه انبارها</option>' +
-        whs.map(w => '<option value="' + w.id + '">' + escHtml(w.name) + '</option>').join('') +
-      '</select></div>' +
-    '<button class="btn btn-primary" onclick="state.drPage=1;loadDeptReport()">🔍 جستجو</button>' +
-    '<button class="btn btn-secondary" onclick="exportDeptExcel()">📥 Excel</button>' +
+  c.innerHTML =
+    '<div class="card mb-4" id="dr-filter-card"><div class="filter-bar">' +
+      '<div class="form-group"><label>از تاریخ</label>' +
+        '<input id="dr-from" placeholder="۱۴۰۴/۰۱/۰۱" dir="ltr" style="text-align:right;" value="' + today + '"/></div>' +
+      '<div class="form-group"><label>تا تاریخ</label>' +
+        '<input id="dr-to" placeholder="۱۴۰۴/۱۲/۲۹" dir="ltr" style="text-align:right;" value="' + today + '"/></div>' +
+      '<div class="form-group"><label>بخش</label>' +
+        '<select id="dr-dept"><option value="">همه بخش‌ها</option>' +
+          depts.map(d => '<option value="' + d.id + '">' + escHtml(d.name) + '</option>').join('') +
+        '</select></div>' +
+      '<div class="form-group"><label>نام کالا</label>' +
+        '<input id="dr-prod" placeholder="جستجوی نام کالا..."/></div>' +
+      '<div class="form-group span-2"><label>جستجو در علت‌ها</label>' +
+        '<input id="dr-note" placeholder="کلمه‌ای از علت/توضیح خروج..."/></div>' +
+      '<div class="form-group"><label>انبار</label>' +
+        '<select id="dr-wh"><option value="">همه انبارها</option>' +
+          whs.map(w => '<option value="' + w.id + '">' + escHtml(w.name) + '</option>').join('') +
+        '</select></div>' +
+      '<div class="filter-actions">' +
+        '<button class="btn btn-primary" onclick="state.drPage=1;loadDeptReport()">🔍 جستجو</button>' +
+        '<button class="btn btn-secondary" onclick="exportDeptExcel()">📥 Excel</button>' +
+      '</div>' +
     '</div>' +
-    '<div class="text-sm text-muted" style="margin-top:10px;">علت هر خروج مستقیماً در جدول دیده می‌شود. نتیجه فقط بعد از جستجو لود می‌شود.</div>' +
+    '<div class="text-sm text-muted" style="margin-top:10px;">Enter = فیلد بعدی · آخرین فیلد = جستجو · علت مستقیم در نتیجه دیده می‌شود</div>' +
     '</div>' +
     '<div id="dr-results"><div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">بازه تاریخ را مشخص کنید و جستجو را بزنید</div></div></div>';
+
+  bindFilterEnterNav(document.getElementById('dr-filter-card'), () => { state.drPage = 1; loadDeptReport(); });
 }
 
 function goDeptPage(page) {
@@ -2633,27 +2861,52 @@ async function loadDeptReport() {
     const total = d.total != null ? d.total : txs.length;
     const totalPages = d.total_pages || 1;
     const curPage = d.page || 1;
-    el.innerHTML = '<div class="card">' +
-      '<div class="flex-between mb-4"><div class="card-title" style="margin:0">📊 خروجی‌ها — ' + fmt(total) + ' مورد</div>' +
-      '<div class="text-sm text-muted">مجموع این صفحه: <b>' + fmt(qtySum) + '</b></div></div>' +
-      '<div class="table-wrap"><table><thead><tr>' +
-        '<th>تاریخ</th><th>کالا</th><th>انبار</th><th>بخش مقصد</th><th>تعداد</th><th>ثبت‌کننده</th><th>علت</th><th>عملیات</th>' +
+
+    const actionCell = (t) => t.is_reversed
+      ? '<span class="badge badge-yellow">↩️ بازگشت‌خورده</span>'
+      : (!window._isViewer
+        ? '<button class="btn btn-sm btn-danger" onclick="reverseDispatch(' + t.id + ',\'' + String(t.product_name||'').replace(/'/g,'') + '\',\'' + String(t.department_name||'').replace(/'/g,'') + '\',' + t.quantity + ',\'' + String(t.unit_name||'').replace(/'/g,'') + '\')">↩️ بازگشت</button>'
+        : '');
+
+    const desk = '<div class="table-wrap desk-only"><table class="table-fit"><thead><tr>' +
+        '<th class="col-date">تاریخ</th><th class="col-name">کالا</th><th class="col-dept">بخش</th>' +
+        '<th class="col-qty">تعداد</th><th class="col-user">ثبت‌کننده</th><th class="col-note">علت</th><th style="width:10%">عملیات</th>' +
       '</tr></thead><tbody>' +
       txs.map((t) =>
-        '<tr><td class="num text-sm text-muted" style="white-space:nowrap">' + escHtml(t.created_at) + '</td>' +
-        '<td class="fw-bold">' + escHtml(t.product_name) + '</td>' +
-        '<td class="text-muted">' + escHtml(t.warehouse_name) + '</td>' +
-        '<td>' + (t.department_name ? '<span class="badge badge-blue">' + escHtml(t.department_name) + '</span>' : '—') + '</td>' +
-        '<td class="num fw-bold val-red">- ' + fmt(t.quantity) + '</td>' +
-        '<td class="text-sm">' + escHtml(t.created_by || '—') + '</td>' +
-        '<td class="note-cell">' + noteHtml(t.note) + '</td>' +
-        '<td>' + (t.is_reversed
-          ? '<span class="badge badge-yellow">↩️ بازگشت‌خورده</span>'
-          : (!window._isViewer ? '<button class="btn btn-sm btn-danger" onclick="reverseDispatch(' + t.id + ',\''+escHtml(t.product_name).replace(/'/g,'')+'\',\''+escHtml(t.department_name||'').replace(/'/g,'')+'\','+t.quantity+',\''+escHtml(t.unit_name||'').replace(/'/g,'')+'\')" title="بازگشت این خروج">↩️ بازگشت</button>' : '')
-        ) + '</td>' +
-        '</tr>'
+        '<tr><td class="col-date num text-muted qty-stack">' + shortDate(t.created_at) + '</td>' +
+        '<td class="col-name"><div class="fw-bold" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(t.product_name) + '</div>' +
+          '<div class="text-sm text-muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(t.warehouse_name) + '</div></td>' +
+        '<td class="col-dept">' + (t.department_name ? '<span class="badge badge-blue">' + escHtml(t.department_name) + '</span>' : '—') + '</td>' +
+        '<td class="col-qty num fw-bold val-red">- ' + fmt(t.quantity) + '</td>' +
+        '<td class="col-user text-sm">' + escHtml(t.created_by || '—') + '</td>' +
+        '<td class="col-note note-cell">' + noteHtml(t.note) + '</td>' +
+        '<td>' + actionCell(t) + '</td></tr>'
       ).join('') +
-      '</tbody></table></div>' +
+      '</tbody></table></div>';
+
+    const mob = '<div class="mobile-list mob-only">' +
+      txs.map((t) =>
+        '<article class="m-card">' +
+          '<div class="m-card-head"><div style="min-width:0;">' +
+            '<div class="m-card-title">' + escHtml(t.product_name) + '</div>' +
+            '<div class="m-card-sub">' + escHtml(t.warehouse_name||'') + ' · ' + escHtml(t.created_at||'') + '</div>' +
+          '</div>' +
+          (t.department_name ? '<span class="badge badge-blue">' + escHtml(t.department_name) + '</span>' : '') +
+          '</div>' +
+          '<div class="m-card-grid">' +
+            '<div><span class="lbl">تعداد</span><b class="val-red">- ' + fmt(t.quantity) + '</b></div>' +
+            '<div><span class="lbl">ثبت‌کننده</span>' + escHtml(t.created_by||'—') + '</div>' +
+          '</div>' +
+          ((t.note||'').trim() ? '<div class="m-card-note"><span class="lbl">علت</span>' + escHtml(t.note) + '</div>' : '') +
+          (actionCell(t) ? '<div style="margin-top:10px;">' + actionCell(t) + '</div>' : '') +
+        '</article>'
+      ).join('') +
+      '</div>';
+
+    el.innerHTML = '<div class="card">' +
+      '<div class="flex-between mb-4" style="flex-wrap:wrap;gap:8px;"><div class="card-title" style="margin:0">📊 خروجی‌ها — ' + fmt(total) + ' مورد</div>' +
+      '<div class="text-sm text-muted">مجموع این صفحه: <b>' + fmt(qtySum) + '</b></div></div>' +
+      desk + mob +
       buildListPager(curPage, totalPages, total, 'goDeptPage') +
       '</div>';
   } catch (e) {
