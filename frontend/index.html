@@ -440,6 +440,49 @@
   }
   .pager .btn { min-height: var(--tap); min-width: var(--tap); }
 
+  .dash-alert-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: min(60vh, 520px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-right: 2px;
+  }
+  .dash-alert-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: border-color .15s, transform .15s;
+  }
+  .dash-alert-card:hover { border-color: var(--accent); }
+  .dash-alert-card.is-out { border-right: 3px solid var(--red); }
+  .dash-alert-card.is-low { border-right: 3px solid var(--yellow); }
+  .dash-alert-top {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 10px; margin-bottom: 6px;
+  }
+  .dash-alert-title {
+    font-weight: 700; font-size: 14px; line-height: 1.4;
+    min-width: 0; word-break: break-word;
+  }
+  .dash-alert-meta {
+    color: var(--text2); font-size: 12px; line-height: 1.4;
+    margin-bottom: 4px; word-break: break-word;
+  }
+  .dash-alert-qty {
+    font-size: 13px; margin-top: 4px;
+  }
+  .dash-alert-desc {
+    margin-top: 8px; padding-top: 8px;
+    border-top: 1px solid var(--border);
+    color: var(--text2); font-size: 12px; line-height: 1.5;
+    word-break: break-word;
+  }
+
   /* ── Modal ── */
   .modal-overlay {
     display: none; position: fixed; inset: 0;
@@ -1398,6 +1441,39 @@ async function renderPage() {
 async function renderDashboard() {
   const d = await api('GET', '/dashboard');
   const c = document.getElementById('content');
+  const alerts = [...(d.out_of_stock || []), ...(d.low_stock || [])];
+
+  const alertCards = alerts.length === 0
+    ? '<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">همه کالاها موجودی کافی دارند</div></div>'
+    : `<div class="dash-alert-list">
+        ${alerts.map(p => {
+          const isOut = p.status === 'out';
+          const badge = isOut
+            ? '<span class="badge badge-red">🚫 تمام شد</span>'
+            : '<span class="badge badge-yellow">⚠️ کم‌موجود</span>';
+          const minLine = p.min_stock
+            ? `<span class="dash-alert-meta">حداقل: ${fmt(p.min_stock)} ${escHtml(p.unit || '')}</span>`
+            : '';
+          const desc = (p.description || '').trim();
+          return `<article class="dash-alert-card ${isOut ? 'is-out' : 'is-low'}" onclick="openProductCard(${p.id})">
+            <div class="dash-alert-top">
+              <div class="dash-alert-title">${escHtml(p.name)}</div>
+              ${badge}
+            </div>
+            <div class="dash-alert-meta">
+              ${escHtml(p.warehouse_name || '—')}
+              ${p.sku ? ' · SKU: ' + escHtml(p.sku) : ''}
+              ${p.category ? ' · ' + escHtml(p.category) : ''}
+            </div>
+            <div class="dash-alert-qty">
+              موجودی: <b>${fmt(p.quantity)} ${escHtml(p.unit || '')}</b>
+              ${minLine ? ' · ' + minLine : ''}
+            </div>
+            ${desc ? `<div class="dash-alert-desc">${escHtml(desc)}</div>` : ''}
+          </article>`;
+        }).join('')}
+      </div>`;
+
   c.innerHTML = `
   <div class="stats-grid">
     <div class="stat-card"><div class="stat-icon">🏭</div><div class="stat-label">تعداد انبار</div><div class="stat-value val-blue">${fmt(d.warehouse_count)}</div></div>
@@ -1407,38 +1483,9 @@ async function renderDashboard() {
     <div class="stat-card" style="grid-column:span 2"><div class="stat-icon">💰</div><div class="stat-label">ارزش کل موجودی</div><div class="stat-value val-blue" style="font-size:22px">${fmtPrice(d.total_value)}</div></div>
   </div>
 
-  <div class="grid-2">
-    <div class="card">
-      <div class="card-title">⚠️ کالاهای کم‌موجود / تمام‌شده</div>
-      ${[...d.out_of_stock, ...d.low_stock].length === 0
-        ? '<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">همه کالاها موجودی کافی دارند</div></div>'
-        : `<div class="table-wrap"><table><thead><tr>
-            <th>کالا</th><th>موجودی</th><th>وضعیت</th>
-           </tr></thead><tbody>
-           ${[...d.out_of_stock,...d.low_stock].map(p=>`<tr>
-             <td class="fw-bold">${p.name}</td>
-             <td class="num">${fmt(p.quantity)} ${p.unit}</td>
-             <td>${p.status==='out'
-               ? '<span class="badge badge-red">🚫 تمام شد</span>'
-               : '<span class="badge badge-yellow">⚠️ کم است</span>'}</td>
-           </tr>`).join('')}
-           </tbody></table></div>`}
-    </div>
-    <div class="card">
-      <div class="card-title">🔄 آخرین حرکات انبار</div>
-      ${d.recent_transactions.length === 0
-        ? '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">حرکتی ثبت نشده</div></div>'
-        : `<div class="table-wrap"><table><thead><tr>
-            <th>کالا</th><th>نوع حرکت</th><th>مقدار</th><th>تاریخ</th>
-           </tr></thead><tbody>
-           ${d.recent_transactions.map(t=>`<tr>
-             <td><span class="clickable-name" onclick="openProductCard(${t.product_id})">${t.product_name}</span></td>
-             <td>${txBadge(t)}</td>
-             <td class="num">${fmt(Math.abs(t.delta != null ? t.delta : t.quantity))}</td>
-             <td class="text-sm text-muted num">${t.created_at}</td>
-           </tr>`).join('')}
-           </tbody></table></div>`}
-    </div>
+  <div class="card" style="margin-top:20px;">
+    <div class="card-title">⚠️ کالاهای کم‌موجود و تمام‌شده</div>
+    ${alertCards}
   </div>`;
 }
 
