@@ -866,10 +866,11 @@ def get_all_transactions():
                  joinedload(Transaction.department),
              ))
     if search:
-        query = query.filter(db.or_(
+        query = query.outerjoin(Department, Transaction.department_id == Department.id).filter(db.or_(
             Product.name.ilike(f'%{search}%'),
             Transaction.note.ilike(f'%{search}%'),
             Transaction.ref_number.ilike(f'%{search}%'),
+            Department.name.ilike(f'%{search}%'),
         ))
     if note_q:
         query = query.filter(Transaction.note.ilike(f'%{note_q}%'))

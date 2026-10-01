@@ -320,19 +320,37 @@
   }
   table.table-fit .badge { font-size: 11px; padding: 2px 7px; white-space: nowrap; }
   table.table-fit .clickable-name { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .col-date { width: 9%; white-space: nowrap; }
-  .col-name { width: 14%; }
-  .col-type { width: 12%; }
-  .col-qty  { width: 11%; }
-  .col-money{ width: 12%; }
-  .col-ref  { width: 8%; }
-  .col-dept { width: 8%; }
-  .col-note { width: 16%; }
+  .col-date { width: 10%; white-space: nowrap; }
+  .col-name { width: 16%; }
+  .col-type { width: 13%; }
+  .col-qty  { width: 12%; }
+  .col-money{ width: 13%; }
+  .col-dept { width: 10%; }
+  .col-note { width: 18%; }
+  .col-detail { width: 26%; }
   .col-user { width: 10%; }
   .qty-stack { line-height: 1.35; }
   .qty-stack .muted { color: var(--text2); font-size: 11px; }
   .money-stack { line-height: 1.35; }
   .money-stack .muted { color: var(--text2); font-size: 11px; }
+  .detail-stack {
+    display: flex; flex-direction: column; gap: 6px;
+    min-width: 0; max-width: 100%;
+  }
+  .detail-stack .detail-dept {
+    display: flex; align-items: center; min-width: 0;
+  }
+  .detail-stack .detail-dept .badge {
+    max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .detail-stack .detail-note {
+    color: var(--text);
+    font-size: 12px; line-height: 1.45;
+    overflow-wrap: anywhere; word-break: break-word;
+    white-space: normal;
+  }
+  .detail-stack .detail-empty { color: var(--text3); }
 
   .filter-bar {
     display: grid;
@@ -1790,6 +1808,16 @@ function txChangeCell(t) {
   return `<span class="val-red">- ${fmt(Math.abs(delta))}</span>`;
 }
 
+function txDetailCell(t) {
+  const dept = (t.department_name || '').trim();
+  const note = (t.note || '').trim();
+  if (!dept && !note) return '<span class="detail-empty">—</span>';
+  return `<div class="detail-stack">
+    ${dept ? `<div class="detail-dept"><span class="badge badge-blue" title="${escHtml(dept)}">${escHtml(dept)}</span></div>` : ''}
+    ${note ? `<div class="detail-note">${escHtml(note)}</div>` : ''}
+  </div>`;
+}
+
 function buildTxTable(txs) {
   if (!txs.length) return '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">نتیجه‌ای یافت نشد</div></div>';
 
@@ -1800,9 +1828,7 @@ function buildTxTable(txs) {
       <th class="col-type">نوع حرکت</th>
       <th class="col-qty">موجودی</th>
       <th class="col-money">قیمت / مبلغ</th>
-      <th class="col-ref">مرجع</th>
-      <th class="col-dept">بخش</th>
-      <th class="col-note">توضیحات</th>
+      <th class="col-detail">بخش / توضیحات</th>
       <th class="col-user">ثبت‌کننده</th>
     </tr></thead><tbody>
     ${txs.map(t=>`<tr>
@@ -1820,9 +1846,7 @@ function buildTxTable(txs) {
         <div>${t.unit_price != null ? fmtPrice(t.unit_price) : '—'}</div>
         <div class="muted">${t.total_cost != null ? fmtPrice(t.total_cost) : '—'}</div>
       </td>
-      <td class="col-ref text-sm" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(t.ref_number||'')}">${escHtml(t.ref_number)||'—'}</td>
-      <td class="col-dept">${t.department_name ? `<span class="badge badge-blue" title="${escHtml(t.department_name)}">${escHtml(t.department_name)}</span>` : '<span class="text-muted">—</span>'}</td>
-      <td class="col-note note-cell">${noteHtml(t.note)}</td>
+      <td class="col-detail">${txDetailCell(t)}</td>
       <td class="col-user text-sm text-muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(t.created_by)||'—'}</td>
     </tr>`).join('')}
     </tbody></table></div>`;
@@ -1840,11 +1864,12 @@ function buildTxTable(txs) {
         <div class="m-card-grid">
           <div><span class="lbl">موجودی</span><b>${fmt(t.before_qty)} → ${fmt(t.after_qty)}</b> <span>${txChangeCell(t)}</span></div>
           <div><span class="lbl">قیمت / مبلغ</span>${t.unit_price!=null?fmtPrice(t.unit_price):'—'}<br><span class="text-muted">${t.total_cost!=null?fmtPrice(t.total_cost):'—'}</span></div>
-          <div><span class="lbl">بخش</span>${t.department_name?escHtml(t.department_name):'—'}</div>
-          <div><span class="lbl">مرجع</span>${escHtml(t.ref_number)||'—'}</div>
           <div><span class="lbl">ثبت‌کننده</span>${escHtml(t.created_by)||'—'}</div>
         </div>
-        ${(t.note||'').trim() ? `<div class="m-card-note"><span class="lbl">توضیحات</span>${escHtml(t.note)}</div>` : ''}
+        <div class="m-card-note">
+          <span class="lbl">بخش / توضیحات</span>
+          ${txDetailCell(t)}
+        </div>
       </article>`).join('')}
   </div>`;
 
@@ -1873,7 +1898,7 @@ async function renderTransactions() {
         <label>جستجو</label>
         <div class="search-bar">
           <span class="search-icon">🔍</span>
-          <input id="tx-search" placeholder="کالا، توضیحات، مرجع..." style="width:100%;"/>
+          <input id="tx-search" placeholder="کالا، توضیحات، بخش..." style="width:100%;"/>
         </div>
       </div>
       <div class="form-group">
