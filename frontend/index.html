@@ -2,7 +2,9 @@
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#0f1117"/>
+<meta name="color-scheme" content="dark light"/>
 <title>انبارگردان | سیستم مدیریت انبار</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap');
@@ -22,6 +24,11 @@
     --text3:     #475569;
     --card-r:    14px;
     --shadow:    0 4px 24px rgba(0,0,0,.4);
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --tap: 44px;
   }
 
   html[data-theme="light"] {
@@ -217,6 +224,7 @@
     box-shadow: var(--shadow);
     max-width: 100%;
     min-width: 0;
+    overflow: visible;
   }
   .card-title {
     font-size: 15px; font-weight: 700; margin-bottom: 20px;
@@ -274,9 +282,18 @@
   .table-wrap {
     overflow-x: auto;
     max-width: 100%;
+    width: 100%;
     -webkit-overflow-scrolling: touch;
+    border-radius: 10px;
+    overscroll-behavior-x: contain;
+    padding-inline: 2px;
   }
-  table { width: 100%; min-width: 600px; border-collapse: collapse; }
+  .card > .table-wrap,
+  .card .table-wrap {
+    margin-inline: 0;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  table:not(.table-fit) { min-width: 560px; }
   thead th {
     padding: 12px 16px; text-align: right;
     font-size: 12px; font-weight: 600; color: var(--text2);
@@ -290,6 +307,304 @@
   tbody tr:hover td { background: var(--bg3); }
   tbody tr:last-child td { border-bottom: none; }
 
+  /* جدول فشرده — داخل کادر می‌ماند */
+  table.table-fit {
+    min-width: 0;
+    width: 100%;
+    table-layout: fixed;
+  }
+  table.table-fit thead th,
+  table.table-fit tbody td {
+    padding: 8px 8px;
+    font-size: 12px;
+    vertical-align: top;
+  }
+  table.table-fit .badge { font-size: 11px; padding: 2px 7px; white-space: nowrap; }
+  table.table-fit .clickable-name { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .col-date { width: 10%; white-space: nowrap; }
+  .col-name { width: 16%; }
+  .col-type { width: 13%; }
+  .col-qty  { width: 12%; }
+  .col-money{ width: 13%; }
+  .col-dept { width: 10%; }
+  .col-note { width: 18%; }
+  .col-detail { width: 26%; }
+  .col-user { width: 10%; }
+  .col-sku { width: 9%; }
+  .col-cat { width: 9%; }
+  .col-status { width: 10%; }
+  .col-actions { width: 120px; }
+  .col-actions-wide { width: 210px; }
+  .row-actions {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    align-items: center;
+    justify-content: flex-start;
+  }
+  .row-actions .btn {
+    flex: 0 0 auto;
+    height: 32px;
+    min-width: 32px;
+    padding: 0 8px;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+    line-height: 1;
+    overflow: visible;
+  }
+  .row-actions .btn-icon {
+    width: 32px;
+    padding: 0;
+    font-size: 14px;
+  }
+  /* ستون عملیات کنار نام (سمت راست RTL) تا زیر لبه چپ مخفی نشود */
+  table.table-fit.has-actions {
+    min-width: 0;
+  }
+  table.table-fit td.col-actions,
+  table.table-fit th.col-actions,
+  table.table-fit td.col-actions-wide,
+  table.table-fit th.col-actions-wide {
+    white-space: nowrap;
+    vertical-align: middle;
+    overflow: visible;
+    padding-left: 12px;
+    padding-right: 8px;
+  }
+
+  /* جدول کاربران — بدون اسکرول افقی و بدون فشردگی */
+  .table-wrap.users-wrap {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+  table.users-table {
+    table-layout: fixed;
+    width: 100%;
+    min-width: 0;
+  }
+  table.users-table th,
+  table.users-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+  }
+  table.users-table .col-user-name { width: 18%; }
+  table.users-table .col-user-display { width: 18%; }
+  table.users-table .col-user-role { width: 14%; }
+  table.users-table .col-user-status { width: 12%; }
+  table.users-table .col-user-login { width: 16%; white-space: normal; }
+  table.users-table .col-user-login .muted { font-size: 11px; }
+  table.users-table .col-actions { width: 88px; }
+  table.users-table .cell-ellip {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+  .users-page-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .users-page-head .card-title { margin: 0; }
+  .users-page-head .btn { flex-shrink: 0; }
+  table.users-table .row-actions {
+    gap: 4px;
+  }
+  table.users-table .row-actions .btn {
+    height: 30px;
+    min-width: 30px;
+    width: 30px;
+    padding: 0;
+  }
+
+  /* چک‌لیست دسترسی بخش‌ها */
+  .perm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .perm-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg3);
+    cursor: pointer;
+    user-select: none;
+    transition: border-color .15s, background .15s;
+  }
+  .perm-item:hover { border-color: var(--accent); }
+  .perm-item input {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .perm-item .perm-label {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .perm-item .perm-hint {
+    font-size: 11px;
+    color: var(--text3);
+  }
+  .perm-item.is-locked {
+    opacity: .72;
+    cursor: default;
+  }
+  .perm-item.is-disabled {
+    opacity: .45;
+    pointer-events: none;
+  }
+  .pass-field {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .pass-field input { flex: 1; min-width: 0; }
+  .pass-field .btn {
+    flex-shrink: 0;
+    min-width: 40px;
+    padding: 0 10px;
+  }
+  .users-m-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .users-m-actions .btn {
+    flex: 1 1 auto;
+    min-height: 40px;
+    justify-content: center;
+  }
+  @media (max-width: 768px) {
+    .perm-item {
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      padding: 10px;
+    }
+    .perm-item .perm-hint {
+      width: 100%;
+      padding-right: 26px;
+      line-height: 1.45;
+    }
+    .users-page-head .btn {
+      width: 100%;
+      justify-content: center;
+      min-height: var(--tap);
+    }
+  }
+  .qty-stack { line-height: 1.35; }
+  .qty-stack .muted { color: var(--text2); font-size: 11px; }
+  .money-stack { line-height: 1.35; }
+  .money-stack .muted { color: var(--text2); font-size: 11px; }
+  .detail-stack {
+    display: flex; flex-direction: column; gap: 6px;
+    min-width: 0; max-width: 100%;
+  }
+  .detail-stack .detail-dept {
+    display: flex; align-items: center; min-width: 0;
+  }
+  .detail-stack .detail-dept .badge {
+    max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .detail-stack .detail-note {
+    color: var(--text);
+    font-size: 12px; line-height: 1.45;
+    overflow-wrap: anywhere; word-break: break-word;
+    white-space: normal;
+  }
+  .detail-stack .detail-empty { color: var(--text3); }
+
+  .filter-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    align-items: end;
+  }
+  .filter-bar .form-group { margin: 0; min-width: 0; }
+  .filter-bar .search-bar { min-width: 0; width: 100%; }
+  .filter-bar .filter-actions {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: end;
+  }
+  .filter-bar .filter-actions .btn { min-height: var(--tap); }
+
+  /* جداسازی قطعی دسکتاپ/موبایل — mobile-list نباید mob-only را روی دسکتاپ باطل کند */
+  .desk-only { display: block !important; }
+  .mob-only { display: none !important; }
+  .mobile-list {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .mobile-list.mob-only { display: none !important; }
+  .m-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .m-card-head {
+    display: flex; justify-content: space-between; gap: 10px;
+    align-items: flex-start; margin-bottom: 8px;
+  }
+  .m-card-title { font-weight: 700; font-size: 14px; line-height: 1.4; }
+  .m-card-sub { color: var(--text2); font-size: 12px; margin-top: 2px; }
+  .m-card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+    font-size: 12px;
+  }
+  .m-card-grid .lbl { color: var(--text2); display: block; margin-bottom: 2px; }
+  .m-card-note {
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 13px; line-height: 1.5;
+    word-break: break-word;
+  }
+  .m-card-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    align-items: stretch;
+  }
+  .m-card-actions.no-delete {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .m-card-actions .btn {
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    justify-content: center;
+    padding: 8px 6px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .m-card-actions .btn-del {
+    width: 40px;
+    min-width: 40px;
+    max-width: 40px;
+    padding: 0;
+    font-size: 15px;
+  }
+
   /* ── Badge ── */
   .badge {
     display: inline-flex; align-items: center; gap: 4px;
@@ -302,6 +617,97 @@
   .badge-in     { background: rgba(34,197,94,.15);  color: var(--green); }
   .badge-out    { background: rgba(239,68,68,.15);  color: var(--red); }
   .badge-adjust { background: rgba(59,130,246,.15); color: var(--accent); }
+  .badge-return { background: rgba(168,85,247,.15); color: #a855f7; }
+  .badge-corr-up { background: rgba(34,197,94,.12); color: var(--green); }
+  .badge-corr-down { background: rgba(239,68,68,.12); color: var(--red); }
+
+  .pc-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px; }
+  .pc-tab {
+    border:1px solid var(--border); background:var(--bg2); color:var(--text2);
+    padding:8px 14px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:600;
+  }
+  .pc-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .pc-panel { display:none; }
+  .pc-panel.active { display:block; }
+  .pc-hero {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 14px; flex-wrap: wrap;
+  }
+  .pc-hero-main { min-width: 0; flex: 1; }
+  .pc-hero-name { font-size: 22px; font-weight: 800; line-height: 1.35; word-break: break-word; }
+  .pc-hero-meta { font-size: 13px; color: var(--text2); margin-top: 6px; line-height: 1.5; word-break: break-word; }
+  .pc-hero-qty {
+    text-align: left; flex-shrink: 0;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 16px; min-width: 110px;
+  }
+  .pc-hero-qty .n { font-size: 28px; font-weight: 800; color: var(--accent); line-height: 1.1; }
+  .pc-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .pc-stats .stat-card.span-2 { grid-column: span 2; }
+  .clickable-name { cursor:pointer; color:var(--accent); }
+  .clickable-name:hover { text-decoration:underline; }
+  .note-cell {
+    max-width: none;
+    min-width: 0;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.45;
+    color: var(--text);
+    font-size: 12px;
+  }
+  .table-wrap table thead th {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--bg2);
+  }
+  .pager {
+    display:flex; justify-content:space-between; align-items:center;
+    gap:12px; flex-wrap:wrap; margin-top:16px;
+  }
+  .pager .btn { min-height: var(--tap); min-width: var(--tap); }
+
+  .dash-alert-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: min(60vh, 520px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-right: 2px;
+  }
+  .dash-alert-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: border-color .15s, transform .15s;
+  }
+  .dash-alert-card:hover { border-color: var(--accent); }
+  .dash-alert-card.is-out { border-right: 3px solid var(--red); }
+  .dash-alert-card.is-low { border-right: 3px solid var(--yellow); }
+  .dash-alert-top {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 10px; margin-bottom: 6px;
+  }
+  .dash-alert-title {
+    font-weight: 700; font-size: 14px; line-height: 1.4;
+    min-width: 0; word-break: break-word;
+  }
+  .dash-alert-meta {
+    color: var(--text2); font-size: 12px; line-height: 1.4;
+    margin-bottom: 4px; word-break: break-word;
+  }
+  .dash-alert-qty {
+    font-size: 13px; margin-top: 4px;
+  }
+  .dash-alert-desc {
+    margin-top: 8px; padding-top: 8px;
+    border-top: 1px solid var(--border);
+    color: var(--text2); font-size: 12px; line-height: 1.5;
+    word-break: break-word;
+  }
 
   /* ── Modal ── */
   .modal-overlay {
@@ -451,22 +857,36 @@
   .sidebar-overlay.show { display: block; }
 
   /* ── Responsive ── */
+  @media (max-width: 1100px) {
+    table.table-fit { font-size: 11px; }
+    table.table-fit thead th, table.table-fit tbody td { padding: 7px 6px; }
+  }
+
   @media (max-width: 768px) {
-    .mobile-menu-btn { display: flex; }
+    .mobile-menu-btn { display: flex; min-width: var(--tap); min-height: var(--tap); }
 
     #sidebar {
       transform: translateX(100%);
-      width: 78vw; max-width: 280px;
+      width: min(86vw, 300px);
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
       box-shadow: -8px 0 30px rgba(0,0,0,.3);
     }
     #sidebar.open { transform: translateX(0); }
     #main { margin-right: 0; }
 
-    #topbar { padding: 0 14px; gap: 10px; flex-wrap: wrap; height: auto; min-height: 56px; padding-top: 8px; padding-bottom: 8px; }
+    #topbar {
+      padding: 8px max(14px, var(--safe-left)) 8px max(14px, var(--safe-right));
+      gap: 10px; flex-wrap: wrap; height: auto; min-height: 56px;
+      padding-top: max(8px, var(--safe-top));
+      position: sticky; top: 0; z-index: 50;
+    }
     .page-title { font-size: 15px; }
-    .topbar-actions { flex-wrap: wrap; gap: 6px; }
-    .topbar-actions .btn { font-size: 12px; padding: 7px 12px; }
-    #content { padding: 14px; }
+    .topbar-actions { flex-wrap: wrap; gap: 6px; width: 100%; }
+    .topbar-actions .btn { font-size: 12px; padding: 10px 12px; min-height: var(--tap); flex: 1 1 auto; justify-content: center; }
+    #content {
+      padding: 12px max(12px, var(--safe-left)) calc(18px + var(--safe-bottom)) max(12px, var(--safe-right));
+    }
 
     .form-grid { grid-template-columns: 1fr; }
     .grid-2, .grid-3 { grid-template-columns: 1fr; }
@@ -476,33 +896,118 @@
 
     .wh-grid { grid-template-columns: 1fr; }
 
-    .modal { width: 94vw; padding: 18px; }
-    .modal-footer { flex-wrap: wrap; }
-    .modal-footer .btn { flex: 1; justify-content: center; }
+    .modal {
+      width: 100%; max-width: 100vw; max-height: 92dvh;
+      border-radius: 16px 16px 0 0; padding: 18px;
+      margin-top: auto;
+    }
+    .modal-overlay.open { align-items: flex-end; }
+    .modal-footer { flex-wrap: wrap; gap: 8px; }
+    .modal-footer .btn { flex: 1; justify-content: center; min-height: var(--tap); }
 
-    table { font-size: 13px; }
+    table:not(.table-fit) { font-size: 13px; }
     thead th, tbody td { padding: 9px 8px; }
 
-    .card { padding: 16px; }
+    .card { padding: 14px; border-radius: 12px; overflow: hidden; }
 
     .tx-tabs { flex-wrap: wrap; }
-    .tx-tab { flex: 1; min-width: 90px; text-align: center; }
+    .tx-tab { flex: 1; min-width: 90px; text-align: center; min-height: var(--tap); }
 
-    #toast-container { left: 12px; right: 12px; bottom: 12px; }
+    #toast-container {
+      left: max(12px, var(--safe-left));
+      right: max(12px, var(--safe-right));
+      bottom: max(12px, var(--safe-bottom));
+    }
     .toast { max-width: 100%; }
 
-    .search-bar input { width: 100% !important; }
+    .search-bar input { width: 100% !important; min-height: var(--tap); }
+    input, select, textarea, .btn { font-size: 16px; } /* جلوگیری از zoom iOS */
+    input, select { min-height: var(--tap); }
+
+    .filter-bar { grid-template-columns: 1fr 1fr; }
+    .filter-bar .span-2 { grid-column: 1 / -1; }
+    .filter-bar .filter-actions {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      align-items: stretch;
+    }
+    .filter-bar .filter-actions .btn {
+      flex: unset;
+      width: 100%;
+      min-height: var(--tap);
+      justify-content: center;
+      align-items: center;
+      padding: 10px 8px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .report-filter-actions {
+      grid-column: 1 / -1 !important;
+      display: grid !important;
+      grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+      gap: 8px !important;
+    }
+    .report-filter-actions .report-action-btn,
+    .report-filter-actions .btn {
+      flex: none !important;
+      width: 100% !important;
+      min-width: 0 !important;
+      min-height: 44px !important;
+      height: 44px !important;
+      max-height: 44px !important;
+      padding: 0 6px !important;
+      font-size: 13px !important;
+      line-height: 1.2 !important;
+      justify-content: center !important;
+      align-items: center !important;
+      white-space: nowrap !important;
+      box-sizing: border-box !important;
+    }
+
+    .desk-only { display: none !important; }
+    .mob-only { display: block !important; }
+    /* specificity بالاتر از .mob-only تا لیست کارتی درست flex شود */
+    .mobile-list.mob-only { display: flex !important; }
+
+    .nav-item { min-height: var(--tap); padding: 12px; }
+    .pc-tabs { gap: 8px; }
+    .pc-tab { min-height: var(--tap); flex: 1 1 calc(50% - 4px); justify-content: center; text-align: center; }
+    .pc-hero { flex-direction: column; }
+    .pc-hero-qty { width: 100%; text-align: center; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .pc-hero-qty .n { font-size: 24px; }
+    .pc-hero-name { font-size: 18px; }
+    .pc-hero-actions .btn { flex: 1 1 auto; justify-content: center; }
+    .pc-stats .stat-card.span-2 { grid-column: span 1; }
   }
 
   @media (max-width: 480px) {
     .stats-grid { grid-template-columns: 1fr 1fr; }
     .logo-text { font-size: 16px; }
     .wh-card-stats { flex-wrap: wrap; gap: 10px; }
+    .filter-bar { grid-template-columns: 1fr; }
+    .m-card-grid { grid-template-columns: 1fr; }
+    .pc-tab { flex: 1 1 calc(50% - 4px); font-size: 12px; padding: 8px 10px; }
+    .report-filter-actions .report-action-btn,
+    .report-filter-actions .btn {
+      font-size: 12px !important;
+      height: 42px !important;
+      max-height: 42px !important;
+      min-height: 42px !important;
+    }
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    .btn:hover { transform: none; }
+    .nav-item:hover { background: transparent; }
+    .nav-item.active:hover { background: rgba(59,130,246,.15); }
   }
 
   .separator { height: 1px; background: var(--border); margin: 8px 12px; }
   .flex-between { display: flex; justify-content: space-between; align-items: center; }
   .flex-gap { display: flex; gap: 10px; align-items: center; }
+  .flex-gap.wrap { flex-wrap: wrap; }
   .mt-4  { margin-top: 16px; }
   .mb-4  { margin-bottom: 16px; }
   .text-sm { font-size: 13px; }
@@ -599,39 +1104,39 @@
   <div style="flex:1;overflow-y:auto;overflow-x:hidden;">
     <div class="nav-section">
       <div class="nav-label">منو اصلی</div>
-      <div class="nav-item active" onclick="navigate('dashboard')">
+      <div class="nav-item active" data-nav="dashboard" onclick="navigate('dashboard')">
         <span class="icon">📊</span> داشبورد
       </div>
-      <div class="nav-item" onclick="navigate('warehouses')">
+      <div class="nav-item" data-nav="warehouses" onclick="navigate('warehouses')">
         <span class="icon">🏭</span> انبارها
       </div>
-      <div class="nav-item" onclick="navigate('products')">
+      <div class="nav-item" data-nav="products" onclick="navigate('products')">
         <span class="icon">📦</span> همه کالاها
       </div>
-      <div class="nav-item" onclick="navigate('departments')">
+      <div class="nav-item" data-nav="departments" onclick="navigate('departments')">
         <span class="icon">🏥</span> بخش‌ها
       </div>
-      <div class="nav-item nav-operator-only" onclick="navigate('dispatch')" style="display:none;">
+      <div class="nav-item nav-operator-only" data-nav="dispatch" onclick="navigate('dispatch')" style="display:none;">
         <span class="icon">🚚</span> خروج رسمی
       </div>
     </div>
     <div class="separator"></div>
     <div class="nav-section">
       <div class="nav-label">گزارشات</div>
-      <div class="nav-item" onclick="navigate('transactions')">
-        <span class="icon">🔄</span> تراکنش‌ها
+      <div class="nav-item" data-nav="transactions" onclick="navigate('transactions')">
+        <span class="icon">🔄</span> حرکات انبار
       </div>
-      <div class="nav-item" onclick="navigate('dept_report')">
+      <div class="nav-item" data-nav="dept_report" onclick="navigate('dept_report')">
         <span class="icon">📊</span> گزارش بخش‌ها
       </div>
-      <div class="nav-item" onclick="navigate('report')">
+      <div class="nav-item" data-nav="report" onclick="navigate('report')">
         <span class="icon">📋</span> گزارش موجودی
       </div>
     </div>
     <div class="separator"></div>
     <div class="nav-section">
       <div class="nav-label">مدیریت</div>
-      <div class="nav-item nav-admin-only" onclick="navigate('users')" style="display:none;">
+      <div class="nav-item nav-admin-only" data-nav="users" onclick="navigate('users')" style="display:none;">
         <span class="icon">👥</span> کاربران
       </div>
       <div class="nav-item" onclick="openChangePasswordModal()">
@@ -643,7 +1148,7 @@
     </div>
   </div>
   <div id="user-badge" style="display:none;"></div>
-  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۲.۰</div>
+  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۳.۱</div>
 </nav>
 
 <!-- Main -->
@@ -751,23 +1256,12 @@
         <input id="prod-cat" placeholder="مثلاً: الکترونیک"/>
       </div>
       <div class="form-group">
-        <label>موجودی</label>
-        <input id="prod-qty" type="number" min="0" placeholder="0"/>
-        <span id="prod-qty-hint" style="display:none;font-size:11px;color:var(--yellow);margin-top:4px;">
-          ⚠️ تغییر موجودی یک تراکنش تنظیم خودکار ثبت می‌کند
-        </span>
-      </div>
-      <div class="form-group">
         <label>واحد</label>
         <select id="prod-unit">
           <option>عدد</option><option>دستگاه</option><option>کیلوگرم</option>
           <option>متر</option><option>لیتر</option><option>جعبه</option>
           <option>بسته</option><option>رول</option><option>جفت</option>
         </select>
-      </div>
-      <div class="form-group">
-        <label>قیمت واحد (ریال)</label>
-        <input id="prod-price" type="number" min="0" placeholder="0"/>
       </div>
       <div class="form-group">
         <label>حداقل موجودی (هشدار)</label>
@@ -777,13 +1271,24 @@
         <label>انبار *</label>
         <select id="prod-wh"></select>
       </div>
+      <div class="form-group full" id="prod-stock-info" style="display:none;">
+        <div class="card" style="margin:0;padding:12px 14px;background:var(--bg3);">
+          <div class="text-sm text-muted">قیمت و افزایش موجودی با «ورود خرید»؛ کاهش موجودی فقط از «خروج رسمی»</div>
+          <div style="margin-top:8px;display:flex;gap:18px;flex-wrap:wrap;">
+            <div><span class="text-sm text-muted">موجودی فعلی:</span> <b id="prod-qty-ro">—</b></div>
+            <div><span class="text-sm text-muted">آخرین قیمت خرید:</span> <b id="prod-price-ro">—</b></div>
+            <div><span class="text-sm text-muted">میانگین هزینه:</span> <b id="prod-avg-ro">—</b></div>
+          </div>
+        </div>
+      </div>
       <div class="form-group full">
         <label>توضیحات کالا</label>
         <textarea id="prod-desc" placeholder="توضیح اختیاری..."></textarea>
       </div>
-      <div class="form-group full" id="prod-edit-note-group" style="display:none;">
-        <label style="color:var(--yellow);">💬 دلیل تغییر موجودی (ثبت در تراکنش)</label>
-        <input id="prod-edit-note" placeholder="مثلاً: اصلاح موجودی پس از انبارگردانی..."/>
+      <div class="form-group full" id="prod-create-hint" style="display:none;">
+        <div class="text-sm" style="color:var(--yellow);">
+          ℹ️ بعد از تعریف کالا، از کارت کالا «ورود خرید» بزنید تا تعداد، قیمت و تاریخ این خرید ثبت شود.
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -826,21 +1331,24 @@
     </div>
     <div id="modal-tx-product-info" class="card" style="margin-bottom:20px;padding:16px;"></div>
     <div class="tx-tabs" id="tx-type-tabs">
-      <button class="tx-tab" onclick="setTxType('in')"  id="tab-in">⬆️ ورود کالا</button>
-      <button class="tx-tab" onclick="setTxType('out')" id="tab-out">⬇️ خروج کالا</button>
-      <button class="tx-tab" onclick="setTxType('adjust')" id="tab-adj">⚖️ تنظیم موجودی</button>
+      <button class="tx-tab" onclick="setTxType('in')"  id="tab-in">⬆️ ورود خرید</button>
+      <button class="tx-tab" onclick="setTxType('adjust')" id="tab-adj">📝 اصلاح موجودی</button>
     </div>
     <div class="form-grid">
       <div class="form-group">
         <label id="tx-qty-label">مقدار *</label>
         <input id="tx-qty" type="number" min="0.01" step="0.01" placeholder="0"/>
       </div>
+      <div class="form-group" id="tx-price-group">
+        <label id="tx-price-label">قیمت خرید این محموله (ریال) *</label>
+        <input id="tx-price" type="number" min="0" step="1" placeholder="مثلاً 1500000"/>
+      </div>
       <div class="form-group">
         <label>تاریخ شمسی *</label>
         <input id="tx-date" placeholder="۱۴۰۴/۰۳/۲۲" dir="ltr" style="text-align:right;"/>
       </div>
       <div class="form-group">
-        <label>شماره مرجع</label>
+        <label>شماره مرجع / فاکتور</label>
         <input id="tx-ref" placeholder="شماره فاکتور یا سند..."/>
       </div>
       <div class="form-group">
@@ -854,7 +1362,12 @@
       </div>
       <div class="form-group full">
         <label>توضیحات</label>
-        <textarea id="tx-note" placeholder="دلیل یا توضیح تراکنش..." style="min-height:60px;"></textarea>
+        <textarea id="tx-note" placeholder="تأمین‌کننده، شماره فاکتور، یا توضیح اصلاح موجودی..." style="min-height:60px;"></textarea>
+      </div>
+      <div class="form-group full" id="tx-adjust-hint" style="display:none;">
+        <div class="text-sm" style="color:var(--yellow);">
+          برای اصلاح، «موجودی واقعی شمارش‌شده» را وارد کنید. سیستم خودش افزایش یا کاهش را ثبت می‌کند.
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -912,7 +1425,7 @@
 
 <!-- ─── User Modal ─────────────────────────────────────────────────── -->
 <div class="modal-overlay" id="modal-user">
-  <div class="modal">
+  <div class="modal" style="max-width:560px;">
     <div class="modal-title">
       <span id="modal-user-title">کاربر جدید</span>
       <button class="modal-close" onclick="closeModal('modal-user')">✕</button>
@@ -920,15 +1433,15 @@
     <div class="form-grid">
       <div class="form-group full" id="user-username-group">
         <label>نام کاربری *</label>
-        <input id="user-username" placeholder="مثلاً: ali123" dir="ltr"/>
+        <input id="user-username" placeholder="مثلاً: ali123" dir="ltr" autocomplete="off"/>
       </div>
       <div class="form-group full">
         <label>نام نمایشی</label>
-        <input id="user-displayname" placeholder="مثلاً: علی رضایی"/>
+        <input id="user-displayname" placeholder="مثلاً: علی رضایی" autocomplete="off"/>
       </div>
       <div class="form-group">
         <label>نقش *</label>
-        <select id="user-role">
+        <select id="user-role" onchange="onUserRoleChange()">
           <option value="viewer">👁 بازدیدکننده — فقط مشاهده</option>
           <option value="operator">✏️ اپراتور — مشاهده و ویرایش</option>
           <option value="admin">👑 مدیر — همه کارها</option>
@@ -940,9 +1453,21 @@
         </label>
       </div>
       <div class="form-group full">
-        <label>رمز عبور</label>
-        <input id="user-password" type="password" placeholder="••••••••" dir="ltr"/>
-        <span id="user-pass-hint" style="display:none;font-size:11px;color:var(--text3);margin-top:4px;">برای تغییر رمز وارد کنید، در غیر این صورت خالی بگذارید</span>
+        <label id="user-pass-label">رمز عبور *</label>
+        <div class="pass-field">
+          <input id="user-password" type="password" placeholder="رمز جدید را وارد کنید" dir="ltr" autocomplete="new-password"/>
+          <button type="button" class="btn btn-secondary" id="user-pass-toggle" onclick="toggleUserPasswordVisibility()" title="نمایش/مخفی کردن">👁</button>
+        </div>
+        <span id="user-pass-hint" style="display:none;font-size:11px;color:var(--text3);margin-top:4px;line-height:1.6;">
+          رمز قبلی به‌صورت امن ذخیره شده و قابل مشاهده نیست. برای تغییر، رمز جدید را وارد کنید؛ در غیر این صورت خالی بگذارید.
+        </span>
+      </div>
+      <div class="form-group full">
+        <label>دسترسی به بخش‌های برنامه</label>
+        <div class="text-sm text-muted" style="margin-bottom:6px;line-height:1.5;">
+          تیک بزنید تا کاربر آن بخش را در منو ببیند. نقش جداگانه سطح نوشتن (مشاهده / ویرایش / مدیر) را تعیین می‌کند.
+        </div>
+        <div class="perm-list" id="user-permissions-list"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -999,25 +1524,65 @@ let state = {
   editWarehouseId: null,
   editProductId: null,
   currentWarehouseId: null,
+  currentProductId: null,
+  productCardTab: 'history',
+  productCardReturn: null,
   txProductId: null,
   txType: 'in',
+  txPage: 1,
+  drPage: 1,
+  loginLogLimit: 20,
+  loginLogUserId: 'all',
 };
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
+function navLabelForPage(page) {
+  const ret = state.productCardReturn || {};
+  const productCardNav = {
+    products: 'همه کالاها',
+    transactions: 'حرکات انبار',
+    report: 'گزارش موجودی',
+    dept_report: 'گزارش بخش‌ها',
+    dashboard: 'داشبورد',
+    warehouse_detail: 'انبارها',
+    warehouses: 'انبارها',
+  }[ret.page] || 'همه کالاها';
+  return {
+    dashboard: 'داشبورد', warehouses: 'انبارها',
+    products: 'همه کالاها', transactions: 'حرکات انبار', report: 'گزارش موجودی',
+    warehouse_detail: 'انبارها', users: 'کاربران',
+    departments: 'بخش‌ها', dispatch: 'خروج رسمی', dept_report: 'گزارش بخش‌ها',
+    product_card: productCardNav,
+  }[page];
+}
+
+function userCanAccess(page) {
+  if (!currentUser) return false;
+  // صفحات داخلی که از بخش‌های اصلی باز می‌شوند
+  const mapped = {
+    warehouse_detail: 'warehouses',
+    product_card: 'products',
+  }[page] || page;
+  if (mapped === 'users') return currentUser.role === 'admin';
+  if (mapped === 'dispatch' && currentUser.role === 'viewer') return false;
+  const perms = currentUser.permissions;
+  if (!Array.isArray(perms) || !perms.length) return true; // سازگاری با نشست‌های قدیمی
+  return perms.includes(mapped);
+}
+
 function navigate(page, params={}) {
-  // viewer نمیتونه بره به صفحه users
-  if (page === 'users' && currentUser && currentUser.role !== 'admin') return;
+  if (currentUser && !userCanAccess(page)) {
+    toast('به این بخش دسترسی ندارید', 'error');
+    return;
+  }
   state.page = page;
   Object.assign(state, params);
+  const activeLabel = navLabelForPage(page);
   document.querySelectorAll('.nav-item').forEach(el => {
-    el.classList.toggle('active',
-      el.textContent.trim() === {
-        dashboard: 'داشبورد', warehouses: 'انبارها',
-        products: 'همه کالاها', transactions: 'تراکنش‌ها', report: 'گزارش موجودی',
-        warehouse_detail: 'انبارها', users: 'کاربران',
-        departments: 'بخش‌ها', dispatch: 'خروج رسمی', dept_report: 'گزارش بخش‌ها',
-      }[page]);
+    const nav = el.getAttribute('data-nav');
+    if (nav) el.classList.toggle('active', nav === page || (page === 'warehouse_detail' && nav === 'warehouses') || (page === 'product_card' && nav === 'products'));
+    else el.classList.toggle('active', el.textContent.trim() === activeLabel);
   });
   closeSidebar();
   renderPage();
@@ -1101,6 +1666,68 @@ function btnDone(btn) {
 
 function fmt(n) { return Number(n||0).toLocaleString('fa-IR'); }
 function fmtPrice(n) { return Number(n||0).toLocaleString('fa-IR') + ' ریال'; }
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+function noteHtml(note) {
+  const text = (note || '').trim();
+  if (!text) return '<span class="text-muted">—</span>';
+  return `<span class="note-cell">${escHtml(text)}</span>`;
+}
+function buildListPager(page, totalPages, total, goFnName) {
+  if (!total) return '';
+  const prevDisabled = page <= 1 ? 'disabled' : '';
+  const nextDisabled = page >= totalPages ? 'disabled' : '';
+  return `<div class="pager">
+    <button class="btn btn-sm btn-secondary" ${prevDisabled} onclick="${goFnName}(${page-1})">← قبلی</button>
+    <div class="text-sm text-muted">صفحه ${fmt(page)} از ${fmt(totalPages)} · مجموع ${fmt(total)} مورد</div>
+    <button class="btn btn-sm btn-secondary" ${nextDisabled} onclick="${goFnName}(${page+1})">بعدی →</button>
+  </div>`;
+}
+
+/** Enter در دسکتاپ: برو فیلد بعدی؛ اگر آخر بود جستجو کن */
+function bindFilterEnterNav(rootEl, onSubmit) {
+  if (!rootEl || typeof onSubmit !== 'function') return;
+  const fields = [...rootEl.querySelectorAll('input:not([type="hidden"]):not([disabled]), select:not([disabled])')];
+  fields.forEach((el, idx) => {
+    el.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      // فقط دسکتاپ/کیبورد فیزیکی — روی موبایل Enter همان رفتار بومی
+      if (window.matchMedia('(max-width: 768px)').matches) {
+        if (idx >= fields.length - 1) {
+          e.preventDefault();
+          onSubmit();
+        }
+        return;
+      }
+      e.preventDefault();
+      const next = fields[idx + 1];
+      if (next) {
+        next.focus();
+        if (next.tagName === 'SELECT') {
+          try { next.showPicker && next.showPicker(); } catch (_) {}
+        } else if (typeof next.select === 'function') {
+          next.select();
+        }
+      } else {
+        onSubmit();
+      }
+    });
+  });
+}
+
+function shortDate(s) {
+  // "1404/07/10 12:30" → دو خط فشرده
+  const t = String(s || '');
+  const parts = t.split(/\s+/);
+  if (parts.length >= 2) return `${escHtml(parts[0])}<br><span class="muted">${escHtml(parts[1])}</span>`;
+  return escHtml(t);
+}
 
 // ─── Render Pages ────────────────────────────────────────────────────────────
 
@@ -1110,9 +1737,10 @@ async function renderPage() {
   document.getElementById('topbar-actions').innerHTML = '';
   const titles = {
     dashboard: 'داشبورد', warehouses: 'مدیریت انبارها',
-    products: 'همه کالاها', transactions: 'تراکنش‌ها', report: 'گزارش موجودی',
+    products: 'همه کالاها', transactions: 'حرکات انبار', report: 'گزارش موجودی',
     warehouse_detail: '', users: 'مدیریت کاربران',
     departments: 'مدیریت بخش‌ها', dispatch: 'خروج رسمی کالا', dept_report: 'گزارش بخش‌ها',
+    product_card: 'کارت کالا',
   };
   document.getElementById('page-title').textContent = titles[state.page] || '';
 
@@ -1120,6 +1748,7 @@ async function renderPage() {
     if      (state.page === 'dashboard')        await renderDashboard();
     else if (state.page === 'warehouses')       await renderWarehouses();
     else if (state.page === 'warehouse_detail') await renderWarehouseDetail();
+    else if (state.page === 'product_card')     await renderProductCard();
     else if (state.page === 'products')         await renderAllProducts();
     else if (state.page === 'transactions')     await renderTransactions();
     else if (state.page === 'report')           await renderReport();
@@ -1137,6 +1766,39 @@ async function renderPage() {
 async function renderDashboard() {
   const d = await api('GET', '/dashboard');
   const c = document.getElementById('content');
+  const alerts = [...(d.out_of_stock || []), ...(d.low_stock || [])];
+
+  const alertCards = alerts.length === 0
+    ? '<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">همه کالاها موجودی کافی دارند</div></div>'
+    : `<div class="dash-alert-list">
+        ${alerts.map(p => {
+          const isOut = p.status === 'out';
+          const badge = isOut
+            ? '<span class="badge badge-red">🚫 تمام شد</span>'
+            : '<span class="badge badge-yellow">⚠️ کم‌موجود</span>';
+          const minLine = p.min_stock
+            ? `<span class="dash-alert-meta">حداقل: ${fmt(p.min_stock)} ${escHtml(p.unit || '')}</span>`
+            : '';
+          const desc = (p.description || '').trim();
+          return `<article class="dash-alert-card ${isOut ? 'is-out' : 'is-low'}" onclick="openProductCard(${p.id})">
+            <div class="dash-alert-top">
+              <div class="dash-alert-title">${escHtml(p.name)}</div>
+              ${badge}
+            </div>
+            <div class="dash-alert-meta">
+              ${escHtml(p.warehouse_name || '—')}
+              ${p.sku ? ' · SKU: ' + escHtml(p.sku) : ''}
+              ${p.category ? ' · ' + escHtml(p.category) : ''}
+            </div>
+            <div class="dash-alert-qty">
+              موجودی: <b>${fmt(p.quantity)} ${escHtml(p.unit || '')}</b>
+              ${minLine ? ' · ' + minLine : ''}
+            </div>
+            ${desc ? `<div class="dash-alert-desc">${escHtml(desc)}</div>` : ''}
+          </article>`;
+        }).join('')}
+      </div>`;
+
   c.innerHTML = `
   <div class="stats-grid">
     <div class="stat-card"><div class="stat-icon">🏭</div><div class="stat-label">تعداد انبار</div><div class="stat-value val-blue">${fmt(d.warehouse_count)}</div></div>
@@ -1146,45 +1808,58 @@ async function renderDashboard() {
     <div class="stat-card" style="grid-column:span 2"><div class="stat-icon">💰</div><div class="stat-label">ارزش کل موجودی</div><div class="stat-value val-blue" style="font-size:22px">${fmtPrice(d.total_value)}</div></div>
   </div>
 
-  <div class="grid-2">
-    <div class="card">
-      <div class="card-title">⚠️ کالاهای کم‌موجود / تمام‌شده</div>
-      ${[...d.out_of_stock, ...d.low_stock].length === 0
-        ? '<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">همه کالاها موجودی کافی دارند</div></div>'
-        : `<div class="table-wrap"><table><thead><tr>
-            <th>کالا</th><th>موجودی</th><th>وضعیت</th>
-           </tr></thead><tbody>
-           ${[...d.out_of_stock,...d.low_stock].map(p=>`<tr>
-             <td class="fw-bold">${p.name}</td>
-             <td class="num">${fmt(p.quantity)} ${p.unit}</td>
-             <td>${p.status==='out'
-               ? '<span class="badge badge-red">🚫 تمام شد</span>'
-               : '<span class="badge badge-yellow">⚠️ کم است</span>'}</td>
-           </tr>`).join('')}
-           </tbody></table></div>`}
-    </div>
-    <div class="card">
-      <div class="card-title">🔄 آخرین تراکنش‌ها</div>
-      ${d.recent_transactions.length === 0
-        ? '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">تراکنشی ثبت نشده</div></div>'
-        : `<div class="table-wrap"><table><thead><tr>
-            <th>کالا</th><th>نوع</th><th>مقدار</th><th>تاریخ</th>
-           </tr></thead><tbody>
-           ${d.recent_transactions.map(t=>`<tr>
-             <td>${t.product_name}</td>
-             <td>${txBadge(t.type)}</td>
-             <td class="num">${fmt(t.quantity)}</td>
-             <td class="text-sm text-muted num">${t.created_at}</td>
-           </tr>`).join('')}
-           </tbody></table></div>`}
-    </div>
+  <div class="card" style="margin-top:20px;">
+    <div class="card-title">⚠️ کالاهای کم‌موجود و تمام‌شده</div>
+    ${alertCards}
   </div>`;
 }
 
-function txBadge(type) {
-  if (type==='in')     return '<span class="badge badge-in">⬆️ ورود</span>';
-  if (type==='out')    return '<span class="badge badge-out">⬇️ خروج</span>';
-  return '<span class="badge badge-adjust">⚖️ تنظیم</span>';
+function txBadge(tOrType) {
+  // پشتیبانی از آبجکت تراکنش جدید و type رشته‌ای قدیمی
+  if (tOrType && typeof tOrType === 'object') {
+    const kind = tOrType.movement_kind || tOrType.type;
+    const label = tOrType.movement_label || '';
+    if (kind === 'purchase' || kind === 'initial' || tOrType.type === 'in')
+      return `<span class="badge badge-in">${label || '⬆️ ورود خرید'}</span>`;
+    if (kind === 'return')
+      return `<span class="badge badge-return">${label || '↩️ بازگشت به انبار'}</span>`;
+    if (kind === 'dispatch' || kind === 'dispatch_reversed' || kind === 'issue' || tOrType.type === 'out')
+      return `<span class="badge badge-out">${label || '⬇️ خروج'}</span>`;
+    if (kind === 'correction_up')
+      return `<span class="badge badge-corr-up">${label || '📈 افزایش موجودی'}</span>`;
+    if (kind === 'correction_down')
+      return `<span class="badge badge-corr-down">${label || '📉 کاهش موجودی'}</span>`;
+    return `<span class="badge badge-adjust">${label || '📝 اصلاح موجودی'}</span>`;
+  }
+  if (tOrType === 'in')  return '<span class="badge badge-in">⬆️ ورود خرید</span>';
+  if (tOrType === 'out') return '<span class="badge badge-out">⬇️ خروج</span>';
+  return '<span class="badge badge-adjust">📝 اصلاح موجودی</span>';
+}
+
+function openProductCard(pid, tab='history') {
+  const fromPage = state.page;
+  navigate('product_card', {
+    currentProductId: pid,
+    productCardTab: tab,
+    productCardReturn: fromPage === 'product_card'
+      ? state.productCardReturn
+      : { page: fromPage, currentWarehouseId: state.currentWarehouseId },
+  });
+}
+
+function backFromProductCard() {
+  const ret = state.productCardReturn || {};
+  if (ret.page && ret.page !== 'product_card') {
+    const params = {};
+    if (ret.currentWarehouseId != null) params.currentWarehouseId = ret.currentWarehouseId;
+    navigate(ret.page, params);
+    return;
+  }
+  if (state.currentWarehouseId) {
+    navigate('warehouse_detail', { currentWarehouseId: state.currentWarehouseId });
+    return;
+  }
+  navigate('products');
 }
 
 // ─── Warehouses ──────────────────────────────────────────────────────────────
@@ -1208,7 +1883,7 @@ async function renderWarehouses() {
     <div class="wh-card" onclick="navigate('warehouse_detail',{currentWarehouseId:${w.id}})">
       ${window._isViewer ? '' : `<div class="wh-card-actions">
         <button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="event.stopPropagation();openWarehouseModal(${w.id})">✏️</button>
-        <button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="event.stopPropagation();deleteWarehouse(${w.id},'${w.name}')">🗑️</button>
+        <button class="btn btn-sm btn-danger" title="حذف" onclick="event.stopPropagation();deleteWarehouse(${w.id},'${w.name}')">حذف</button>
       </div>`}
       <div class="wh-card-name">${w.name}</div>
       <div class="wh-card-loc">${w.location ? '📍 '+w.location : '📍 مکان ثبت نشده'}</div>
@@ -1248,54 +1923,349 @@ async function renderWarehouseDetail() {
     <div class="stat-card"><div class="stat-label">💰 ارزش کل</div><div class="stat-value val-green" style="font-size:18px;">${fmtPrice(totalVal)}</div></div>
   </div>
   <div class="card">
-    <div class="flex-between mb-4">
+    <div class="flex-between mb-4" style="flex-wrap:wrap;gap:10px;">
       <div class="card-title" style="margin:0">کالاهای این انبار</div>
-      <div class="search-bar"><span class="search-icon">🔍</span><input id="prod-search" placeholder="جستجوی کالا..." oninput="filterProds()" style="width:220px;"/></div>
+      <div class="search-bar" style="flex:1;min-width:160px;max-width:280px;">
+        <span class="search-icon">🔍</span>
+        <input id="prod-search" placeholder="جستجوی کالا..." oninput="filterProds()" style="width:100%;"/>
+      </div>
     </div>
     ${prods.length===0
       ? `<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">هنوز کالایی ثبت نشده</div><br>
          <button class="btn btn-primary" onclick="openProductModal(null,${wid})">➕ کالای جدید</button></div>`
-      : `<div class="table-wrap"><table id="prods-table">
+      : `<div class="table-wrap desk-only"><table class="table-fit has-actions" id="prods-table">
           <thead><tr>
-            <th>نام کالا</th><th>کد SKU</th><th>دسته</th>
-            <th>موجودی</th><th>قیمت واحد</th><th>ارزش کل</th><th>وضعیت</th><th>عملیات</th>
+            <th class="col-name">نام کالا</th>
+            <th class="col-actions-wide">عملیات</th>
+            <th class="col-qty">موجودی</th>
+            <th class="col-money">قیمت</th>
+            <th class="col-money">ارزش کل</th>
+            <th class="col-status">وضعیت</th>
+            <th class="col-sku">کد SKU</th>
+            <th class="col-cat">دسته</th>
           </tr></thead><tbody>
           ${prods.map(p=>prodRow(p)).join('')}
-          </tbody></table></div>`}
+          </tbody></table></div>
+         <div class="mobile-list mob-only" id="prods-mobile">
+          ${prods.map(p=>whProdCard(p)).join('')}
+         </div>`}
   </div>`;
   window._prods = prods;
 }
 
+function whProdStatusBadge(p) {
+  const safeName = String(p.name || '').replace(/'/g, "\\'");
+  if (p.manual_status === 'unavailable' || p.status === 'out')
+    return `<span class="badge badge-red" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal(${p.id},'${safeName}','${p.status}')">🚫 ناموجود</span>`;
+  if (p.manual_status === 'low' || p.status === 'low')
+    return `<span class="badge badge-yellow" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal(${p.id},'${safeName}','${p.status}')">⚠️ کم است</span>`;
+  return `<span class="badge badge-green" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal(${p.id},'${safeName}','${p.status}')">✅ موجود</span>`;
+}
+
 function prodRow(p) {
-  const statusBadge = p.manual_status === 'unavailable' || p.status==='out'
-    ? '<span class="badge badge-red" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal('+p.id+',\''+p.name+'\',\''+p.status+'\')">🚫 ناموجود</span>'
-    : p.manual_status === 'low' || p.status==='low'
-    ? '<span class="badge badge-yellow" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal('+p.id+',\''+p.name+'\',\''+p.status+'\')">⚠️ کم است</span>'
-    : '<span class="badge badge-green" title="کلیک برای تغییر" style="cursor:pointer" onclick="openStatusModal('+p.id+',\''+p.name+'\',\''+p.status+'\')">✅ موجود</span>';
+  const safeName = String(p.name || '').replace(/'/g, "\\'");
+  const lastBuy = p.unit_price ? fmtPrice(p.unit_price) : '—';
+  const avg = p.avg_cost ? fmtPrice(p.avg_cost) : (p.cost_basis ? fmtPrice(p.cost_basis) : '—');
   return `<tr id="prod-row-${p.id}">
-    <td class="fw-bold">${p.name}${p.description?`<br><span class="text-sm text-muted">${p.description}</span>`:''}</td>
-    <td class="text-muted num">${p.sku||'—'}</td>
-    <td>${p.category||'—'}</td>
-    <td class="num fw-bold">${fmt(p.quantity)} ${p.unit}</td>
-    <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
-    <td class="num">${fmtPrice(p.total_value)}</td>
-    <td>${statusBadge}</td>
-    <td>
-      <div class="flex-gap">
-        ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" onclick="openTxModal(${p.id})">🔄 ثبت</button>`}
-        ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️</button>`}
-        ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id},'${p.name}')">🗑️</button>`}
+    <td class="col-name fw-bold">
+      <span class="clickable-name" onclick="openProductCard(${p.id})" title="${escHtml(p.name)}">${escHtml(p.name)}</span>
+      ${p.description?`<br><span class="text-sm text-muted">${escHtml(p.description)}</span>`:''}
+    </td>
+    <td class="col-actions-wide">
+      <div class="row-actions">
+        <button class="btn btn-sm btn-primary" title="کارت کالا" onclick="openProductCard(${p.id})">📋</button>
+        ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" title="ورود خرید" onclick="openProductCard(${p.id},'in')">⬆️</button>`}
+        ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openProductModal(${p.id})">✏️</button>`}
+        ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger" title="حذف" onclick="deleteProduct(${p.id},'${safeName}')">حذف</button>`}
       </div>
     </td>
+    <td class="col-qty num fw-bold">${fmt(p.quantity)} ${escHtml(p.unit)}</td>
+    <td class="col-money num money-stack">
+      <div title="آخرین خرید">${lastBuy}</div>
+      <div class="muted" title="میانگین هزینه">میانگین: ${avg}</div>
+    </td>
+    <td class="col-money num">${fmtPrice(p.total_value)}</td>
+    <td class="col-status">${whProdStatusBadge(p)}</td>
+    <td class="col-sku text-muted num">${escHtml(p.sku)||'—'}</td>
+    <td class="col-cat">${escHtml(p.category)||'—'}</td>
   </tr>`;
 }
 
+function whProdCard(p) {
+  const safeName = String(p.name || '').replace(/'/g, "\\'");
+  const actions = window._isViewer
+    ? `<div class="m-card-actions no-delete">
+        <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت</button>
+      </div>`
+    : `<div class="m-card-actions">
+        <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت</button>
+        <button class="btn btn-sm btn-success" onclick="openProductCard(${p.id},'in')">⬆️ ورود</button>
+        <button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️ ویرایش</button>
+        <button class="btn btn-sm btn-danger btn-del" title="حذف کالا" onclick="deleteProduct(${p.id},'${safeName}')">🗑</button>
+      </div>`;
+  return `<article class="m-card" id="prod-card-${p.id}">
+    <div class="m-card-head">
+      <div style="min-width:0;">
+        <div class="m-card-title clickable-name" onclick="openProductCard(${p.id})">${escHtml(p.name)}</div>
+        <div class="m-card-sub">${escHtml(p.sku || 'بدون SKU')}${p.category ? ' · ' + escHtml(p.category) : ''}</div>
+      </div>
+      ${whProdStatusBadge(p)}
+    </div>
+    <div class="m-card-grid">
+      <div><span class="lbl">موجودی</span><b>${fmt(p.quantity)} ${escHtml(p.unit||'')}</b></div>
+      <div><span class="lbl">آخرین خرید</span>${p.unit_price?fmtPrice(p.unit_price):'—'}</div>
+      <div><span class="lbl">میانگین هزینه</span>${p.avg_cost?fmtPrice(p.avg_cost):(p.cost_basis?fmtPrice(p.cost_basis):'—')}</div>
+      <div><span class="lbl">ارزش کل</span>${fmtPrice(p.total_value)}</div>
+    </div>
+    ${actions}
+  </article>`;
+}
+
 function filterProds() {
-  const q = document.getElementById('prod-search').value.toLowerCase();
-  const prods = window._prods||[];
+  const q = (document.getElementById('prod-search')?.value || '').toLowerCase();
+  const prods = window._prods || [];
+  const filtered = prods.filter(p =>
+    (p.name || '').toLowerCase().includes(q) ||
+    (p.sku || '').toLowerCase().includes(q) ||
+    (p.category || '').toLowerCase().includes(q)
+  );
   const tbody = document.querySelector('#prods-table tbody');
-  if (!tbody) return;
-  tbody.innerHTML = prods.filter(p=>p.name.toLowerCase().includes(q)||p.sku.toLowerCase().includes(q)||(p.category||'').toLowerCase().includes(q)).map(prodRow).join('');
+  if (tbody) tbody.innerHTML = filtered.map(prodRow).join('');
+  const mob = document.getElementById('prods-mobile');
+  if (mob) mob.innerHTML = filtered.map(whProdCard).join('');
+}
+
+// ─── Product Card (کارت کالا) ────────────────────────────────────────────────
+
+async function renderProductCard() {
+  const pid = state.currentProductId;
+  if (!pid) { backFromProductCard(); return; }
+  const data = await api('GET', `/products/${pid}/card`);
+  const p = data.product;
+  const s = data.summary;
+  const tab = state.productCardTab || 'history';
+  state.currentWarehouseId = p.warehouse_id;
+
+  document.getElementById('page-title').textContent = `📋 کارت کالا`;
+  document.getElementById('topbar-actions').innerHTML = `
+    <button class="btn btn-secondary" onclick="backFromProductCard()">← بازگشت</button>`;
+
+  const statusBadge = p.status==='out'
+    ? '<span class="badge badge-red">🚫 ناموجود</span>'
+    : p.status==='low'
+    ? '<span class="badge badge-yellow">⚠️ کم‌موجود</span>'
+    : '<span class="badge badge-green">✅ موجود</span>';
+
+  const metaParts = [
+    p.warehouse_name || '',
+    p.sku ? 'SKU: ' + p.sku : '',
+    p.category || '',
+    p.unit ? 'واحد: ' + p.unit : '',
+  ].filter(Boolean).map(escHtml);
+
+  // تب‌های عملیاتی قدیمی را به اکشن تبدیل کن؛ خروج فقط از «خروج رسمی»
+  let viewTab = tab;
+  let pendingAction = null;
+  if (tab === 'in') { viewTab = 'purchases'; pendingAction = 'in'; }
+  else if (tab === 'adjust') { viewTab = 'history'; pendingAction = 'adjust'; }
+  else if (tab === 'out') { viewTab = 'history'; }
+  state.productCardTab = viewTab;
+
+  document.getElementById('content').innerHTML = `
+  <div class="card mb-4">
+    <div class="pc-hero">
+      <div class="pc-hero-main">
+        <div class="pc-hero-name">${escHtml(p.name)}</div>
+        <div class="pc-hero-meta">${metaParts.join(' · ')}</div>
+        <div style="margin-top:10px;">${statusBadge}</div>
+        <div class="pc-hero-actions">
+          ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" onclick="openTxModal(${p.id},'in')">⬆️ ورود خرید</button>`}
+          ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openTxModal(${p.id},'adjust')">📝 اصلاح موجودی</button>`}
+          ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️ مشخصات</button>`}
+        </div>
+        ${window._isViewer ? '' : `<div class="text-sm text-muted" style="margin-top:10px;">برای خروج کالا از منوی «خروج رسمی» استفاده کنید.</div>`}
+      </div>
+      <div class="pc-hero-qty">
+        <div>
+          <div class="n num">${fmt(p.quantity)}</div>
+          <div class="text-sm text-muted">${escHtml(p.unit||'')} موجودی فعلی</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-grid pc-stats" style="margin-bottom:20px;">
+    <div class="stat-card"><div class="stat-label">⬆️ مجموع ورود</div><div class="stat-value val-green">${fmt(s.total_in)}</div></div>
+    <div class="stat-card"><div class="stat-label">⬇️ مجموع خروج</div><div class="stat-value val-red">${fmt(s.total_out)}</div></div>
+    <div class="stat-card"><div class="stat-label">💰 آخرین خرید</div><div class="stat-value val-blue" style="font-size:16px;">${p.unit_price?fmtPrice(p.unit_price):'—'}</div></div>
+    <div class="stat-card"><div class="stat-label">📊 میانگین هزینه</div><div class="stat-value val-blue" style="font-size:16px;">${(p.avg_cost||p.cost_basis)?fmtPrice(p.avg_cost||p.cost_basis):'—'}</div></div>
+    <div class="stat-card span-2"><div class="stat-label">💎 ارزش موجودی</div><div class="stat-value val-green" style="font-size:20px;">${fmtPrice(s.current_value)}</div></div>
+  </div>
+
+  <div class="pc-tabs">
+    <button class="pc-tab ${viewTab==='history'?'active':''}" onclick="setProductCardTab('history')">📜 تاریخچه</button>
+    <button class="pc-tab ${viewTab==='purchases'?'active':''}" onclick="setProductCardTab('purchases')">🛒 خریدها</button>
+  </div>
+
+  <div class="card">
+    <div id="pc-panel"></div>
+  </div>`;
+
+  window._productCardData = data;
+  renderProductCardPanel(viewTab);
+  if (pendingAction === 'in' || pendingAction === 'adjust') {
+    openTxModal(pid, pendingAction);
+  }
+}
+
+function setProductCardTab(tab) {
+  if (tab === 'in') {
+    openTxModal(state.currentProductId, 'in');
+    state.productCardTab = 'purchases';
+    document.querySelectorAll('.pc-tab').forEach(el => {
+      el.classList.toggle('active', el.textContent.trim() === '🛒 خریدها');
+    });
+    renderProductCardPanel('purchases');
+    return;
+  }
+  if (tab === 'out') {
+    toast('خروج کالا فقط از منوی «خروج رسمی» ثبت می‌شود', 'error');
+    return;
+  }
+  if (tab === 'adjust') {
+    openTxModal(state.currentProductId, 'adjust');
+    return;
+  }
+  state.productCardTab = tab;
+  document.querySelectorAll('.pc-tab').forEach(el => {
+    const map = { history: '📜 تاریخچه', purchases: '🛒 خریدها' };
+    el.classList.toggle('active', el.textContent.trim() === map[tab]);
+  });
+  renderProductCardPanel(tab);
+}
+
+function renderProductCardPanel(tab) {
+  const panel = document.getElementById('pc-panel');
+  const data = window._productCardData;
+  if (!panel || !data) return;
+
+  if (tab === 'purchases') {
+    const purchases = data.purchases || [];
+    const s = data.summary;
+    panel.innerHTML = `
+      <div class="flex-between mb-4" style="flex-wrap:wrap;gap:10px;">
+        <div class="card-title" style="margin:0">🛒 گزارش خریدهای این کالا</div>
+        <div class="text-sm text-muted">
+          ${fmt(s.purchase_count)} خرید · جمع تعداد: ${fmt(s.purchase_qty)} · جمع مبلغ: ${fmtPrice(s.purchase_cost)}
+          ${s.avg_purchase_price ? ' · میانگین: '+fmtPrice(s.avg_purchase_price) : ''}
+        </div>
+      </div>
+      ${purchases.length === 0
+        ? '<div class="empty"><div class="empty-icon">🛒</div><div class="empty-text">هنوز ورود خریدی ثبت نشده</div></div>'
+        : `<div class="table-wrap desk-only"><table class="table-fit has-actions">
+            <thead><tr>
+              <th class="col-date">تاریخ</th><th class="col-type">نوع</th><th class="col-qty">تعداد</th>
+              <th class="col-money">قیمت واحد</th><th class="col-money">مبلغ کل</th>
+              <th class="col-sku">شماره فاکتور</th><th class="col-user">ثبت‌کننده</th>
+              <th class="col-note">توضیحات</th>
+              ${window._isViewer ? '' : '<th class="col-actions">عملیات</th>'}
+            </tr></thead><tbody>
+            ${purchases.map(t=>`<tr>
+              <td class="num text-sm">${escHtml(t.created_at)}</td>
+              <td>${txBadge(t)}</td>
+              <td class="num fw-bold">${fmt(t.quantity)} ${escHtml(t.unit_name||'')}</td>
+              <td class="num">${t.unit_price!=null?fmtPrice(t.unit_price):'—'}</td>
+              <td class="num">${t.total_cost!=null?fmtPrice(t.total_cost):'—'}</td>
+              <td class="text-sm">${escHtml(t.ref_number)||'—'}</td>
+              <td class="text-sm">${escHtml(t.created_by)||'—'}</td>
+              <td class="note-cell">${noteHtml(t.note)}</td>
+              ${window._isViewer ? '' : `<td class="col-actions"><div class="row-actions">
+                <button class="btn btn-sm btn-danger" title="حذف این ورود خرید" onclick="reversePurchase(${t.id},${t.quantity},'${String(t.unit_name||'').replace(/'/g,"\\'")}','${String(data.product.name||'').replace(/'/g,"\\'")}')">حذف</button>
+              </div></td>`}
+            </tr>`).join('')}
+            </tbody></table></div>
+           <div class="mobile-list mob-only">
+            ${purchases.map(t => `<article class="m-card">
+              <div class="m-card-head">
+                <div style="min-width:0;">
+                  <div class="m-card-title">${escHtml(t.created_at||'')}</div>
+                  <div class="m-card-sub">${escHtml(t.created_by||'—')}${t.ref_number ? ' · فاکتور ' + escHtml(t.ref_number) : ''}</div>
+                </div>
+                ${txBadge(t)}
+              </div>
+              <div class="m-card-grid">
+                <div><span class="lbl">تعداد</span><b>${fmt(t.quantity)} ${escHtml(t.unit_name||'')}</b></div>
+                <div><span class="lbl">قیمت واحد</span>${t.unit_price!=null?fmtPrice(t.unit_price):'—'}</div>
+                <div><span class="lbl">مبلغ کل</span>${t.total_cost!=null?fmtPrice(t.total_cost):'—'}</div>
+              </div>
+              ${t.note ? `<div class="m-card-note"><span class="lbl">توضیحات</span>${noteHtml(t.note)}</div>` : ''}
+              ${window._isViewer ? '' : `<div class="flex-gap" style="margin-top:10px;flex-wrap:wrap;">
+                <button class="btn btn-sm btn-danger" onclick="reversePurchase(${t.id},${t.quantity},'${String(t.unit_name||'').replace(/'/g,"\\'")}','${String(data.product.name||'').replace(/'/g,"\\'")}')">🗑 حذف این ورود</button>
+              </div>`}
+            </article>`).join('')}
+           </div>`}`;
+    return;
+  }
+
+  // history (default)
+  const moves = data.movements || [];
+  panel.innerHTML = `
+    <div class="flex-between mb-4">
+      <div class="card-title" style="margin:0">📜 همه حرکات این کالا — ${fmt(moves.length)} مورد</div>
+    </div>
+    ${buildProductCardMoves(moves)}`;
+}
+
+function buildProductCardMoves(txs) {
+  if (!txs.length) return '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">هنوز حرکتی ثبت نشده</div></div>';
+
+  const desk = `<div class="table-wrap desk-only"><table class="table-fit">
+    <thead><tr>
+      <th class="col-date">تاریخ</th>
+      <th class="col-type">نوع حرکت</th>
+      <th class="col-qty">موجودی</th>
+      <th class="col-money">قیمت / مبلغ</th>
+      <th class="col-detail">بخش / توضیحات</th>
+      <th class="col-user">ثبت‌کننده</th>
+    </tr></thead><tbody>
+    ${txs.map(t=>`<tr>
+      <td class="col-date num text-muted qty-stack">${shortDate(t.created_at)}</td>
+      <td class="col-type">${txBadge(t)}</td>
+      <td class="col-qty num qty-stack">
+        <div class="muted">${fmt(t.before_qty)} → ${fmt(t.after_qty)}</div>
+        <div class="fw-bold">${txChangeCell(t)}</div>
+      </td>
+      <td class="col-money num money-stack">
+        <div>${t.unit_price != null ? fmtPrice(t.unit_price) : '—'}</div>
+        <div class="muted">${t.total_cost != null ? fmtPrice(t.total_cost) : '—'}</div>
+      </td>
+      <td class="col-detail">${txDetailCell(t)}</td>
+      <td class="col-user text-sm text-muted">${escHtml(t.created_by)||'—'}</td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+
+  const mob = `<div class="mobile-list mob-only">
+    ${txs.map(t => `
+      <article class="m-card">
+        <div class="m-card-head">
+          <div style="min-width:0;">
+            <div class="m-card-title">${escHtml(t.created_at||'')}</div>
+            <div class="m-card-sub">${escHtml(t.created_by)||'—'}</div>
+          </div>
+          <div>${txBadge(t)}</div>
+        </div>
+        <div class="m-card-grid">
+          <div><span class="lbl">موجودی</span><b>${fmt(t.before_qty)} → ${fmt(t.after_qty)}</b> <span>${txChangeCell(t)}</span></div>
+          <div><span class="lbl">قیمت / مبلغ</span>${t.unit_price!=null?fmtPrice(t.unit_price):'—'}<br><span class="text-muted">${t.total_cost!=null?fmtPrice(t.total_cost):'—'}</span></div>
+        </div>
+        <div class="m-card-note">
+          <span class="lbl">بخش / توضیحات</span>
+          ${txDetailCell(t)}
+        </div>
+      </article>`).join('')}
+  </div>`;
+
+  return desk + mob;
 }
 
 // ─── All Products ─────────────────────────────────────────────────────────────
@@ -1308,9 +2278,12 @@ async function renderAllProducts() {
     window._isViewer ? '' : `<button class="btn btn-primary" onclick="openProductModal()">➕ کالای جدید</button>`;
   const c = document.getElementById('content');
   c.innerHTML = `<div class="card">
-    <div class="flex-between mb-4">
+    <div class="flex-between mb-4" style="flex-wrap:wrap;gap:10px;">
       <div class="card-title" style="margin:0" id="all-prods-count">در حال بارگذاری...</div>
-      <div class="search-bar"><span class="search-icon">🔍</span><input id="all-prod-search" placeholder="جستجو..." oninput="searchAllProds(this.value)" style="width:220px;"/></div>
+      <div class="search-bar" style="flex:1;min-width:180px;max-width:320px;">
+        <span class="search-icon">🔍</span>
+        <input id="all-prod-search" placeholder="جستجو..." oninput="searchAllProds(this.value)" style="width:100%;"/>
+      </div>
     </div>
     <div id="all-prods-body"><div class="spinner"></div></div>
   </div>`;
@@ -1326,6 +2299,12 @@ function searchAllProds(val) {
 }
 
 function goToProdPage(page) { loadProdPage(page); }
+
+function prodStatusBadge(p) {
+  if (p.status === 'out') return '<span class="badge badge-red">🚫 تمام شد</span>';
+  if (p.status === 'low') return '<span class="badge badge-yellow">⚠️ کم</span>';
+  return '<span class="badge badge-green">✅ موجود</span>';
+}
 
 async function loadProdPage(page) {
   const search = window._allProdsSearch || '';
@@ -1344,28 +2323,60 @@ async function loadProdPage(page) {
       : `<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">هیچ کالایی ثبت نشده</div></div>`;
     return;
   }
-  body.innerHTML = `<div class="table-wrap"><table id="all-prods-table">
-    <thead><tr>
-      <th>نام کالا</th><th>انبار</th><th>دسته</th><th>موجودی</th><th>قیمت</th><th>وضعیت</th><th>عملیات</th>
-    </tr></thead><tbody>
-    ${res.items.map(p=>allProdRow(p)).join('')}
-    </tbody></table></div>
+  body.innerHTML = `
+    <div class="table-wrap desk-only"><table class="table-fit has-actions" id="all-prods-table">
+      <thead><tr>
+        <th class="col-name">نام کالا</th>
+        <th class="col-actions">عملیات</th>
+        <th class="col-name">انبار</th>
+        <th class="col-cat">دسته</th>
+        <th class="col-qty">موجودی</th>
+        <th class="col-money">آخرین خرید</th>
+        <th class="col-status">وضعیت</th>
+      </tr></thead><tbody>
+      ${res.items.map(p=>allProdRow(p)).join('')}
+      </tbody></table></div>
+    <div class="mobile-list mob-only">
+      ${res.items.map(p=>allProdCard(p)).join('')}
+    </div>
     ${buildPager(res.page, res.total_pages)}`;
 }
 
 function allProdRow(p) {
+  const wh = p.warehouse_name || (state.warehouses.find(w=>w.id===p.warehouse_id)||{name:'—'}).name;
   return `<tr>
-    <td class="fw-bold">${p.name}</td>
-    <td class="text-muted">${(state.warehouses.find(w=>w.id===p.warehouse_id)||{name:'—'}).name}</td>
-    <td>${p.category||'—'}</td>
-    <td class="num">${fmt(p.quantity)} ${p.unit}</td>
-    <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
-    <td>${p.status==='out'?'<span class="badge badge-red">🚫 تمام شد</span>':p.status==='low'?'<span class="badge badge-yellow">⚠️ کم</span>':'<span class="badge badge-green">✅ موجود</span>'}</td>
-    <td><div class="flex-gap">
-      <button class="btn btn-sm btn-success" onclick="openTxModal(${p.id})">🔄</button>
-      <button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️</button>
+    <td class="col-name fw-bold"><span class="clickable-name" onclick="openProductCard(${p.id})" title="${escHtml(p.name)}">${escHtml(p.name)}</span></td>
+    <td class="col-actions"><div class="row-actions">
+      <button class="btn btn-sm btn-primary" title="کارت کالا" onclick="openProductCard(${p.id})">📋</button>
+      ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openProductModal(${p.id})">✏️</button>`}
     </div></td>
+    <td class="col-name text-muted">${escHtml(wh)}</td>
+    <td class="col-cat">${escHtml(p.category)||'—'}</td>
+    <td class="col-qty num">${fmt(p.quantity)} ${escHtml(p.unit)}</td>
+    <td class="col-money num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
+    <td class="col-status">${prodStatusBadge(p)}</td>
   </tr>`;
+}
+
+function allProdCard(p) {
+  const wh = p.warehouse_name || (state.warehouses.find(w=>w.id===p.warehouse_id)||{name:'—'}).name;
+  return `<article class="m-card">
+    <div class="m-card-head">
+      <div style="min-width:0;">
+        <div class="m-card-title clickable-name" onclick="openProductCard(${p.id})">${escHtml(p.name)}</div>
+        <div class="m-card-sub">${escHtml(wh)}${p.category ? ' · ' + escHtml(p.category) : ''}</div>
+      </div>
+      ${prodStatusBadge(p)}
+    </div>
+    <div class="m-card-grid">
+      <div><span class="lbl">موجودی</span><b>${fmt(p.quantity)} ${escHtml(p.unit||'')}</b></div>
+      <div><span class="lbl">آخرین خرید</span>${p.unit_price?fmtPrice(p.unit_price):'—'}</div>
+    </div>
+    <div class="flex-gap" style="margin-top:10px;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت کالا</button>
+      ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️ ویرایش</button>`}
+    </div>
+  </article>`;
 }
 
 function buildPager(page, totalPages) {
@@ -1382,83 +2393,195 @@ function buildPager(page, totalPages) {
 // ─── Transactions ────────────────────────────────────────────────────────────
 
 function txChangeCell(t) {
-  if (t.type === 'adjust') return `<span class="val-blue">= ${fmt(t.quantity)}</span>`;
-  if (t.type === 'in')  return `<span class="val-green">+ ${fmt(t.quantity)}</span>`;
-  return `<span class="val-red">- ${fmt(t.quantity)}</span>`;
+  const delta = (t.delta != null) ? t.delta : (t.type === 'in' ? t.quantity : t.type === 'out' ? -t.quantity : 0);
+  if (t.type === 'adjust') {
+    const d = (t.after_qty != null && t.before_qty != null) ? (t.after_qty - t.before_qty) : delta;
+    if (d > 0) return `<span class="val-green">+ ${fmt(d)}</span>`;
+    if (d < 0) return `<span class="val-red">- ${fmt(Math.abs(d))}</span>`;
+    return `<span class="val-blue">${fmt(t.quantity)}</span>`;
+  }
+  if (delta >= 0) return `<span class="val-green">+ ${fmt(Math.abs(delta))}</span>`;
+  return `<span class="val-red">- ${fmt(Math.abs(delta))}</span>`;
+}
+
+function txDetailCell(t) {
+  const dept = (t.department_name || '').trim();
+  const note = (t.note || '').trim();
+  if (!dept && !note) return '<span class="detail-empty">—</span>';
+  return `<div class="detail-stack">
+    ${dept ? `<div class="detail-dept"><span class="badge badge-blue" title="${escHtml(dept)}">${escHtml(dept)}</span></div>` : ''}
+    ${note ? `<div class="detail-note">${escHtml(note)}</div>` : ''}
+  </div>`;
 }
 
 function buildTxTable(txs) {
   if (!txs.length) return '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">نتیجه‌ای یافت نشد</div></div>';
-  return `<div class="table-wrap"><table id="tx-table">
+
+  const desk = `<div class="table-wrap desk-only"><table class="table-fit" id="tx-table">
     <thead><tr>
-      <th>تاریخ</th><th>کالا</th><th>انبار</th><th>نوع</th><th>قبل</th><th>تغییر</th><th>بعد</th><th>مرجع</th><th>توضیحات</th>
+      <th class="col-date">تاریخ</th>
+      <th class="col-name">کالا</th>
+      <th class="col-type">نوع حرکت</th>
+      <th class="col-qty">موجودی</th>
+      <th class="col-money">قیمت / مبلغ</th>
+      <th class="col-detail">بخش / توضیحات</th>
+      <th class="col-user">ثبت‌کننده</th>
     </tr></thead><tbody>
     ${txs.map(t=>`<tr>
-      <td class="num text-sm text-muted" style="white-space:nowrap">${t.created_at}</td>
-      <td class="fw-bold">${t.product_name}</td>
-      <td class="text-muted">${t.warehouse_name}</td>
-      <td>${txBadge(t.type)}</td>
-      <td class="num">${fmt(t.before_qty)}</td>
-      <td class="num fw-bold">${txChangeCell(t)}</td>
-      <td class="num fw-bold">${fmt(t.after_qty)}</td>
-      <td class="text-sm">${t.ref_number||'—'}</td>
-      <td class="text-sm" style="max-width:200px;">
-        ${t.note ? `<span title="${t.note}" style="color:var(--text2);">💬 ${t.note}</span>` : '<span class="text-muted">—</span>'}
+      <td class="col-date num text-muted qty-stack">${shortDate(t.created_at)}</td>
+      <td class="col-name">
+        <span class="clickable-name fw-bold" onclick="openProductCard(${t.product_id})" title="${escHtml(t.product_name)}">${escHtml(t.product_name)}</span>
+        <div class="text-sm text-muted" style="margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(t.warehouse_name||'')}</div>
       </td>
+      <td class="col-type">${txBadge(t)}</td>
+      <td class="col-qty num qty-stack">
+        <div class="muted">${fmt(t.before_qty)} → ${fmt(t.after_qty)}</div>
+        <div class="fw-bold">${txChangeCell(t)}</div>
+      </td>
+      <td class="col-money num money-stack">
+        <div>${t.unit_price != null ? fmtPrice(t.unit_price) : '—'}</div>
+        <div class="muted">${t.total_cost != null ? fmtPrice(t.total_cost) : '—'}</div>
+      </td>
+      <td class="col-detail">${txDetailCell(t)}</td>
+      <td class="col-user text-sm text-muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(t.created_by)||'—'}</td>
     </tr>`).join('')}
     </tbody></table></div>`;
+
+  const mob = `<div class="mobile-list mob-only">
+    ${txs.map(t => `
+      <article class="m-card">
+        <div class="m-card-head">
+          <div style="min-width:0;">
+            <div class="m-card-title clickable-name" onclick="openProductCard(${t.product_id})">${escHtml(t.product_name)}</div>
+            <div class="m-card-sub">${escHtml(t.warehouse_name||'')} · ${escHtml(t.created_at||'')}</div>
+          </div>
+          <div>${txBadge(t)}</div>
+        </div>
+        <div class="m-card-grid">
+          <div><span class="lbl">موجودی</span><b>${fmt(t.before_qty)} → ${fmt(t.after_qty)}</b> <span>${txChangeCell(t)}</span></div>
+          <div><span class="lbl">قیمت / مبلغ</span>${t.unit_price!=null?fmtPrice(t.unit_price):'—'}<br><span class="text-muted">${t.total_cost!=null?fmtPrice(t.total_cost):'—'}</span></div>
+          <div><span class="lbl">ثبت‌کننده</span>${escHtml(t.created_by)||'—'}</div>
+        </div>
+        <div class="m-card-note">
+          <span class="lbl">بخش / توضیحات</span>
+          ${txDetailCell(t)}
+        </div>
+      </article>`).join('')}
+  </div>`;
+
+  return desk + mob;
 }
 
 async function renderTransactions() {
   const whs = state.warehouses.length ? state.warehouses : await api('GET', '/warehouses');
   state.warehouses = whs;
+  state.txPage = 1;
   const c = document.getElementById('content');
+  const today = todayJalali();
 
   c.innerHTML = `
-  <div class="card mb-4">
-    <div class="flex-gap" style="flex-wrap:wrap;gap:12px;">
-      <div class="search-bar" style="flex:1;min-width:200px;">
-        <span class="search-icon">🔍</span>
-        <input id="tx-search" placeholder="جستجو در کالا، توضیحات، مرجع..." oninput="searchTx()" style="width:100%;"/>
+  <div class="card mb-4" id="tx-filter-card">
+    <div class="filter-bar">
+      <div class="form-group">
+        <label>از تاریخ</label>
+        <input id="tx-from" placeholder="۱۴۰۴/۰۱/۰۱" dir="ltr" style="text-align:right;" value="${today}"/>
       </div>
-      <select id="tx-filter-type" onchange="searchTx()" style="width:150px;">
-        <option value="">همه انواع</option>
-        <option value="in">⬆️ ورود</option>
-        <option value="out">⬇️ خروج</option>
-        <option value="adjust">⚖️ تنظیم</option>
-      </select>
-      <select id="tx-filter-wh" onchange="searchTx()" style="width:170px;">
-        <option value="">همه انبارها</option>
-        ${whs.map(w=>`<option value="${w.id}">${w.name}</option>`).join('')}
-      </select>
-      <button class="btn btn-secondary" onclick="searchTx()">🔄 بروزرسانی</button>
+      <div class="form-group">
+        <label>تا تاریخ</label>
+        <input id="tx-to" placeholder="۱۴۰۴/۱۲/۲۹" dir="ltr" style="text-align:right;" value="${today}"/>
+      </div>
+      <div class="form-group span-2">
+        <label>جستجو</label>
+        <div class="search-bar">
+          <span class="search-icon">🔍</span>
+          <input id="tx-search" placeholder="کالا، توضیحات، بخش..." style="width:100%;"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>نوع حرکت</label>
+        <select id="tx-filter-type">
+          <option value="">همه حرکات</option>
+          <option value="in">⬆️ ورود خرید</option>
+          <option value="out">⬇️ خروج</option>
+          <option value="adjust">📝 اصلاح موجودی</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>انبار</label>
+        <select id="tx-filter-wh">
+          <option value="">همه انبارها</option>
+          ${whs.map(w=>`<option value="${w.id}">${escHtml(w.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-primary" onclick="state.txPage=1;searchTx()">🔍 جستجو</button>
+      </div>
     </div>
+    <div class="text-sm text-muted" style="margin-top:10px;">Enter = فیلد بعدی · در آخرین فیلد = جستجو</div>
   </div>
   <div class="card">
     <div class="flex-between mb-4">
-      <div class="card-title" style="margin:0" id="tx-count-title">در حال بارگذاری...</div>
+      <div class="card-title" style="margin:0" id="tx-count-title">آماده جستجو</div>
     </div>
-    <div id="tx-results"><div class="spinner"></div></div>
+    <div id="tx-results"><div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">بازه تاریخ را مشخص کنید و جستجو را بزنید</div></div></div>
   </div>`;
 
-  await searchTx();
+  bindFilterEnterNav(document.getElementById('tx-filter-card'), () => { state.txPage = 1; searchTx(); });
+}
+
+function goTxPage(page) {
+  if (page < 1) return;
+  state.txPage = page;
+  searchTx();
 }
 
 async function searchTx() {
-  const search = (document.getElementById('tx-search')||{}).value || '';
-  const type   = (document.getElementById('tx-filter-type')||{}).value || '';
-  const whId   = (document.getElementById('tx-filter-wh')||{}).value || '';
+  const fromStr = (document.getElementById('tx-from')||{}).value || '';
+  const toStr   = (document.getElementById('tx-to')||{}).value || '';
+  const search  = (document.getElementById('tx-search')||{}).value || '';
+  const type    = (document.getElementById('tx-filter-type')||{}).value || '';
+  const whId    = (document.getElementById('tx-filter-wh')||{}).value || '';
 
+  if (!fromStr.trim() || !toStr.trim()) {
+    toast('از تاریخ و تا تاریخ را وارد کنید', 'error');
+    return;
+  }
+  const fromISO = jalaliToISODate(fromStr.trim(), false);
+  const toISO = jalaliToISODate(toStr.trim(), true);
+  if (!fromISO || !toISO) {
+    toast('فرمت تاریخ اشتباه است — مثال: ۱۴۰۴/۰۷/۱۰', 'error');
+    return;
+  }
+
+  const page = state.txPage || 1;
   const params = new URLSearchParams();
+  params.set('from_date', fromISO);
+  params.set('to_date', toISO);
+  params.set('page', String(page));
+  params.set('per_page', '50');
   if (search) params.set('search', search);
   if (type)   params.set('type', type);
   if (whId)   params.set('warehouse_id', whId);
 
-  const txs = await api('GET', `/transactions?${params.toString()}`);
   const title = document.getElementById('tx-count-title');
   const results = document.getElementById('tx-results');
-  if (title) title.textContent = `🔄 تاریخچه تراکنش‌ها — ${fmt(txs.length)} مورد`;
-  if (results) results.innerHTML = buildTxTable(txs);
+  if (title) title.textContent = 'در حال جستجو...';
+  if (results) results.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    const res = await api('GET', `/transactions?${params.toString()}`);
+    const txs = Array.isArray(res) ? res : (res.items || []);
+    const total = Array.isArray(res) ? txs.length : (res.total || txs.length);
+    const totalPages = Array.isArray(res) ? 1 : (res.total_pages || 1);
+    const curPage = Array.isArray(res) ? 1 : (res.page || 1);
+    if (title) title.textContent = `🔄 تاریخچه حرکات انبار — ${fmt(total)} مورد`;
+    if (results) {
+      results.innerHTML = buildTxTable(txs) + buildListPager(curPage, totalPages, total, 'goTxPage');
+    }
+  } catch (e) {
+    if (title) title.textContent = 'خطا در جستجو';
+    if (results) results.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">جستجو ناموفق بود</div></div>';
+  }
 }
 
 // ─── Report ──────────────────────────────────────────────────────────────────
@@ -1467,57 +2590,88 @@ async function renderReport() {
   const whs = await api('GET', '/warehouses');
   state.warehouses = whs;
   const c = document.getElementById('content');
-  c.innerHTML = `<div class="card mb-4">
-    <div class="flex-gap" style="flex-wrap:wrap;">
-      <label class="fw-bold">فیلتر انبار:</label>
-      <select id="rep-wh" onchange="loadReport()" style="width:200px;">
-        <option value="">همه انبارها</option>
-        ${whs.map(w=>`<option value="${w.id}">${w.name}</option>`).join('')}
-      </select>
-      <label class="fw-bold">وضعیت:</label>
-      <select id="rep-status" onchange="loadReport()" style="width:160px;">
-        <option value="">همه وضعیت‌ها</option>
-        <option value="normal">✅ موجود</option>
-        <option value="low">⚠️ کم‌موجود</option>
-        <option value="out">🚫 ناموجود</option>
-      </select>
-      <button class="btn btn-secondary" onclick="printReport()">🖨️ چاپ</button>
-      <button class="btn btn-secondary" onclick="exportInventoryExcel()">📥 Excel</button>
+  c.innerHTML = `<div class="card mb-4" id="rep-filter-card">
+    <div class="filter-bar">
+      <div class="form-group span-2">
+        <label>جستجوی نام کالا</label>
+        <input id="rep-search" placeholder="نام کالا، کد SKU یا دسته..."/>
+      </div>
+      <div class="form-group">
+        <label>انبار</label>
+        <select id="rep-wh">
+          <option value="">همه انبارها</option>
+          ${whs.map(w=>`<option value="${w.id}">${escHtml(w.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>وضعیت</label>
+        <select id="rep-status">
+          <option value="">همه وضعیت‌ها</option>
+          <option value="normal">✅ موجود</option>
+          <option value="low">⚠️ کم‌موجود</option>
+          <option value="out">🚫 ناموجود</option>
+        </select>
+      </div>
+      <div class="filter-actions report-filter-actions">
+        <button type="button" class="btn btn-primary report-action-btn" onclick="loadReport()">جستجو</button>
+        <button type="button" class="btn btn-secondary report-action-btn" onclick="printReport()">چاپ</button>
+        <button type="button" class="btn btn-secondary report-action-btn" onclick="exportInventoryExcel()">Excel</button>
+      </div>
     </div>
   </div>
-  <div id="report-content"><div class="spinner"></div></div>`;
-  loadReport();
+  <div id="report-content">
+    <div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">برای مشاهده گزارش، فیلترها را تنظیم و جستجو را بزنید</div></div>
+  </div>`;
+  bindFilterEnterNav(document.getElementById('rep-filter-card'), loadReport);
 }
 
 async function loadReport() {
   const wid = document.getElementById('rep-wh').value;
   const status = document.getElementById('rep-status').value;
+  const search = (document.getElementById('rep-search') || {}).value || '';
   const params = new URLSearchParams();
   if (wid) params.set('warehouse_id', wid);
   if (status) params.set('status', status);
-  const d = await api('GET', `/report/inventory?${params.toString()}`);
+  if (search.trim()) params.set('search', search.trim());
   const rc = document.getElementById('report-content');
+  if (rc) rc.innerHTML = '<div class="spinner"></div>';
+  const d = await api('GET', `/report/inventory?${params.toString()}`);
+  if (!rc) return;
+  if (!d.products.length) {
+    rc.innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">کالایی با این فیلتر پیدا نشد</div></div>';
+    return;
+  }
   rc.innerHTML = `
   <div class="card" id="printable-report">
     <div class="flex-between mb-4">
       <div class="card-title" style="margin:0">📋 گزارش موجودی — ${d.generated_at}</div>
-      <div class="fw-bold val-blue">ارزش کل: ${fmtPrice(d.total_value)}</div>
+      <div class="fw-bold val-blue">ارزش کل: ${fmtPrice(d.total_value)} · ${fmt(d.products.length)} کالا</div>
     </div>
-    <div class="table-wrap"><table>
+    <div class="table-wrap"><table class="table-fit">
       <thead><tr>
-        <th>#</th><th>نام کالا</th><th>کد</th><th>دسته</th><th>موجودی</th><th>واحد</th><th>قیمت واحد</th><th>ارزش کل</th><th>آخرین بروزرسانی</th><th>وضعیت</th>
+        <th style="width:4%">#</th>
+        <th class="col-name">نام کالا</th>
+        <th class="col-sku">کد</th>
+        <th class="col-cat">دسته</th>
+        <th class="col-qty">موجودی</th>
+        <th class="col-money">قیمت</th>
+        <th class="col-money">ارزش کل</th>
+        <th class="col-date">بروزرسانی</th>
+        <th class="col-status">وضعیت</th>
       </tr></thead><tbody>
       ${d.products.map((p,i)=>`<tr>
         <td class="text-muted">${i+1}</td>
-        <td class="fw-bold">${p.name}</td>
-        <td class="num text-muted">${p.sku||'—'}</td>
-        <td>${p.category||'—'}</td>
-        <td class="num fw-bold">${fmt(p.quantity)}</td>
-        <td>${p.unit}</td>
-        <td class="num">${p.unit_price?fmtPrice(p.unit_price):'—'}</td>
-        <td class="num">${fmtPrice(p.total_value)}</td>
-        <td class="text-sm text-muted num">${p.updated_at}</td>
-        <td>${p.status==='out'?'<span class="badge badge-red">🚫 تمام</span>':p.status==='low'?'<span class="badge badge-yellow">⚠️ کم</span>':'<span class="badge badge-green">✅ موجود</span>'}</td>
+        <td class="col-name fw-bold"><span class="clickable-name" onclick="openProductCard(${p.id})" title="${escHtml(p.name)}">${escHtml(p.name)}</span></td>
+        <td class="col-sku num text-muted">${escHtml(p.sku)||'—'}</td>
+        <td class="col-cat">${escHtml(p.category)||'—'}</td>
+        <td class="col-qty num fw-bold">${fmt(p.quantity)} ${escHtml(p.unit||'')}</td>
+        <td class="col-money num money-stack">
+          <div title="آخرین خرید">${p.unit_price?fmtPrice(p.unit_price):'—'}</div>
+          <div class="muted" title="میانگین هزینه">${(p.avg_cost||p.cost_basis)?fmtPrice(p.avg_cost||p.cost_basis):'—'}</div>
+        </td>
+        <td class="col-money num">${fmtPrice(p.total_value)}</td>
+        <td class="col-date text-sm text-muted num">${escHtml(p.updated_at||'')}</td>
+        <td class="col-status">${p.status==='out'?'<span class="badge badge-red">🚫 تمام</span>':p.status==='low'?'<span class="badge badge-yellow">⚠️ کم</span>':'<span class="badge badge-green">✅ موجود</span>'}</td>
       </tr>`).join('')}
       </tbody></table></div></div>`;
 }
@@ -1631,7 +2785,7 @@ async function saveWarehouse() {
 async function deleteWarehouse(id, name) {
   if (!confirm(`آیا از حذف انبار "${name}" مطمئن هستید؟`)) return;
   await api('DELETE', `/warehouses/${id}`);
-  toast('انبار حذف شد 🗑️');
+  toast('انبار حذف شد 🗑');
   renderPage();
 }
 
@@ -1640,7 +2794,6 @@ async function deleteWarehouse(id, name) {
 async function openProductModal(id=null, whId=null) {
   state.editProductId = id;
 
-  // ریست دکمه ذخیره — جلوگیری از ماندن در حالت «در حال ذخیره»
   const saveBtn = document.querySelector('#modal-product .btn-primary');
   if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ذخیره'; }
 
@@ -1650,39 +2803,35 @@ async function openProductModal(id=null, whId=null) {
   const sel = document.getElementById('prod-wh');
   sel.innerHTML = whs.map(w=>`<option value="${w.id}">${w.name}</option>`).join('');
 
-  document.getElementById('modal-prod-title').textContent = id ? 'ویرایش کالا' : 'کالای جدید';
+  document.getElementById('modal-prod-title').textContent = id ? 'ویرایش مشخصات کالا' : 'تعریف کالای جدید';
+  const stockInfo = document.getElementById('prod-stock-info');
+  const createHint = document.getElementById('prod-create-hint');
+
   if (id) {
-    // فقط یک کالا را بگیر — نه همه کالاها (سریع‌تر)
     const p = await api('GET', `/products/${id}`);
     if (p) {
       document.getElementById('prod-name').value = p.name;
       document.getElementById('prod-sku').value = p.sku||'';
       document.getElementById('prod-cat').value = p.category||'';
-      document.getElementById('prod-qty').value = p.quantity;
       document.getElementById('prod-unit').value = p.unit;
-      document.getElementById('prod-price').value = p.unit_price||0;
       document.getElementById('prod-min').value = p.min_stock||0;
       document.getElementById('prod-desc').value = p.description||'';
       sel.value = p.warehouse_id;
+      document.getElementById('prod-qty-ro').textContent = `${fmt(p.quantity)} ${p.unit}`;
+      document.getElementById('prod-price-ro').textContent = p.unit_price ? fmtPrice(p.unit_price) : '—';
+      document.getElementById('prod-avg-ro').textContent = (p.avg_cost || p.cost_basis) ? fmtPrice(p.avg_cost || p.cost_basis) : '—';
     }
     document.getElementById('prod-wh-group').style.display = 'none';
-    const qtyHint = document.getElementById('prod-qty-hint');
-    if (qtyHint) qtyHint.style.display = 'block';
-    const editNoteGroup = document.getElementById('prod-edit-note-group');
-    if (editNoteGroup) editNoteGroup.style.display = 'flex';
-    document.getElementById('prod-edit-note').value = '';
+    if (stockInfo) stockInfo.style.display = 'flex';
+    if (createHint) createHint.style.display = 'none';
   } else {
     ['prod-name','prod-sku','prod-cat','prod-desc'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('prod-qty').value = 0;
-    document.getElementById('prod-price').value = 0;
     document.getElementById('prod-min').value = 0;
     document.getElementById('prod-unit').value = 'عدد';
     if (whId) sel.value = whId;
     document.getElementById('prod-wh-group').style.display = 'flex';
-    const qtyHint2 = document.getElementById('prod-qty-hint');
-    if (qtyHint2) qtyHint2.style.display = 'none';
-    const editNoteGroup2 = document.getElementById('prod-edit-note-group');
-    if (editNoteGroup2) editNoteGroup2.style.display = 'none';
+    if (stockInfo) stockInfo.style.display = 'none';
+    if (createHint) createHint.style.display = 'flex';
   }
   openModal('modal-product');
 }
@@ -1690,7 +2839,6 @@ async function openProductModal(id=null, whId=null) {
 async function saveProduct() {
   const name = document.getElementById('prod-name').value.trim();
   if (!name) { toast('نام کالا را وارد کنید', 'error'); return; }
-  // جلوگیری از ثبت دوباره
   const saveBtn = document.querySelector('#modal-product .btn-primary');
   if (saveBtn && saveBtn.disabled) return;
   btnLoading(saveBtn, 'در حال ذخیره...');
@@ -1698,24 +2846,26 @@ async function saveProduct() {
     const body = {
       name, sku: document.getElementById('prod-sku').value,
       category: document.getElementById('prod-cat').value,
-      quantity: parseFloat(document.getElementById('prod-qty').value)||0,
       unit: document.getElementById('prod-unit').value,
-      unit_price: parseFloat(document.getElementById('prod-price').value)||0,
       min_stock: parseFloat(document.getElementById('prod-min').value)||0,
       description: document.getElementById('prod-desc').value,
       warehouse_id: parseInt(document.getElementById('prod-wh').value),
     };
     if (state.editProductId) {
-      body.quantity = parseFloat(document.getElementById('prod-qty').value) || 0;
-      body.note = document.getElementById('prod-edit-note').value || '';
       await api('PUT', `/products/${state.editProductId}`, body);
-      toast('کالا ویرایش شد ✏️');
+      toast('مشخصات کالا ذخیره شد ✏️');
+      closeModal('modal-product');
+      await renderPage();
     } else {
-      await api('POST', '/products', body);
-      toast('کالای جدید ثبت شد 📦');
+      const created = await api('POST', '/products', body);
+      toast('کالا تعریف شد — حالا ورود خرید را ثبت کنید 📦');
+      closeModal('modal-product');
+      if (created && created.id) {
+        openProductCard(created.id, 'in');
+      } else {
+        await renderPage();
+      }
     }
-    closeModal('modal-product');
-    await renderPage();
   } catch(e) {
     // خطا قبلاً در api() نمایش داده شده
   } finally {
@@ -1726,7 +2876,7 @@ async function saveProduct() {
 async function deleteProduct(id, name) {
   if (!confirm(`آیا از حذف کالای "${name}" مطمئن هستید؟`)) return;
   await api('DELETE', `/products/${id}`);
-  toast('کالا حذف شد 🗑️');
+  toast('کالا حذف شد 🗑');
   renderPage();
 }
 
@@ -1739,31 +2889,55 @@ function todayJalali() {
   }).replace(/\//g, '/');
 }
 
-// Convert Jalali input string to ISO for backend
-function jalaliToISO(jStr) {
-  // Accepts ۱۴۰۴/۰۳/۲۲ or 1404/03/22
-  const normalized = jStr.replace(/[۰-۹]/g, d => String.fromCharCode(d.charCodeAt(0) - 1776));
-  const parts = normalized.split('/');
-  if (parts.length !== 3) return null;
-  const [jy, jm, jd] = parts.map(Number);
-  // Jalali to Gregorian (simple algorithm)
-  const jy2 = jy - 979; const jm2 = jm - 1; const jd2 = jd - 1;
-  let jDayNo = 365 * jy2 + Math.floor(jy2 / 4) - Math.floor(jy2 / 100) + Math.floor(jy2 / 400);
-  for (let i = 0; i < jm2; i++) jDayNo += [31,28+(jy%4===0&&(jy%100!==0||jy%400===0)?1:0),31,30,31,30,31,31,30,31,30,31][i]||[31,31,31,31,31,31,30,30,30,29,29,29][i];
-  jDayNo += jd2;
-  let gDayNo = jDayNo + 79;
-  let gy = 1600 + 400 * Math.floor(gDayNo / 146097); gDayNo %= 146097;
-  let leap = true;
-  if (gDayNo >= 36525) { gDayNo--; gy += 100 * Math.floor(gDayNo / 36524); gDayNo %= 36524; if (gDayNo >= 365) gDayNo++; else leap = false; }
-  gy += 4 * Math.floor(gDayNo / 1461); gDayNo %= 1461;
-  if (gDayNo >= 366) { leap = false; gDayNo--; gy += Math.floor(gDayNo / 365); gDayNo %= 365; }
-  const gMonths = [31, 28+leap, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  let gm = 0;
-  for (; gm < 12 && gDayNo >= gMonths[gm]; gm++) gDayNo -= gMonths[gm];
-  return `${gy}-${String(gm+1).padStart(2,'0')}-${String(gDayNo+1).padStart(2,'0')}T12:00:00`;
+function jalaliToISODate(jStr, endOfDay=false) {
+  const iso = jalaliToISO(jStr);
+  if (!iso) return null;
+  return iso.replace(/T.*/, endOfDay ? 'T23:59:59' : 'T00:00:00');
 }
 
-async function openTxModal(prodId) {
+// Convert Jalali input string to ISO for backend
+function jalaliToISO(jStr) {
+  // Accepts ۱۴۰۴/۰۳/۲۲ or 1404/03/22 (also Arabic-Indic ٠-٩)
+  const normalized = jStr
+    .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 1632));
+  const parts = normalized.split(/[\/\-.\s]+/).filter(Boolean);
+  if (parts.length !== 3) return null;
+  const [jy, jm, jd] = parts.map(Number);
+  if (![jy, jm, jd].every(n => Number.isFinite(n)) || jm < 1 || jm > 12 || jd < 1 || jd > 31) return null;
+
+  // Correct Jalali → Gregorian (same calendar math as common jalaali-js)
+  let gy = (jy <= 979) ? 621 : 1600;
+  let jy2 = (jy <= 979) ? jy : jy - 979;
+  let days = (365 * jy2) + Math.floor(jy2 / 33) * 8 + Math.floor(((jy2 % 33) + 3) / 4)
+    + 78 + jd + ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
+  gy += 400 * Math.floor(days / 146097);
+  days %= 146097;
+  if (days > 36524) {
+    gy += 100 * Math.floor(--days / 36524);
+    days %= 36524;
+    if (days >= 365) days++;
+  }
+  gy += 4 * Math.floor(days / 1461);
+  days %= 1461;
+  if (days > 365) {
+    gy += Math.floor((days - 1) / 365);
+    days = (days - 1) % 365;
+  }
+  let gd = days + 1;
+  const leap = ((gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0));
+  const gMonths = [0, 31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  let gm = 1;
+  for (; gm <= 12 && gd > gMonths[gm]; gm++) gd -= gMonths[gm];
+  return `${gy}-${String(gm).padStart(2,'0')}-${String(gd).padStart(2,'0')}T12:00:00`;
+}
+
+async function openTxModal(prodId, preferType='in') {
+  // خروج فقط از مسیر «خروج رسمی» — نه از کارت کالا
+  if (preferType === 'out') {
+    toast('برای خروج کالا از منوی «خروج رسمی» استفاده کنید', 'error');
+    return;
+  }
   state.txProductId = prodId;
   const p = await api('GET', `/products/${prodId}`);
   if (!p) return;
@@ -1774,6 +2948,7 @@ async function openTxModal(prodId) {
         <div class="fw-bold" style="font-size:16px;">${p.name}</div>
         <div class="text-sm text-muted">${p.sku?'SKU: '+p.sku+' | ':''}${p.category||''}</div>
         <div style="margin-top:6px;">${statusLabel}</div>
+        <div class="text-sm text-muted" style="margin-top:4px;">آخرین خرید: ${p.unit_price?fmtPrice(p.unit_price):'—'} | میانگین: ${(p.avg_cost||p.cost_basis)?fmtPrice(p.avg_cost||p.cost_basis):'—'}</div>
       </div>
       <div style="text-align:center">
         <div style="font-size:28px;font-weight:800;color:var(--accent)">${fmt(p.quantity)}</div>
@@ -1781,28 +2956,39 @@ async function openTxModal(prodId) {
       </div>
     </div>`;
   document.getElementById('tx-qty').value = '';
+  document.getElementById('tx-price').value = p.unit_price || '';
   document.getElementById('tx-ref').value = '';
   document.getElementById('tx-note').value = '';
   document.getElementById('tx-date').value = todayJalali();
   document.getElementById('tx-status').value = 'auto';
-  setTxType('in');
+  setTxType(preferType === 'adjust' ? 'adjust' : 'in');
   openModal('modal-tx');
 }
 
 function setTxType(type) {
+  if (type === 'out') {
+    toast('خروج کالا فقط از منوی «خروج رسمی» ثبت می‌شود', 'error');
+    type = 'in';
+  }
   state.txType = type;
-  ['in','out','adjust'].forEach(t => {
-    const tab = document.getElementById('tab-'+t);
+  ['in','adjust'].forEach(t => {
+    const tab = document.getElementById(t === 'adjust' ? 'tab-adj' : 'tab-'+t);
+    if (!tab) return;
     tab.className = 'tx-tab' + (t===type ? ` active-${t==='adjust'?'adj':t}` : '');
   });
-  const labels = { in:'مقدار ورودی *', out:'مقدار خروجی *', adjust:'موجودی جدید *' };
-  const btns = { in:'✅ ثبت ورود', out:'✅ ثبت خروج', adjust:'✅ تنظیم موجودی' };
+  const labels = { in:'مقدار ورودی *', adjust:'موجودی واقعی شمارش‌شده *' };
+  const btns = { in:'✅ ثبت ورود خرید', adjust:'✅ ثبت اصلاح موجودی' };
   document.getElementById('tx-qty-label').textContent = labels[type];
   const txBtn = document.getElementById('btn-save-tx');
   txBtn.textContent = btns[type];
-  txBtn.disabled = false;  // ریست وضعیت disabled هنگام تغییر نوع
+  txBtn.disabled = false;
   document.getElementById('modal-tx-title').textContent =
-    type==='in' ? '⬆️ ورود کالا' : type==='out' ? '⬇️ خروج کالا' : '⚖️ تنظیم موجودی';
+    type==='in' ? '⬆️ ورود خرید' : '📝 اصلاح موجودی';
+
+  const priceGroup = document.getElementById('tx-price-group');
+  const adjustHint = document.getElementById('tx-adjust-hint');
+  if (priceGroup) priceGroup.style.display = type === 'in' ? 'flex' : 'none';
+  if (adjustHint) adjustHint.style.display = type === 'adjust' ? 'flex' : 'none';
 }
 
 async function saveTx() {
@@ -1813,21 +2999,28 @@ async function saveTx() {
   const isoDate = jalaliToISO(dateStr);
   if (!isoDate) { toast('فرمت تاریخ اشتباه است — مثال: ۱۴۰۴/۰۳/۲۲', 'error'); return; }
 
+  const payload = {
+    type: state.txType,
+    quantity: qty,
+    note: document.getElementById('tx-note').value,
+    ref_number: document.getElementById('tx-ref').value,
+    custom_date: isoDate,
+    manual_status: document.getElementById('tx-status').value === 'auto' ? null : document.getElementById('tx-status').value,
+  };
+
+  if (state.txType === 'in') {
+    const price = parseFloat(document.getElementById('tx-price').value);
+    if (isNaN(price) || price < 0) { toast('قیمت خرید این محموله را وارد کنید', 'error'); return; }
+    payload.unit_price = price;
+  }
+
   const btn = document.getElementById('btn-save-tx');
   if (btn.disabled) return;
   btnLoading(btn, 'در حال ثبت...');
 
   try {
-    const manualStatus = document.getElementById('tx-status').value;
-    await api('POST', `/products/${state.txProductId}/transactions`, {
-      type: state.txType,
-      quantity: qty,
-      note: document.getElementById('tx-note').value,
-      ref_number: document.getElementById('tx-ref').value,
-      custom_date: isoDate,
-      manual_status: manualStatus === 'auto' ? null : manualStatus,
-    });
-    const msgs = { in: 'ورود کالا ثبت شد ⬆️', out: 'خروج کالا ثبت شد ⬇️', adjust: 'موجودی تنظیم شد ⚖️' };
+    await api('POST', `/products/${state.txProductId}/transactions`, payload);
+    const msgs = { in: 'ورود خرید ثبت شد ⬆️', out: 'خروج ثبت شد ⬇️', adjust: 'اصلاح موجودی ثبت شد 📝' };
     toast(msgs[state.txType]);
     closeModal('modal-tx');
     await renderPage();
@@ -1948,12 +3141,40 @@ async function renderDepartments() {
     return;
   }
 
-  c.innerHTML = '<div class="card"><div class="card-title">🏥 بخش‌های تعریف شده</div><div class="table-wrap"><table><thead><tr><th>نام بخش</th><th>توضیحات</th><th>تاریخ ثبت</th><th>عملیات</th></tr></thead><tbody>' +
-    depts.map(d => '<tr><td class="fw-bold">' + d.name + '</td><td class="text-muted">' + (d.description || '—') + '</td><td class="text-sm num">' + d.created_at + '</td><td><div class="flex-gap">' +
-      (window._isViewer ? '' : '<button class="btn btn-sm btn-secondary" onclick="openDeptModal(' + d.id + ')">✏️</button>') +
-      (window._isViewer ? '' : '<button class="btn btn-sm btn-danger" onclick="deleteDept(' + d.id + ',\''+d.name+'\')">🗑️</button>') +
-      '</div></td></tr>').join('') +
-    '</tbody></table></div></div>';
+  const desk = '<div class="table-wrap desk-only"><table class="table-fit has-actions"><thead><tr>' +
+    '<th class="col-name">نام بخش</th><th class="col-actions">عملیات</th><th class="col-detail">توضیحات</th><th class="col-date">تاریخ ثبت</th></tr></thead><tbody>' +
+    depts.map(d => {
+      const safeName = String(d.name || '').replace(/'/g, "\\'");
+      return '<tr><td class="col-name fw-bold">' + escHtml(d.name) + '</td>' +
+        '<td class="col-actions"><div class="row-actions">' +
+        (window._isViewer ? '' : '<button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openDeptModal(' + d.id + ')">✏️</button>') +
+        (window._isViewer ? '' : '<button class="btn btn-sm btn-danger" title="حذف" onclick="deleteDept(' + d.id + ',\'' + safeName + '\')">حذف</button>') +
+        '</div></td>' +
+        '<td class="col-detail text-muted note-cell">' + escHtml(d.description || '—') + '</td>' +
+        '<td class="col-date text-sm num">' + escHtml(d.created_at) + '</td></tr>';
+    }).join('') +
+    '</tbody></table></div>';
+
+  const mob = '<div class="mobile-list mob-only">' +
+    depts.map(d => {
+      const safeName = String(d.name || '').replace(/'/g, "\\'");
+      return '<article class="m-card">' +
+        '<div class="m-card-head"><div style="min-width:0;">' +
+          '<div class="m-card-title">' + escHtml(d.name) + '</div>' +
+          '<div class="m-card-sub">ثبت: ' + escHtml(d.created_at || '—') + '</div>' +
+        '</div></div>' +
+        '<div class="m-card-note"><span class="lbl">توضیحات</span>' +
+          escHtml((d.description || '').trim() || '—') + '</div>' +
+        (window._isViewer ? '' :
+          '<div class="flex-gap" style="margin-top:10px;flex-wrap:wrap;">' +
+            '<button class="btn btn-sm btn-secondary" onclick="openDeptModal(' + d.id + ')">✏️ ویرایش</button>' +
+            '<button class="btn btn-sm btn-danger" onclick="deleteDept(' + d.id + ',\'' + safeName + '\')">🗑 حذف</button>' +
+          '</div>') +
+      '</article>';
+    }).join('') +
+    '</div>';
+
+  c.innerHTML = '<div class="card"><div class="card-title">🏥 بخش‌های تعریف شده</div>' + desk + mob + '</div>';
 }
 
 let editDeptId = null;
@@ -2001,7 +3222,7 @@ async function saveDept() {
 async function deleteDept(id, name) {
   if (!confirm('آیا از حذف بخش "' + name + '" مطمئن هستید؟')) return;
   await api('DELETE', '/departments/' + id);
-  toast('بخش حذف شد 🗑️');
+  toast('بخش حذف شد 🗑');
   renderPage();
 }
 
@@ -2222,83 +3443,141 @@ async function renderDeptReport() {
     api('GET', '/warehouses'),
   ]);
   state.warehouses = whs;
+  state.drPage = 1;
   const c = document.getElementById('content');
+  const today = todayJalali();
 
-  c.innerHTML = '<div class="card mb-4"><div class="flex-gap" style="flex-wrap:wrap;gap:12px;">' +
-    '<div><label class="fw-bold" style="margin-left:6px;">بخش:</label>' +
-      '<select id="dr-dept" onchange="loadDeptReport()" style="width:180px;"><option value="">همه بخش‌ها</option>' +
-        depts.map(d => '<option value="' + d.id + '">' + d.name + '</option>').join('') +
-      '</select></div>' +
-    '<div><label class="fw-bold" style="margin-left:6px;">کالا:</label>' +
-      '<input id="dr-prod" placeholder="جستجوی نام کالا..." oninput="loadDeptReport()" style="width:180px;"/></div>' +
-    '<div><label class="fw-bold" style="margin-left:6px;">انبار:</label>' +
-      '<select id="dr-wh" onchange="loadDeptReport()" style="width:160px;"><option value="">همه انبارها</option>' +
-        whs.map(w => '<option value="' + w.id + '">' + w.name + '</option>').join('') +
-      '</select></div>' +
-    '<button class="btn btn-secondary" onclick="loadDeptReport()">🔄 بروزرسانی</button>' +
-    '<button class="btn btn-secondary" onclick="exportDeptExcel()">📥 Excel</button>' +
-    '</div></div>' +
-    '<div id="dr-results"><div class="spinner"></div></div>';
+  c.innerHTML =
+    '<div class="card mb-4" id="dr-filter-card"><div class="filter-bar">' +
+      '<div class="form-group"><label>از تاریخ</label>' +
+        '<input id="dr-from" placeholder="۱۴۰۴/۰۱/۰۱" dir="ltr" style="text-align:right;" value="' + today + '"/></div>' +
+      '<div class="form-group"><label>تا تاریخ</label>' +
+        '<input id="dr-to" placeholder="۱۴۰۴/۱۲/۲۹" dir="ltr" style="text-align:right;" value="' + today + '"/></div>' +
+      '<div class="form-group"><label>بخش</label>' +
+        '<select id="dr-dept"><option value="">همه بخش‌ها</option>' +
+          depts.map(d => '<option value="' + d.id + '">' + escHtml(d.name) + '</option>').join('') +
+        '</select></div>' +
+      '<div class="form-group"><label>نام کالا</label>' +
+        '<input id="dr-prod" placeholder="جستجوی نام کالا..."/></div>' +
+      '<div class="form-group span-2"><label>جستجو در علت‌ها</label>' +
+        '<input id="dr-note" placeholder="کلمه‌ای از علت/توضیح خروج..."/></div>' +
+      '<div class="form-group"><label>انبار</label>' +
+        '<select id="dr-wh"><option value="">همه انبارها</option>' +
+          whs.map(w => '<option value="' + w.id + '">' + escHtml(w.name) + '</option>').join('') +
+        '</select></div>' +
+      '<div class="filter-actions">' +
+        '<button class="btn btn-primary" onclick="state.drPage=1;loadDeptReport()">🔍 جستجو</button>' +
+        '<button class="btn btn-secondary" onclick="exportDeptExcel()">📥 Excel</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="text-sm text-muted" style="margin-top:10px;">Enter = فیلد بعدی · آخرین فیلد = جستجو · علت مستقیم در نتیجه دیده می‌شود</div>' +
+    '</div>' +
+    '<div id="dr-results"><div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">بازه تاریخ را مشخص کنید و جستجو را بزنید</div></div></div>';
 
+  bindFilterEnterNav(document.getElementById('dr-filter-card'), () => { state.drPage = 1; loadDeptReport(); });
+}
+
+function goDeptPage(page) {
+  if (page < 1) return;
+  state.drPage = page;
   loadDeptReport();
 }
 
 async function loadDeptReport() {
+  const fromStr = (document.getElementById('dr-from') || {}).value || '';
+  const toStr = (document.getElementById('dr-to') || {}).value || '';
   const deptId = (document.getElementById('dr-dept') || {}).value || '';
   const prodSearch = (document.getElementById('dr-prod') || {}).value || '';
+  const noteSearch = (document.getElementById('dr-note') || {}).value || '';
   const whId = (document.getElementById('dr-wh') || {}).value || '';
-  const params = new URLSearchParams({ type: 'out' });
-  if (deptId) params.set('department_id', deptId);
-  if (prodSearch) params.set('search', prodSearch);
-  if (whId) params.set('warehouse_id', whId);
-  const txs = await api('GET', '/transactions?' + params.toString());
-  const el = document.getElementById('dr-results');
-  if (!el) return;
-  if (!txs.length) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">هیچ خروجی یافت نشد</div></div>';
+
+  if (!fromStr.trim() || !toStr.trim()) {
+    toast('از تاریخ و تا تاریخ را وارد کنید', 'error');
     return;
   }
-  const total = txs.reduce((s, t) => s + t.quantity, 0);
-  el.innerHTML = '<div class="card">' +
-    '<div class="flex-between mb-4"><div class="card-title" style="margin:0">📊 خروجی‌ها — ' + txs.length + ' مورد</div>' +
-    '<div class="text-sm text-muted">مجموع: <b>' + fmt(total) + '</b></div></div>' +
-    '<div class="table-wrap"><table><thead><tr>' +
-      '<th>تاریخ</th><th>کالا</th><th>انبار</th><th>بخش مقصد</th><th>تعداد</th><th>ثبت‌کننده</th><th>علت</th><th>عملیات</th>' +
-    '</tr></thead><tbody>' +
-    txs.map((t, i) =>
-      '<tr><td class="num text-sm text-muted" style="white-space:nowrap">' + t.created_at + '</td>' +
-      '<td class="fw-bold">' + t.product_name + '</td>' +
-      '<td class="text-muted">' + t.warehouse_name + '</td>' +
-      '<td>' + (t.department_name ? '<span class="badge badge-blue">' + t.department_name + '</span>' : '—') + '</td>' +
-      '<td class="num fw-bold val-red">- ' + fmt(t.quantity) + '</td>' +
-      '<td class="text-sm">' + (t.created_by || '—') + '</td>' +
-      '<td>' + (t.note ? '<span style="display:flex;align-items:center;gap:6px;"><button class="btn btn-sm btn-secondary" data-note="' + t.note.replace(/"/g,"&quot;") + '" onclick="toggleNote(this)">💬 علت</button><span class="note-text" style="display:none;font-size:12px;color:var(--text2);"></span></span>' : '<span class="text-muted">—</span>') + '</td>' +
-      '<td>' + (t.is_reversed
-        ? '<span class="badge badge-yellow">↩️ بازگشت‌خورده</span>'
-        : (!window._isViewer ? '<button class="btn btn-sm btn-danger" onclick="reverseDispatch(' + t.id + ',\''+t.product_name+'\',\''+t.department_name+'\','+t.quantity+',\''+t.unit_name+'\')" title="بازگشت این خروج">↩️ بازگشت</button>' : '')
-      ) + '</td>' +
-      '</tr>'
-    ).join('') +
-    '</tbody></table></div></div>';
-}
+  const fromISO = jalaliToISODate(fromStr.trim(), false);
+  const toISO = jalaliToISODate(toStr.trim(), true);
+  if (!fromISO || !toISO) {
+    toast('فرمت تاریخ اشتباه است — مثال: ۱۴۰۴/۰۷/۱۰', 'error');
+    return;
+  }
 
-function showNote(idx, note) {
-  // legacy - kept for compatibility
-}
+  const page = state.drPage || 1;
+  const params = new URLSearchParams();
+  params.set('from_date', fromISO);
+  params.set('to_date', toISO);
+  params.set('page', String(page));
+  params.set('per_page', '50');
+  if (deptId) params.set('department_id', deptId);
+  if (prodSearch.trim()) params.set('product', prodSearch.trim());
+  if (noteSearch.trim()) params.set('note', noteSearch.trim());
+  if (whId) params.set('warehouse_id', whId);
 
-function toggleNote(btn) {
-  const note = btn.getAttribute('data-note');
-  const span = btn.nextElementSibling;
-  if (!span) return;
-  if (span.style.display === 'none' || span.style.display === '') {
-    span.textContent = note || '—';
-    span.style.display = 'inline';
-    btn.textContent = '💬 بستن';
-    btn.style.background = 'rgba(59,130,246,.2)';
-  } else {
-    span.style.display = 'none';
-    btn.textContent = '💬 علت';
-    btn.style.background = '';
+  const el = document.getElementById('dr-results');
+  if (el) el.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    const d = await api('GET', '/dispatch/report?' + params.toString());
+    const txs = (d && (d.transactions || d.items)) || [];
+    if (!el) return;
+    if (!txs.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">هیچ خروجی با این فیلتر یافت نشد</div></div>';
+      return;
+    }
+    const qtySum = txs.reduce((s, t) => s + t.quantity, 0);
+    const total = d.total != null ? d.total : txs.length;
+    const totalPages = d.total_pages || 1;
+    const curPage = d.page || 1;
+
+    const actionCell = (t) => t.is_reversed
+      ? '<span class="badge badge-yellow">↩️ بازگشت‌خورده</span>'
+      : (!window._isViewer
+        ? '<div class="row-actions"><button class="btn btn-sm btn-danger" title="بازگشت به انبار" onclick="reverseDispatch(' + t.id + ',\'' + String(t.product_name||'').replace(/'/g,'') + '\',\'' + String(t.department_name||'').replace(/'/g,'') + '\',' + t.quantity + ',\'' + String(t.unit_name||'').replace(/'/g,'') + '\')">↩️</button></div>'
+        : '');
+
+    const desk = '<div class="table-wrap desk-only"><table class="table-fit has-actions"><thead><tr>' +
+        '<th class="col-date">تاریخ</th><th class="col-name">کالا</th><th class="col-actions">عملیات</th><th class="col-dept">بخش</th>' +
+        '<th class="col-qty">تعداد</th><th class="col-user">ثبت‌کننده</th><th class="col-note">علت</th>' +
+      '</tr></thead><tbody>' +
+      txs.map((t) =>
+        '<tr><td class="col-date num text-muted qty-stack">' + shortDate(t.created_at) + '</td>' +
+        '<td class="col-name"><div class="fw-bold" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(t.product_name) + '</div>' +
+          '<div class="text-sm text-muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(t.warehouse_name) + '</div></td>' +
+        '<td class="col-actions">' + actionCell(t) + '</td>' +
+        '<td class="col-dept">' + (t.department_name ? '<span class="badge badge-blue">' + escHtml(t.department_name) + '</span>' : '—') + '</td>' +
+        '<td class="col-qty num fw-bold val-red">- ' + fmt(t.quantity) + '</td>' +
+        '<td class="col-user text-sm">' + escHtml(t.created_by || '—') + '</td>' +
+        '<td class="col-note note-cell">' + noteHtml(t.note) + '</td></tr>'
+      ).join('') +
+      '</tbody></table></div>';
+
+    const mob = '<div class="mobile-list mob-only">' +
+      txs.map((t) =>
+        '<article class="m-card">' +
+          '<div class="m-card-head"><div style="min-width:0;">' +
+            '<div class="m-card-title">' + escHtml(t.product_name) + '</div>' +
+            '<div class="m-card-sub">' + escHtml(t.warehouse_name||'') + ' · ' + escHtml(t.created_at||'') + '</div>' +
+          '</div>' +
+          (t.department_name ? '<span class="badge badge-blue">' + escHtml(t.department_name) + '</span>' : '') +
+          '</div>' +
+          '<div class="m-card-grid">' +
+            '<div><span class="lbl">تعداد</span><b class="val-red">- ' + fmt(t.quantity) + '</b></div>' +
+            '<div><span class="lbl">ثبت‌کننده</span>' + escHtml(t.created_by||'—') + '</div>' +
+          '</div>' +
+          ((t.note||'').trim() ? '<div class="m-card-note"><span class="lbl">علت</span>' + escHtml(t.note) + '</div>' : '') +
+          (actionCell(t) ? '<div style="margin-top:10px;">' + actionCell(t) + '</div>' : '') +
+        '</article>'
+      ).join('') +
+      '</div>';
+
+    el.innerHTML = '<div class="card">' +
+      '<div class="flex-between mb-4" style="flex-wrap:wrap;gap:8px;"><div class="card-title" style="margin:0">📊 خروجی‌ها — ' + fmt(total) + ' مورد</div>' +
+      '<div class="text-sm text-muted">مجموع این صفحه: <b>' + fmt(qtySum) + '</b></div></div>' +
+      desk + mob +
+      buildListPager(curPage, totalPages, total, 'goDeptPage') +
+      '</div>';
+  } catch (e) {
+    if (el) el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">جستجو ناموفق بود</div></div>';
   }
 }
 
@@ -2320,15 +3599,20 @@ function showApp() {
   document.getElementById('sidebar').style.display = 'flex';
   document.getElementById('main').style.display = 'flex';
   updateUserBadge();
-  const adminOnly = document.querySelectorAll('.nav-admin-only');
-  adminOnly.forEach(el => {
-    el.style.display = currentUser && currentUser.role === 'admin' ? 'flex' : 'none';
-  });
-  const operatorOnly = document.querySelectorAll('.nav-operator-only');
-  operatorOnly.forEach(el => {
-    el.style.display = currentUser && currentUser.role !== 'viewer' ? 'flex' : 'none';
-  });
+  applyNavPermissions();
   window._isViewer = currentUser && currentUser.role === 'viewer';
+}
+
+function applyNavPermissions() {
+  const perms = (currentUser && Array.isArray(currentUser.permissions)) ? currentUser.permissions : null;
+  document.querySelectorAll('.nav-item[data-nav]').forEach(el => {
+    const key = el.getAttribute('data-nav');
+    let show = true;
+    if (key === 'users') show = currentUser && currentUser.role === 'admin';
+    else if (key === 'dispatch') show = currentUser && currentUser.role !== 'viewer';
+    if (show && perms) show = perms.includes(key);
+    el.style.display = show ? 'flex' : 'none';
+  });
 }
 
 function updateUserBadge() {
@@ -2353,6 +3637,14 @@ function updateUserBadge() {
   }
 }
 
+function firstAccessiblePage() {
+  const order = ['dashboard', 'warehouses', 'products', 'departments', 'dispatch', 'transactions', 'dept_report', 'report', 'users'];
+  for (const p of order) {
+    if (userCanAccess(p)) return p;
+  }
+  return 'dashboard';
+}
+
 async function doLogin() {
   const username = document.getElementById('login-username').value.trim();
   const password = document.getElementById('login-password').value;
@@ -2369,7 +3661,7 @@ async function doLogin() {
     setToken(d.token);
     currentUser = d.user;
     showApp();
-    navigate('dashboard');
+    navigate(firstAccessiblePage());
   } catch(e) {
     errEl.textContent = e.name === 'AbortError' ? 'پاسخ سرور طول کشید، دوباره امتحان کنید' : 'خطا در ارتباط با سرور';
   } finally {
@@ -2417,34 +3709,116 @@ async function saveChangePassword() {
 
 // ─── User Management Page ─────────────────────────────────────────────────────
 
+const APP_SECTION_DEFS = [
+  { key: 'dashboard', label: 'داشبورد', hint: 'خلاصه وضعیت انبار' },
+  { key: 'warehouses', label: 'انبارها', hint: 'مدیریت انبار و کالاهای داخل آن' },
+  { key: 'products', label: 'همه کالاها', hint: 'فهرست سراسری کالاها' },
+  { key: 'departments', label: 'بخش‌ها', hint: 'تعریف بخش‌های مصرف‌کننده' },
+  { key: 'dispatch', label: 'خروج رسمی', hint: 'ثبت خروج به بخش‌ها', roleMin: 'operator' },
+  { key: 'transactions', label: 'حرکات انبار', hint: 'ورود / خروج / اصلاح' },
+  { key: 'dept_report', label: 'گزارش بخش‌ها', hint: 'مصرف بخش‌ها' },
+  { key: 'report', label: 'گزارش موجودی', hint: 'موجودی و ارزش' },
+  { key: 'users', label: 'کاربران', hint: 'فقط برای مدیر', roleMin: 'admin' },
+];
+
+const DEFAULT_PERMS_BY_ROLE = {
+  admin: APP_SECTION_DEFS.map(s => s.key),
+  operator: APP_SECTION_DEFS.map(s => s.key).filter(k => k !== 'users'),
+  viewer: APP_SECTION_DEFS.map(s => s.key).filter(k => k !== 'users' && k !== 'dispatch'),
+};
+
 async function renderUsers() {
   const users = await api('GET', '/users');
+  window._usersList = users;
   const c = document.getElementById('content');
-  document.getElementById('topbar-actions').innerHTML =
-    `<button class="btn btn-primary" onclick="openUserModal()">➕ کاربر جدید</button>`;
+  // دکمه در خود صفحه — تا topbar موبایل شلوغ نشود
+  document.getElementById('topbar-actions').innerHTML = '';
+
+  const limit = state.loginLogLimit || 20;
+  const userId = state.loginLogUserId || 'all';
+
+  const desk = `<div class="table-wrap users-wrap desk-only"><table class="table-fit has-actions users-table">
+      <thead><tr>
+        <th class="col-user-name">نام کاربری</th>
+        <th class="col-actions">عملیات</th>
+        <th class="col-user-display">نام نمایشی</th>
+        <th class="col-user-role">نقش</th>
+        <th class="col-user-status">وضعیت</th>
+        <th class="col-user-login">آخرین ورود</th>
+      </tr></thead><tbody>
+      ${users.map(u => {
+        const safeUser = String(u.username || '').replace(/'/g, "\\'");
+        return `<tr>
+        <td class="col-user-name"><span class="cell-ellip fw-bold" title="${escHtml(u.username)}">${escHtml(u.username)}</span></td>
+        <td class="col-actions"><div class="row-actions">
+          <button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openUserModal(${u.id})">✏️</button>
+          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteUser(${u.id},'${safeUser}')">🗑</button>` : ''}
+        </div></td>
+        <td class="col-user-display"><span class="cell-ellip" title="${escHtml(u.display_name)}">${escHtml(u.display_name)}</span></td>
+        <td class="col-user-role">${roleBadge(u.role)}</td>
+        <td class="col-user-status">${u.is_active ? '<span class="badge badge-green">فعال</span>' : '<span class="badge badge-red">غیرفعال</span>'}</td>
+        <td class="col-user-login text-sm text-muted num">${u.last_login ? shortDate(u.last_login) : '—'}</td>
+      </tr>`;
+      }).join('')}
+      </tbody></table></div>`;
+
+  const mob = `<div class="mobile-list mob-only">
+    ${users.map(u => {
+      const safeUser = String(u.username || '').replace(/'/g, "\\'");
+      const permCount = Array.isArray(u.permissions) ? u.permissions.length : 0;
+      return `<article class="m-card">
+        <div class="m-card-head">
+          <div style="min-width:0;">
+            <div class="m-card-title">${escHtml(u.display_name || u.username)}</div>
+            <div class="m-card-sub">@${escHtml(u.username)}</div>
+          </div>
+          ${u.is_active ? '<span class="badge badge-green">فعال</span>' : '<span class="badge badge-red">غیرفعال</span>'}
+        </div>
+        <div class="m-card-grid">
+          <div><span class="lbl">نقش</span>${roleBadge(u.role)}</div>
+          <div><span class="lbl">آخرین ورود</span><span class="num">${escHtml(u.last_login || '—')}</span></div>
+          <div><span class="lbl">دسترسی بخش‌ها</span>${fmt(permCount)} بخش</div>
+        </div>
+        <div class="users-m-actions">
+          <button class="btn btn-sm btn-secondary" onclick="openUserModal(${u.id})">✏️ ویرایش</button>
+          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id},'${safeUser}')">🗑 حذف</button>` : ''}
+        </div>
+      </article>`;
+    }).join('')}
+  </div>`;
+
   c.innerHTML = `
   <div class="card mb-4">
-    <div class="card-title">📋 لاگ ورود کاربران (آخرین ۲۰۰ مورد)</div>
-    <div id="login-log-section"><div class="spinner"></div></div>
+    <div class="users-page-head">
+      <div class="card-title">👥 مدیریت کاربران</div>
+      <button class="btn btn-primary" onclick="openUserModal()">➕ کاربر جدید</button>
+    </div>
+    ${desk}
+    ${mob}
   </div>
   <div class="card">
-    <div class="card-title">👥 مدیریت کاربران</div>
-    <div class="table-wrap"><table>
-      <thead><tr>
-        <th>نام کاربری</th><th>نام نمایشی</th><th>نقش</th><th>وضعیت</th><th>آخرین ورود</th><th>عملیات</th>
-      </tr></thead><tbody>
-      ${users.map(u => `<tr>
-        <td class="fw-bold">${u.username}</td>
-        <td>${u.display_name}</td>
-        <td>${roleBadge(u.role)}</td>
-        <td>${u.is_active ? '<span class="badge badge-green">✅ فعال</span>' : '<span class="badge badge-red">🚫 غیرفعال</span>'}</td>
-        <td class="text-sm text-muted num">${u.last_login || '—'}</td>
-        <td><div class="flex-gap">
-          <button class="btn btn-sm btn-secondary" onclick="openUserModal(${u.id})">✏️ ویرایش</button>
-          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id},'${u.username}')">🗑️</button>` : ''}
-        </div></td>
-      </tr>`).join('')}
-      </tbody></table></div>
+    <div class="flex-between mb-4" style="flex-wrap:wrap;gap:12px;">
+      <div class="card-title" style="margin:0">📋 لاگ ورود کاربران</div>
+    </div>
+    <div class="filter-bar mb-4">
+      <div class="form-group">
+        <label>تعداد موارد اخیر</label>
+        <select id="login-log-limit" onchange="onLoginLogFilterChange()">
+          ${[10, 20, 50, 100].map(n => `<option value="${n}" ${n===limit?'selected':''}>آخرین ${fmt(n)} مورد</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>فیلتر کاربر</label>
+        <select id="login-log-user" onchange="onLoginLogFilterChange()">
+          <option value="all" ${userId==='all'?'selected':''}>همه کاربران</option>
+          ${users.map(u => `<option value="${u.id}" ${String(userId)===String(u.id)?'selected':''}>${escHtml(u.display_name || u.username)} (@${escHtml(u.username)})</option>`).join('')}
+        </select>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-secondary" onclick="loadLoginLogs()">🔄 بروزرسانی</button>
+      </div>
+    </div>
+    <div id="login-log-section"><div class="spinner"></div></div>
   </div>`;
   loadLoginLogs();
 }
@@ -2455,23 +3829,105 @@ function roleBadge(role) {
   return '<span class="badge" style="background:var(--bg3);color:var(--text2);">👁 بازدیدکننده</span>';
 }
 
+function onLoginLogFilterChange() {
+  const limitEl = document.getElementById('login-log-limit');
+  const userEl = document.getElementById('login-log-user');
+  if (limitEl) state.loginLogLimit = parseInt(limitEl.value, 10) || 20;
+  if (userEl) state.loginLogUserId = userEl.value || 'all';
+  loadLoginLogs();
+}
+
 async function loadLoginLogs() {
-  const logs = await api('GET', '/login-logs');
   const el = document.getElementById('login-log-section');
   if (!el) return;
-  if (!logs.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">هنوز ورودی ثبت نشده</div></div>'; return; }
-  el.innerHTML = `<div class="table-wrap"><table>
-    <thead><tr><th>تاریخ و ساعت</th><th>نام کاربری</th><th>نام نمایشی</th><th>IP</th></tr></thead>
-    <tbody>${logs.map(l=>`<tr>
-      <td class="num text-sm">${l.logged_in_at}</td>
-      <td class="fw-bold">${l.username}</td>
-      <td>${l.display_name}</td>
-      <td class="text-sm text-muted">${l.ip_address}</td>
-    </tr>`).join('')}</tbody>
-  </table></div>`;
+  el.innerHTML = '<div class="spinner"></div>';
+  const limit = state.loginLogLimit || 20;
+  const userId = state.loginLogUserId || 'all';
+  const params = new URLSearchParams({ limit });
+  if (userId && userId !== 'all') params.set('user_id', userId);
+  const logs = await api('GET', `/login-logs?${params.toString()}`);
+  if (!logs.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">ورودی‌ای با این فیلتر یافت نشد</div></div>';
+    return;
+  }
+  el.innerHTML = `
+    <div class="text-sm text-muted mb-4">نمایش ${fmt(logs.length)} مورد اخیر</div>
+    <div class="table-wrap users-wrap desk-only"><table class="table-fit users-table">
+      <thead><tr>
+        <th style="width:22%">تاریخ و ساعت</th>
+        <th class="col-user-name">نام کاربری</th>
+        <th class="col-user-display">نام نمایشی</th>
+        <th style="width:18%">IP</th>
+      </tr></thead>
+      <tbody>${logs.map(l=>`<tr>
+        <td class="num text-sm">${shortDate(l.logged_in_at)}</td>
+        <td class="col-user-name"><span class="cell-ellip fw-bold" title="${escHtml(l.username)}">${escHtml(l.username)}</span></td>
+        <td class="col-user-display"><span class="cell-ellip" title="${escHtml(l.display_name)}">${escHtml(l.display_name)}</span></td>
+        <td class="text-sm text-muted"><span class="cell-ellip" dir="ltr">${escHtml(l.ip_address || '—')}</span></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+    <div class="mobile-list mob-only">
+      ${logs.map(l => `<article class="m-card">
+        <div class="m-card-head">
+          <div style="min-width:0;">
+            <div class="m-card-title">${escHtml(l.display_name || l.username)}</div>
+            <div class="m-card-sub">@${escHtml(l.username)}</div>
+          </div>
+          <div class="text-sm text-muted num">${escHtml(l.logged_in_at)}</div>
+        </div>
+        <div class="m-card-grid">
+          <div><span class="lbl">IP</span>${escHtml(l.ip_address || '—')}</div>
+        </div>
+      </article>`).join('')}
+    </div>`;
 }
 
 let editUserId = null;
+
+function renderUserPermissionsList(selected, role) {
+  const box = document.getElementById('user-permissions-list');
+  if (!box) return;
+  const roleVal = role || document.getElementById('user-role').value || 'viewer';
+  const selectedSet = new Set(selected || DEFAULT_PERMS_BY_ROLE[roleVal] || DEFAULT_PERMS_BY_ROLE.viewer);
+  box.innerHTML = APP_SECTION_DEFS.map(s => {
+    const adminOnly = s.roleMin === 'admin';
+    const opOnly = s.roleMin === 'operator';
+    const locked = adminOnly && roleVal === 'admin';
+    const disabled = (adminOnly && roleVal !== 'admin') || (opOnly && roleVal === 'viewer');
+    const checked = locked || (!disabled && selectedSet.has(s.key));
+    const cls = ['perm-item'];
+    if (locked) cls.push('is-locked');
+    if (disabled) cls.push('is-disabled');
+    return `<label class="${cls.join(' ')}">
+      <input type="checkbox" class="user-perm-check" value="${s.key}" ${checked ? 'checked' : ''} ${locked || disabled ? 'disabled' : ''}/>
+      <span class="perm-label">${s.label}</span>
+      <span class="perm-hint">${s.hint}${locked ? ' · همیشه برای مدیر' : ''}</span>
+    </label>`;
+  }).join('');
+}
+
+function collectUserPermissions() {
+  const role = document.getElementById('user-role').value;
+  const checks = [...document.querySelectorAll('.user-perm-check')];
+  const perms = checks.filter(c => c.checked && !c.disabled).map(c => c.value);
+  if (role === 'admin' && !perms.includes('users')) perms.push('users');
+  return perms;
+}
+
+function onUserRoleChange() {
+  const role = document.getElementById('user-role').value;
+  // هنگام تغییر نقش، پیش‌فرض همان نقش را پیشنهاد بده (چک‌باکس‌های فعال را نگه نداریم تا گیج نشود)
+  renderUserPermissionsList(DEFAULT_PERMS_BY_ROLE[role] || DEFAULT_PERMS_BY_ROLE.viewer, role);
+}
+
+function toggleUserPasswordVisibility() {
+  const input = document.getElementById('user-password');
+  const btn = document.getElementById('user-pass-toggle');
+  if (!input) return;
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  if (btn) btn.textContent = show ? '🙈' : '👁';
+}
 
 function openUserModal(id=null) {
   editUserId = id;
@@ -2479,18 +3935,26 @@ function openUserModal(id=null) {
   document.getElementById('user-username').value = '';
   document.getElementById('user-displayname').value = '';
   document.getElementById('user-password').value = '';
+  document.getElementById('user-password').type = 'password';
+  const toggleBtn = document.getElementById('user-pass-toggle');
+  if (toggleBtn) toggleBtn.textContent = '👁';
   document.getElementById('user-role').value = 'viewer';
   document.getElementById('user-active').checked = true;
   document.getElementById('user-pass-hint').style.display = id ? 'block' : 'none';
+  document.getElementById('user-pass-label').textContent = id ? 'تنظیم رمز عبور جدید' : 'رمز عبور *';
   document.getElementById('user-username-group').style.display = id ? 'none' : 'flex';
+  renderUserPermissionsList(DEFAULT_PERMS_BY_ROLE.viewer, 'viewer');
   if (id) {
-    api('GET', '/users').then(users => {
-      const u = users.find(x => x.id === id);
+    const cached = (window._usersList || []).find(x => x.id === id);
+    const apply = (u) => {
       if (!u) return;
-      document.getElementById('user-displayname').value = u.display_name;
+      document.getElementById('user-displayname').value = u.display_name || '';
       document.getElementById('user-role').value = u.role;
       document.getElementById('user-active').checked = u.is_active;
-    });
+      renderUserPermissionsList(u.permissions || DEFAULT_PERMS_BY_ROLE[u.role], u.role);
+    };
+    if (cached) apply(cached);
+    else api('GET', '/users').then(users => apply(users.find(x => x.id === id)));
   }
   openModal('modal-user');
 }
@@ -2500,6 +3964,7 @@ async function saveUser() {
     display_name: document.getElementById('user-displayname').value.trim(),
     role: document.getElementById('user-role').value,
     is_active: document.getElementById('user-active').checked,
+    permissions: collectUserPermissions(),
   };
   const pass = document.getElementById('user-password').value;
   if (pass) body.password = pass;
@@ -2507,13 +3972,20 @@ async function saveUser() {
     body.username = document.getElementById('user-username').value.trim();
     if (!body.username || !pass) { toast('نام کاربری و رمز عبور الزامی است', 'error'); return; }
   }
+  if (!body.permissions.length) { toast('حداقل یک بخش را انتخاب کنید', 'error'); return; }
   const btn = document.querySelector('#modal-user .btn-primary');
   if (btn && btn.disabled) return;
   btnLoading(btn, 'در حال ذخیره...');
   try {
     if (editUserId) {
-      await api('PUT', `/users/${editUserId}`, body);
+      const updated = await api('PUT', `/users/${editUserId}`, body);
       toast('کاربر ویرایش شد ✅');
+      // اگر خود ادمین را ویرایش کرد، منو را تازه کن
+      if (updated && currentUser && updated.id === currentUser.id) {
+        currentUser = { ...currentUser, ...updated };
+        applyNavPermissions();
+        updateUserBadge();
+      }
     } else {
       await api('POST', '/users', body);
       toast('کاربر جدید ساخته شد ✅');
@@ -2530,7 +4002,7 @@ async function saveUser() {
 async function deleteUser(id, username) {
   if (!confirm(`آیا از حذف کاربر "${username}" مطمئن هستید؟`)) return;
   await api('DELETE', `/users/${id}`);
-  toast('کاربر حذف شد 🗑️');
+  toast('کاربر حذف شد 🗑');
   renderPage();
 }
 
@@ -2558,9 +4030,11 @@ function downloadExcel(rows, headers, filename) {
 async function exportInventoryExcel() {
   const wid    = (document.getElementById('rep-wh')     || {}).value || '';
   const status = (document.getElementById('rep-status') || {}).value || '';
+  const search = (document.getElementById('rep-search') || {}).value || '';
   const params = new URLSearchParams();
   if (wid)    params.set('warehouse_id', wid);
   if (status) params.set('status', status);
+  if (search.trim()) params.set('search', search.trim());
   const d = await api('GET', `/report/inventory?${params}`);
   if (!d || !d.products.length) { toast('داده‌ای برای خروجی وجود ندارد', 'error'); return; }
 
@@ -2572,6 +4046,7 @@ async function exportInventoryExcel() {
     quantity:   p.quantity,
     unit:       p.unit,
     unit_price: p.unit_price || 0,
+    avg_cost:   p.avg_cost || p.cost_basis || 0,
     total_value: p.total_value || 0,
     min_stock:  p.min_stock || 0,
     status:     statusLabel[p.status] || '',
@@ -2581,7 +4056,8 @@ async function exportInventoryExcel() {
   const headers = {
     name: 'نام کالا', sku: 'کد SKU', category: 'دسته‌بندی',
     quantity: 'موجودی', unit: 'واحد',
-    unit_price: 'قیمت واحد (ریال)', total_value: 'ارزش کل (ریال)',
+    unit_price: 'آخرین قیمت خرید (ریال)', avg_cost: 'میانگین هزینه (ریال)',
+    total_value: 'ارزش کل (ریال)',
     min_stock: 'حداقل موجودی', status: 'وضعیت', updated_at: 'آخرین بروزرسانی',
   };
 
@@ -2591,18 +4067,30 @@ async function exportInventoryExcel() {
 }
 
 async function exportDeptExcel() {
+  const fromStr = (document.getElementById('dr-from') || {}).value || '';
+  const toStr   = (document.getElementById('dr-to') || {}).value || '';
   const deptId  = (document.getElementById('dr-dept') || {}).value || '';
   const product = (document.getElementById('dr-prod') || {}).value || '';
+  const note    = (document.getElementById('dr-note') || {}).value || '';
   const whId    = (document.getElementById('dr-wh')   || {}).value || '';
+  if (!fromStr.trim() || !toStr.trim()) { toast('ابتدا از/تا تاریخ را مشخص و جستجو کنید', 'error'); return; }
+  const fromISO = jalaliToISODate(fromStr.trim(), false);
+  const toISO = jalaliToISODate(toStr.trim(), true);
+  if (!fromISO || !toISO) { toast('فرمت تاریخ اشتباه است', 'error'); return; }
   const params  = new URLSearchParams();
+  params.set('from_date', fromISO);
+  params.set('to_date', toISO);
+  params.set('page', '1');
+  params.set('per_page', '200');
   if (deptId)  params.set('department_id', deptId);
   if (product) params.set('product', product);
+  if (note)    params.set('note', note);
   if (whId)    params.set('warehouse_id', whId);
   const d = await api('GET', `/dispatch/report?${params}`);
-  if (!d || !d.transactions.length) { toast('داده‌ای برای خروجی وجود ندارد', 'error'); return; }
+  const excelTxs = (d && (d.transactions || d.items)) || [];
+  if (!excelTxs.length) { toast('داده‌ای برای خروجی وجود ندارد', 'error'); return; }
 
-  const typeLabel = { in: 'ورود', out: 'خروج', adjust: 'تنظیم' };
-  const rows = d.transactions.map(t => ({
+  const rows = excelTxs.map(t => ({
     date:        t.created_at,
     product:     t.product_name,
     warehouse:   t.warehouse_name,
@@ -2665,6 +4153,23 @@ async function reverseDispatch(txId, productName, deptName, qty, unit) {
   );
 }
 
+async function reversePurchase(txId, qty, unit, productName) {
+  showConfirm(
+    '🗑 حذف ورود خرید',
+    `آیا مطمئن هستید که می‌خواهید ورود خرید ${fmt(qty)} ${unit || ''} از کالای «${productName || ''}» را حذف کنید؟ این مقدار از موجودی فعلی کم می‌شود و قابل بازگشت نیست مگر با ثبت دوباره.`,
+    async () => {
+      try {
+        await api('POST', `/transactions/${txId}/reverse-purchase`);
+        toast('ورود خرید حذف شد و از موجودی کم شد ✅');
+        state.productCardTab = 'purchases';
+        await renderPage();
+      } catch(e) {}
+    },
+    '🗑 بله، حذف کن',
+    true
+  );
+}
+
 async function initApp() {
   const token = getToken();
   if (!token) { showLogin(); return; }
@@ -2673,7 +4178,7 @@ async function initApp() {
     if (!r.ok) { clearToken(); showLogin(); return; }
     currentUser = await r.json();
     showApp();
-    navigate('dashboard');
+    navigate(firstAccessiblePage());
   } catch(e) {
     showLogin();
   }
