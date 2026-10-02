@@ -774,12 +774,33 @@
       flex: unset;
       width: 100%;
       min-height: var(--tap);
-      height: 100%;
       justify-content: center;
       align-items: center;
       padding: 10px 8px;
       font-size: 13px;
       white-space: nowrap;
+    }
+    .report-filter-actions {
+      grid-column: 1 / -1 !important;
+      display: grid !important;
+      grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+      gap: 8px !important;
+    }
+    .report-filter-actions .report-action-btn,
+    .report-filter-actions .btn {
+      flex: none !important;
+      width: 100% !important;
+      min-width: 0 !important;
+      min-height: 44px !important;
+      height: 44px !important;
+      max-height: 44px !important;
+      padding: 0 6px !important;
+      font-size: 13px !important;
+      line-height: 1.2 !important;
+      justify-content: center !important;
+      align-items: center !important;
+      white-space: nowrap !important;
+      box-sizing: border-box !important;
     }
 
     .desk-only { display: none !important; }
@@ -805,9 +826,12 @@
     .filter-bar { grid-template-columns: 1fr; }
     .m-card-grid { grid-template-columns: 1fr; }
     .pc-tab { flex: 1 1 calc(50% - 4px); font-size: 12px; padding: 8px 10px; }
-    .filter-bar .filter-actions .btn {
-      font-size: 12px;
-      padding: 10px 6px;
+    .report-filter-actions .report-action-btn,
+    .report-filter-actions .btn {
+      font-size: 12px !important;
+      height: 42px !important;
+      max-height: 42px !important;
+      min-height: 42px !important;
     }
   }
 
@@ -1940,11 +1964,13 @@ function renderProductCardPanel(tab) {
       </div>
       ${purchases.length === 0
         ? '<div class="empty"><div class="empty-icon">🛒</div><div class="empty-text">هنوز ورود خریدی ثبت نشده</div></div>'
-        : `<div class="table-wrap desk-only"><table class="table-fit">
+        : `<div class="table-wrap desk-only"><table class="table-fit has-actions">
             <thead><tr>
               <th class="col-date">تاریخ</th><th class="col-type">نوع</th><th class="col-qty">تعداد</th>
               <th class="col-money">قیمت واحد</th><th class="col-money">مبلغ کل</th>
-              <th class="col-sku">شماره فاکتور</th><th class="col-user">ثبت‌کننده</th><th class="col-note">توضیحات</th>
+              <th class="col-sku">شماره فاکتور</th><th class="col-user">ثبت‌کننده</th>
+              <th class="col-note">توضیحات</th>
+              ${window._isViewer ? '' : '<th class="col-actions">عملیات</th>'}
             </tr></thead><tbody>
             ${purchases.map(t=>`<tr>
               <td class="num text-sm">${escHtml(t.created_at)}</td>
@@ -1955,6 +1981,9 @@ function renderProductCardPanel(tab) {
               <td class="text-sm">${escHtml(t.ref_number)||'—'}</td>
               <td class="text-sm">${escHtml(t.created_by)||'—'}</td>
               <td class="note-cell">${noteHtml(t.note)}</td>
+              ${window._isViewer ? '' : `<td class="col-actions"><div class="row-actions">
+                <button class="btn btn-sm btn-danger" title="حذف این ورود خرید" onclick="reversePurchase(${t.id},${t.quantity},'${String(t.unit_name||'').replace(/'/g,"\\'")}','${String(data.product.name||'').replace(/'/g,"\\'")}')">حذف</button>
+              </div></td>`}
             </tr>`).join('')}
             </tbody></table></div>
            <div class="mobile-list mob-only">
@@ -1972,6 +2001,9 @@ function renderProductCardPanel(tab) {
                 <div><span class="lbl">مبلغ کل</span>${t.total_cost!=null?fmtPrice(t.total_cost):'—'}</div>
               </div>
               ${t.note ? `<div class="m-card-note"><span class="lbl">توضیحات</span>${noteHtml(t.note)}</div>` : ''}
+              ${window._isViewer ? '' : `<div class="flex-gap" style="margin-top:10px;flex-wrap:wrap;">
+                <button class="btn btn-sm btn-danger" onclick="reversePurchase(${t.id},${t.quantity},'${String(t.unit_name||'').replace(/'/g,"\\'")}','${String(data.product.name||'').replace(/'/g,"\\'")}')">🗑 حذف این ورود</button>
+              </div>`}
             </article>`).join('')}
            </div>`}`;
     return;
@@ -2382,10 +2414,10 @@ async function renderReport() {
           <option value="out">🚫 ناموجود</option>
         </select>
       </div>
-      <div class="filter-actions">
-        <button class="btn btn-primary" onclick="loadReport()">🔍 جستجو</button>
-        <button class="btn btn-secondary" onclick="printReport()">🖨️ چاپ</button>
-        <button class="btn btn-secondary" onclick="exportInventoryExcel()">📥 Excel</button>
+      <div class="filter-actions report-filter-actions">
+        <button type="button" class="btn btn-primary report-action-btn" onclick="loadReport()">جستجو</button>
+        <button type="button" class="btn btn-secondary report-action-btn" onclick="printReport()">چاپ</button>
+        <button type="button" class="btn btn-secondary report-action-btn" onclick="exportInventoryExcel()">Excel</button>
       </div>
     </div>
   </div>
@@ -3817,6 +3849,23 @@ async function reverseDispatch(txId, productName, deptName, qty, unit) {
       } catch(e) {}
     },
     '↩️ بله، بازگشت بزن',
+    true
+  );
+}
+
+async function reversePurchase(txId, qty, unit, productName) {
+  showConfirm(
+    '🗑 حذف ورود خرید',
+    `آیا مطمئن هستید که می‌خواهید ورود خرید ${fmt(qty)} ${unit || ''} از کالای «${productName || ''}» را حذف کنید؟ این مقدار از موجودی فعلی کم می‌شود و قابل بازگشت نیست مگر با ثبت دوباره.`,
+    async () => {
+      try {
+        await api('POST', `/transactions/${txId}/reverse-purchase`);
+        toast('ورود خرید حذف شد و از موجودی کم شد ✅');
+        state.productCardTab = 'purchases';
+        await renderPage();
+      } catch(e) {}
+    },
+    '🗑 بله، حذف کن',
     true
   );
 }

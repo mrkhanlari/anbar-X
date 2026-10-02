@@ -254,6 +254,8 @@ class Transaction(db.Model):
         if self.type == 'in':
             if self.reversed_by_id:
                 return 'return', '↩️ بازگشت به انبار'
+            if self.is_reversed:
+                return 'purchase_void', '⬆️ ورود خرید (حذف‌شده)'
             note = (self.note or '').strip()
             if note == 'موجودی اولیه':
                 return 'initial', '📦 موجودی اولیه'
@@ -263,6 +265,8 @@ class Transaction(db.Model):
                 if self.is_reversed:
                     return 'dispatch_reversed', '⬇️ خروج به بخش (بازگشت‌خورده)'
                 return 'dispatch', '⬇️ خروج به بخش'
+            if self.reversed_by_id:
+                return 'purchase_cancel', '🗑️ حذف ورود خرید'
             return 'issue', '⬇️ خروج از انبار'
         before = self.before_qty if self.before_qty is not None else 0
         after = self.after_qty if self.after_qty is not None else self.quantity
@@ -766,7 +770,7 @@ def product_card(pid):
         elif delta < 0:
             total_out += abs(delta)
         kind, _ = tx.movement_meta()
-        if kind in ('purchase', 'initial') and tx.type == 'in':
+        if kind in ('purchase', 'initial') and tx.type == 'in' and not tx.is_reversed:
             up = tx.unit_price if tx.unit_price is not None else (p.unit_price or 0)
             cost = tx.total_cost if tx.total_cost is not None else (tx.quantity * (up or 0))
             purchase_qty += tx.quantity
@@ -975,6 +979,93 @@ def reverse_dispatch(tx_id):
     )
     db.session.add(reverse_tx)
 
+    tx.is_reversed = True
+    db.session.commit()
+
+    return jsonify({
+        'ok': True,
+        'reverse_transaction': reverse_tx.to_dict(),
+        'product': product.to_dict(),
+    })
+
+
+@app.route('/api/transactions/<int:tx_id>/reverse-purchase', methods=['POST'])
+@require_auth('operator')
+def reverse_purchase(tx_id):
+    """حذف/برگشت یک ورود خرید اشتباه — با کم کردن همان تعداد از موجودی"""
+    user = get_current_user()
+    tx = Transaction.query.get_or_404(tx_id)
+
+    if tx.type != 'in' or tx.department_id is not None or tx.reversed_by_id is not None:
+        return jsonify({'error': 'فقط ورود خرید قابل حذف است'}), 400
+    if tx.is_reversed:
+        return jsonify({'error': 'این ورود خرید قبلاً حذف شده'}), 400
+
+    product = Product.query.get_or_404(tx.product_id)
+    if product.quantity < tx.quantity:
+        return jsonify({
+            'error': (
+                f'موجودی فعلی ({product.quantity} {product.unit}) برای حذف این ورود '
+                f'({tx.quantity} {product.unit}) کافی نیست. احتمالاً بخشی از آن خارج شده است.'
+            )
+        }), 400
+
+    before = product.quantity
+    product.quantity -= tx.quantity
+    product.updated_at = now_tehran()
+
+    # میانگین و آخرین قیمت را از خریدهای باقی‌مانده دوباره حساب کن
+    remaining = (
+        Transaction.query
+        .filter(
+            Transaction.product_id == product.id,
+            Transaction.type == 'in',
+            Transaction.department_id.is_(None),
+            Transaction.reversed_by_id.is_(None),
+            Transaction.is_reversed.is_(False),
+            Transaction.id != tx.id,
+        )
+        .order_by(Transaction.created_at.asc(), Transaction.id.asc())
+        .all()
+    )
+    total_qty = 0.0
+    total_cost = 0.0
+    last_price = 0.0
+    for ptx in remaining:
+        kind, _ = ptx.movement_meta()
+        if kind not in ('purchase', 'initial'):
+            continue
+        price = float(ptx.unit_price or 0)
+        qty = float(ptx.quantity or 0)
+        if qty <= 0:
+            continue
+        total_qty += qty
+        total_cost += qty * price
+        last_price = price
+    if total_qty > 0:
+        product.avg_cost = total_cost / total_qty
+        product.unit_price = last_price
+    else:
+        product.avg_cost = 0
+        product.unit_price = 0
+
+    unit_price = tx.unit_price if tx.unit_price is not None else product.cost_basis()
+    total_cost_tx = tx.total_cost if tx.total_cost is not None else (tx.quantity * (unit_price or 0))
+
+    reverse_tx = Transaction(
+        product_id=tx.product_id,
+        type='out',
+        quantity=tx.quantity,
+        before_qty=before,
+        after_qty=product.quantity,
+        unit_price=unit_price,
+        total_cost=total_cost_tx,
+        note=f'حذف ورود خرید اشتباه (شناسه تراکنش: {tx_id})',
+        ref_number=tx.ref_number or '',
+        created_by=user.display_name or user.username,
+        reversed_by_id=tx_id,
+    )
+    db.session.add(reverse_tx)
     tx.is_reversed = True
     db.session.commit()
 
