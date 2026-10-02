@@ -441,6 +441,34 @@
     font-size: 13px; line-height: 1.5;
     word-break: break-word;
   }
+  .m-card-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    align-items: stretch;
+  }
+  .m-card-actions.no-delete {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .m-card-actions .btn {
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    justify-content: center;
+    padding: 8px 6px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .m-card-actions .btn-del {
+    width: 40px;
+    min-width: 40px;
+    max-width: 40px;
+    padding: 0;
+    font-size: 15px;
+  }
 
   /* ── Badge ── */
   .badge {
@@ -1800,6 +1828,16 @@ function prodRow(p) {
 
 function whProdCard(p) {
   const safeName = String(p.name || '').replace(/'/g, "\\'");
+  const actions = window._isViewer
+    ? `<div class="m-card-actions no-delete">
+        <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت</button>
+      </div>`
+    : `<div class="m-card-actions">
+        <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت</button>
+        <button class="btn btn-sm btn-success" onclick="openProductCard(${p.id},'in')">⬆️ ورود</button>
+        <button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️ ویرایش</button>
+        <button class="btn btn-sm btn-danger btn-del" title="حذف کالا" onclick="deleteProduct(${p.id},'${safeName}')">🗑</button>
+      </div>`;
   return `<article class="m-card" id="prod-card-${p.id}">
     <div class="m-card-head">
       <div style="min-width:0;">
@@ -1814,12 +1852,7 @@ function whProdCard(p) {
       <div><span class="lbl">میانگین هزینه</span>${p.avg_cost?fmtPrice(p.avg_cost):(p.cost_basis?fmtPrice(p.cost_basis):'—')}</div>
       <div><span class="lbl">ارزش کل</span>${fmtPrice(p.total_value)}</div>
     </div>
-    <div class="flex-gap" style="margin-top:10px;flex-wrap:wrap;">
-      <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت کالا</button>
-      ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" onclick="openProductCard(${p.id},'in')">⬆️ ورود</button>`}
-      ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️ ویرایش</button>`}
-      ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id},'${safeName}')">🗑</button>`}
-    </div>
+    ${actions}
   </article>`;
 }
 
