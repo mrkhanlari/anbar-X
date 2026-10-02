@@ -763,8 +763,24 @@
 
     .filter-bar { grid-template-columns: 1fr 1fr; }
     .filter-bar .span-2 { grid-column: 1 / -1; }
-    .filter-bar .filter-actions { grid-column: 1 / -1; }
-    .filter-bar .filter-actions .btn { flex: 1; }
+    .filter-bar .filter-actions {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      align-items: stretch;
+    }
+    .filter-bar .filter-actions .btn {
+      flex: unset;
+      width: 100%;
+      min-height: var(--tap);
+      height: 100%;
+      justify-content: center;
+      align-items: center;
+      padding: 10px 8px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
 
     .desk-only { display: none !important; }
     .mob-only { display: block !important; }
@@ -789,6 +805,10 @@
     .filter-bar { grid-template-columns: 1fr; }
     .m-card-grid { grid-template-columns: 1fr; }
     .pc-tab { flex: 1 1 calc(50% - 4px); font-size: 12px; padding: 8px 10px; }
+    .filter-bar .filter-actions .btn {
+      font-size: 12px;
+      padding: 10px 6px;
+    }
   }
 
   @media (hover: none) and (pointer: coarse) {
@@ -1066,7 +1086,7 @@
       </div>
       <div class="form-group full" id="prod-stock-info" style="display:none;">
         <div class="card" style="margin:0;padding:12px 14px;background:var(--bg3);">
-          <div class="text-sm text-muted">موجودی و قیمت فقط از طریق «ورود خرید» / «خروج» در کارت کالا تغییر می‌کند</div>
+          <div class="text-sm text-muted">قیمت و افزایش موجودی با «ورود خرید»؛ کاهش موجودی فقط از «خروج رسمی»</div>
           <div style="margin-top:8px;display:flex;gap:18px;flex-wrap:wrap;">
             <div><span class="text-sm text-muted">موجودی فعلی:</span> <b id="prod-qty-ro">—</b></div>
             <div><span class="text-sm text-muted">آخرین قیمت خرید:</span> <b id="prod-price-ro">—</b></div>
@@ -1125,7 +1145,6 @@
     <div id="modal-tx-product-info" class="card" style="margin-bottom:20px;padding:16px;"></div>
     <div class="tx-tabs" id="tx-type-tabs">
       <button class="tx-tab" onclick="setTxType('in')"  id="tab-in">⬆️ ورود خرید</button>
-      <button class="tx-tab" onclick="setTxType('out')" id="tab-out">⬇️ خروج از انبار</button>
       <button class="tx-tab" onclick="setTxType('adjust')" id="tab-adj">📝 اصلاح موجودی</button>
     </div>
     <div class="form-grid">
@@ -1156,7 +1175,7 @@
       </div>
       <div class="form-group full">
         <label>توضیحات</label>
-        <textarea id="tx-note" placeholder="تأمین‌کننده، دلیل خروج، یا توضیح اصلاح موجودی..." style="min-height:60px;"></textarea>
+        <textarea id="tx-note" placeholder="تأمین‌کننده، شماره فاکتور، یا توضیح اصلاح موجودی..." style="min-height:60px;"></textarea>
       </div>
       <div class="form-group full" id="tx-adjust-hint" style="display:none;">
         <div class="text-sm" style="color:var(--yellow);">
@@ -1822,6 +1841,14 @@ async function renderProductCard() {
     p.unit ? 'واحد: ' + p.unit : '',
   ].filter(Boolean).map(escHtml);
 
+  // تب‌های عملیاتی قدیمی را به اکشن تبدیل کن؛ خروج فقط از «خروج رسمی»
+  let viewTab = tab;
+  let pendingAction = null;
+  if (tab === 'in') { viewTab = 'purchases'; pendingAction = 'in'; }
+  else if (tab === 'adjust') { viewTab = 'history'; pendingAction = 'adjust'; }
+  else if (tab === 'out') { viewTab = 'history'; }
+  state.productCardTab = viewTab;
+
   document.getElementById('content').innerHTML = `
   <div class="card mb-4">
     <div class="pc-hero">
@@ -1830,10 +1857,11 @@ async function renderProductCard() {
         <div class="pc-hero-meta">${metaParts.join(' · ')}</div>
         <div style="margin-top:10px;">${statusBadge}</div>
         <div class="pc-hero-actions">
-          ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️ مشخصات</button>`}
           ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" onclick="openTxModal(${p.id},'in')">⬆️ ورود خرید</button>`}
-          ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger" onclick="openTxModal(${p.id},'out')">⬇️ خروج</button>`}
+          ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openTxModal(${p.id},'adjust')">📝 اصلاح موجودی</button>`}
+          ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️ مشخصات</button>`}
         </div>
+        ${window._isViewer ? '' : `<div class="text-sm text-muted" style="margin-top:10px;">برای خروج کالا از منوی «خروج رسمی» استفاده کنید.</div>`}
       </div>
       <div class="pc-hero-qty">
         <div>
@@ -1853,11 +1881,8 @@ async function renderProductCard() {
   </div>
 
   <div class="pc-tabs">
-    <button class="pc-tab ${tab==='history'?'active':''}" onclick="setProductCardTab('history')">📜 تاریخچه</button>
-    <button class="pc-tab ${tab==='purchases'?'active':''}" onclick="setProductCardTab('purchases')">🛒 خریدها</button>
-    ${window._isViewer ? '' : `<button class="pc-tab ${tab==='in'?'active':''}" onclick="setProductCardTab('in')">⬆️ ورود</button>`}
-    ${window._isViewer ? '' : `<button class="pc-tab ${tab==='out'?'active':''}" onclick="setProductCardTab('out')">⬇️ خروج</button>`}
-    ${window._isViewer ? '' : `<button class="pc-tab ${tab==='adjust'?'active':''}" onclick="setProductCardTab('adjust')">📝 اصلاح</button>`}
+    <button class="pc-tab ${viewTab==='history'?'active':''}" onclick="setProductCardTab('history')">📜 تاریخچه</button>
+    <button class="pc-tab ${viewTab==='purchases'?'active':''}" onclick="setProductCardTab('purchases')">🛒 خریدها</button>
   </div>
 
   <div class="card">
@@ -1865,27 +1890,35 @@ async function renderProductCard() {
   </div>`;
 
   window._productCardData = data;
-  renderProductCardPanel(tab);
+  renderProductCardPanel(viewTab);
+  if (pendingAction === 'in' || pendingAction === 'adjust') {
+    openTxModal(pid, pendingAction);
+  }
 }
 
 function setProductCardTab(tab) {
-  state.productCardTab = tab;
-  document.querySelectorAll('.pc-tab').forEach(el => {
-    const map = {
-      history: '📜 تاریخچه',
-      purchases: '🛒 خریدها',
-      in: '⬆️ ورود',
-      out: '⬇️ خروج',
-      adjust: '📝 اصلاح',
-    };
-    el.classList.toggle('active', el.textContent.trim() === map[tab]);
-  });
-  if (tab === 'in' || tab === 'out' || tab === 'adjust') {
-    openTxModal(state.currentProductId, tab);
-    // تب تاریخچه را بعد از بستن مودال نگه می‌داریم ولی پنل فعلی را هم نشان بده
-    renderProductCardPanel(tab === 'in' ? 'purchases' : 'history');
+  if (tab === 'in') {
+    openTxModal(state.currentProductId, 'in');
+    state.productCardTab = 'purchases';
+    document.querySelectorAll('.pc-tab').forEach(el => {
+      el.classList.toggle('active', el.textContent.trim() === '🛒 خریدها');
+    });
+    renderProductCardPanel('purchases');
     return;
   }
+  if (tab === 'out') {
+    toast('خروج کالا فقط از منوی «خروج رسمی» ثبت می‌شود', 'error');
+    return;
+  }
+  if (tab === 'adjust') {
+    openTxModal(state.currentProductId, 'adjust');
+    return;
+  }
+  state.productCardTab = tab;
+  document.querySelectorAll('.pc-tab').forEach(el => {
+    const map = { history: '📜 تاریخچه', purchases: '🛒 خریدها' };
+    el.classList.toggle('active', el.textContent.trim() === map[tab]);
+  });
   renderProductCardPanel(tab);
 }
 
@@ -2670,6 +2703,11 @@ function jalaliToISO(jStr) {
 }
 
 async function openTxModal(prodId, preferType='in') {
+  // خروج فقط از مسیر «خروج رسمی» — نه از کارت کالا
+  if (preferType === 'out') {
+    toast('برای خروج کالا از منوی «خروج رسمی» استفاده کنید', 'error');
+    return;
+  }
   state.txProductId = prodId;
   const p = await api('GET', `/products/${prodId}`);
   if (!p) return;
@@ -2693,25 +2731,29 @@ async function openTxModal(prodId, preferType='in') {
   document.getElementById('tx-note').value = '';
   document.getElementById('tx-date').value = todayJalali();
   document.getElementById('tx-status').value = 'auto';
-  setTxType(preferType || 'in');
+  setTxType(preferType === 'adjust' ? 'adjust' : 'in');
   openModal('modal-tx');
 }
 
 function setTxType(type) {
+  if (type === 'out') {
+    toast('خروج کالا فقط از منوی «خروج رسمی» ثبت می‌شود', 'error');
+    type = 'in';
+  }
   state.txType = type;
-  ['in','out','adjust'].forEach(t => {
-    const tab = document.getElementById('tab-'+t);
+  ['in','adjust'].forEach(t => {
+    const tab = document.getElementById(t === 'adjust' ? 'tab-adj' : 'tab-'+t);
     if (!tab) return;
     tab.className = 'tx-tab' + (t===type ? ` active-${t==='adjust'?'adj':t}` : '');
   });
-  const labels = { in:'مقدار ورودی *', out:'مقدار خروجی *', adjust:'موجودی واقعی شمارش‌شده *' };
-  const btns = { in:'✅ ثبت ورود خرید', out:'✅ ثبت خروج', adjust:'✅ ثبت اصلاح موجودی' };
+  const labels = { in:'مقدار ورودی *', adjust:'موجودی واقعی شمارش‌شده *' };
+  const btns = { in:'✅ ثبت ورود خرید', adjust:'✅ ثبت اصلاح موجودی' };
   document.getElementById('tx-qty-label').textContent = labels[type];
   const txBtn = document.getElementById('btn-save-tx');
   txBtn.textContent = btns[type];
   txBtn.disabled = false;
   document.getElementById('modal-tx-title').textContent =
-    type==='in' ? '⬆️ ورود خرید' : type==='out' ? '⬇️ خروج از انبار' : '📝 اصلاح موجودی';
+    type==='in' ? '⬆️ ورود خرید' : '📝 اصلاح موجودی';
 
   const priceGroup = document.getElementById('tx-price-group');
   const adjustHint = document.getElementById('tx-adjust-hint');
