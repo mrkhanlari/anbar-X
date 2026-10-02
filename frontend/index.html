@@ -372,6 +372,113 @@
     padding-left: 12px;
     padding-right: 8px;
   }
+
+  /* جدول کاربران — بدون اسکرول افقی و بدون فشردگی */
+  .table-wrap.users-wrap {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+  table.users-table {
+    table-layout: fixed;
+    width: 100%;
+    min-width: 0;
+  }
+  table.users-table th,
+  table.users-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+  }
+  table.users-table .col-user-name { width: 18%; }
+  table.users-table .col-user-display { width: 18%; }
+  table.users-table .col-user-role { width: 14%; }
+  table.users-table .col-user-status { width: 12%; }
+  table.users-table .col-user-login { width: 16%; }
+  table.users-table .col-actions { width: 88px; }
+  table.users-table .cell-ellip {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+  table.users-table .row-actions {
+    gap: 4px;
+  }
+  table.users-table .row-actions .btn {
+    height: 30px;
+    min-width: 30px;
+    width: 30px;
+    padding: 0;
+  }
+
+  /* چک‌لیست دسترسی بخش‌ها */
+  .perm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .perm-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg3);
+    cursor: pointer;
+    user-select: none;
+    transition: border-color .15s, background .15s;
+  }
+  .perm-item:hover { border-color: var(--accent); }
+  .perm-item input {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .perm-item .perm-label {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .perm-item .perm-hint {
+    font-size: 11px;
+    color: var(--text3);
+  }
+  .perm-item.is-locked {
+    opacity: .72;
+    cursor: default;
+  }
+  .perm-item.is-disabled {
+    opacity: .45;
+    pointer-events: none;
+  }
+  .pass-field {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .pass-field input { flex: 1; min-width: 0; }
+  .pass-field .btn {
+    flex-shrink: 0;
+    min-width: 40px;
+    padding: 0 10px;
+  }
+  .users-m-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .users-m-actions .btn {
+    flex: 1 1 auto;
+    min-height: 40px;
+    justify-content: center;
+  }
   .qty-stack { line-height: 1.35; }
   .qty-stack .muted { color: var(--text2); font-size: 11px; }
   .money-stack { line-height: 1.35; }
@@ -969,39 +1076,39 @@
   <div style="flex:1;overflow-y:auto;overflow-x:hidden;">
     <div class="nav-section">
       <div class="nav-label">منو اصلی</div>
-      <div class="nav-item active" onclick="navigate('dashboard')">
+      <div class="nav-item active" data-nav="dashboard" onclick="navigate('dashboard')">
         <span class="icon">📊</span> داشبورد
       </div>
-      <div class="nav-item" onclick="navigate('warehouses')">
+      <div class="nav-item" data-nav="warehouses" onclick="navigate('warehouses')">
         <span class="icon">🏭</span> انبارها
       </div>
-      <div class="nav-item" onclick="navigate('products')">
+      <div class="nav-item" data-nav="products" onclick="navigate('products')">
         <span class="icon">📦</span> همه کالاها
       </div>
-      <div class="nav-item" onclick="navigate('departments')">
+      <div class="nav-item" data-nav="departments" onclick="navigate('departments')">
         <span class="icon">🏥</span> بخش‌ها
       </div>
-      <div class="nav-item nav-operator-only" onclick="navigate('dispatch')" style="display:none;">
+      <div class="nav-item nav-operator-only" data-nav="dispatch" onclick="navigate('dispatch')" style="display:none;">
         <span class="icon">🚚</span> خروج رسمی
       </div>
     </div>
     <div class="separator"></div>
     <div class="nav-section">
       <div class="nav-label">گزارشات</div>
-      <div class="nav-item" onclick="navigate('transactions')">
+      <div class="nav-item" data-nav="transactions" onclick="navigate('transactions')">
         <span class="icon">🔄</span> حرکات انبار
       </div>
-      <div class="nav-item" onclick="navigate('dept_report')">
+      <div class="nav-item" data-nav="dept_report" onclick="navigate('dept_report')">
         <span class="icon">📊</span> گزارش بخش‌ها
       </div>
-      <div class="nav-item" onclick="navigate('report')">
+      <div class="nav-item" data-nav="report" onclick="navigate('report')">
         <span class="icon">📋</span> گزارش موجودی
       </div>
     </div>
     <div class="separator"></div>
     <div class="nav-section">
       <div class="nav-label">مدیریت</div>
-      <div class="nav-item nav-admin-only" onclick="navigate('users')" style="display:none;">
+      <div class="nav-item nav-admin-only" data-nav="users" onclick="navigate('users')" style="display:none;">
         <span class="icon">👥</span> کاربران
       </div>
       <div class="nav-item" onclick="openChangePasswordModal()">
@@ -1290,7 +1397,7 @@
 
 <!-- ─── User Modal ─────────────────────────────────────────────────── -->
 <div class="modal-overlay" id="modal-user">
-  <div class="modal">
+  <div class="modal" style="max-width:560px;">
     <div class="modal-title">
       <span id="modal-user-title">کاربر جدید</span>
       <button class="modal-close" onclick="closeModal('modal-user')">✕</button>
@@ -1298,15 +1405,15 @@
     <div class="form-grid">
       <div class="form-group full" id="user-username-group">
         <label>نام کاربری *</label>
-        <input id="user-username" placeholder="مثلاً: ali123" dir="ltr"/>
+        <input id="user-username" placeholder="مثلاً: ali123" dir="ltr" autocomplete="off"/>
       </div>
       <div class="form-group full">
         <label>نام نمایشی</label>
-        <input id="user-displayname" placeholder="مثلاً: علی رضایی"/>
+        <input id="user-displayname" placeholder="مثلاً: علی رضایی" autocomplete="off"/>
       </div>
       <div class="form-group">
         <label>نقش *</label>
-        <select id="user-role">
+        <select id="user-role" onchange="onUserRoleChange()">
           <option value="viewer">👁 بازدیدکننده — فقط مشاهده</option>
           <option value="operator">✏️ اپراتور — مشاهده و ویرایش</option>
           <option value="admin">👑 مدیر — همه کارها</option>
@@ -1318,9 +1425,21 @@
         </label>
       </div>
       <div class="form-group full">
-        <label>رمز عبور</label>
-        <input id="user-password" type="password" placeholder="••••••••" dir="ltr"/>
-        <span id="user-pass-hint" style="display:none;font-size:11px;color:var(--text3);margin-top:4px;">برای تغییر رمز وارد کنید، در غیر این صورت خالی بگذارید</span>
+        <label id="user-pass-label">رمز عبور *</label>
+        <div class="pass-field">
+          <input id="user-password" type="password" placeholder="رمز جدید را وارد کنید" dir="ltr" autocomplete="new-password"/>
+          <button type="button" class="btn btn-secondary" id="user-pass-toggle" onclick="toggleUserPasswordVisibility()" title="نمایش/مخفی کردن">👁</button>
+        </div>
+        <span id="user-pass-hint" style="display:none;font-size:11px;color:var(--text3);margin-top:4px;line-height:1.6;">
+          رمز قبلی به‌صورت امن ذخیره شده و قابل مشاهده نیست. برای تغییر، رمز جدید را وارد کنید؛ در غیر این صورت خالی بگذارید.
+        </span>
+      </div>
+      <div class="form-group full">
+        <label>دسترسی به بخش‌های برنامه</label>
+        <div class="text-sm text-muted" style="margin-bottom:6px;line-height:1.5;">
+          تیک بزنید تا کاربر آن بخش را در منو ببیند. نقش جداگانه سطح نوشتن (مشاهده / ویرایش / مدیر) را تعیین می‌کند.
+        </div>
+        <div class="perm-list" id="user-permissions-list"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -1410,14 +1529,32 @@ function navLabelForPage(page) {
   }[page];
 }
 
+function userCanAccess(page) {
+  if (!currentUser) return false;
+  // صفحات داخلی که از بخش‌های اصلی باز می‌شوند
+  const mapped = {
+    warehouse_detail: 'warehouses',
+    product_card: 'products',
+  }[page] || page;
+  if (mapped === 'users') return currentUser.role === 'admin';
+  if (mapped === 'dispatch' && currentUser.role === 'viewer') return false;
+  const perms = currentUser.permissions;
+  if (!Array.isArray(perms) || !perms.length) return true; // سازگاری با نشست‌های قدیمی
+  return perms.includes(mapped);
+}
+
 function navigate(page, params={}) {
-  // viewer نمیتونه بره به صفحه users
-  if (page === 'users' && currentUser && currentUser.role !== 'admin') return;
+  if (currentUser && !userCanAccess(page)) {
+    toast('به این بخش دسترسی ندارید', 'error');
+    return;
+  }
   state.page = page;
   Object.assign(state, params);
   const activeLabel = navLabelForPage(page);
   document.querySelectorAll('.nav-item').forEach(el => {
-    el.classList.toggle('active', el.textContent.trim() === activeLabel);
+    const nav = el.getAttribute('data-nav');
+    if (nav) el.classList.toggle('active', nav === page || (page === 'warehouse_detail' && nav === 'warehouses') || (page === 'product_card' && nav === 'products'));
+    else el.classList.toggle('active', el.textContent.trim() === activeLabel);
   });
   closeSidebar();
   renderPage();
@@ -3434,15 +3571,20 @@ function showApp() {
   document.getElementById('sidebar').style.display = 'flex';
   document.getElementById('main').style.display = 'flex';
   updateUserBadge();
-  const adminOnly = document.querySelectorAll('.nav-admin-only');
-  adminOnly.forEach(el => {
-    el.style.display = currentUser && currentUser.role === 'admin' ? 'flex' : 'none';
-  });
-  const operatorOnly = document.querySelectorAll('.nav-operator-only');
-  operatorOnly.forEach(el => {
-    el.style.display = currentUser && currentUser.role !== 'viewer' ? 'flex' : 'none';
-  });
+  applyNavPermissions();
   window._isViewer = currentUser && currentUser.role === 'viewer';
+}
+
+function applyNavPermissions() {
+  const perms = (currentUser && Array.isArray(currentUser.permissions)) ? currentUser.permissions : null;
+  document.querySelectorAll('.nav-item[data-nav]').forEach(el => {
+    const key = el.getAttribute('data-nav');
+    let show = true;
+    if (key === 'users') show = currentUser && currentUser.role === 'admin';
+    else if (key === 'dispatch') show = currentUser && currentUser.role !== 'viewer';
+    if (show && perms) show = perms.includes(key);
+    el.style.display = show ? 'flex' : 'none';
+  });
 }
 
 function updateUserBadge() {
@@ -3467,6 +3609,14 @@ function updateUserBadge() {
   }
 }
 
+function firstAccessiblePage() {
+  const order = ['dashboard', 'warehouses', 'products', 'departments', 'dispatch', 'transactions', 'dept_report', 'report', 'users'];
+  for (const p of order) {
+    if (userCanAccess(p)) return p;
+  }
+  return 'dashboard';
+}
+
 async function doLogin() {
   const username = document.getElementById('login-username').value.trim();
   const password = document.getElementById('login-password').value;
@@ -3483,7 +3633,7 @@ async function doLogin() {
     setToken(d.token);
     currentUser = d.user;
     showApp();
-    navigate('dashboard');
+    navigate(firstAccessiblePage());
   } catch(e) {
     errEl.textContent = e.name === 'AbortError' ? 'پاسخ سرور طول کشید، دوباره امتحان کنید' : 'خطا در ارتباط با سرور';
   } finally {
@@ -3531,6 +3681,24 @@ async function saveChangePassword() {
 
 // ─── User Management Page ─────────────────────────────────────────────────────
 
+const APP_SECTION_DEFS = [
+  { key: 'dashboard', label: 'داشبورد', hint: 'خلاصه وضعیت انبار' },
+  { key: 'warehouses', label: 'انبارها', hint: 'مدیریت انبار و کالاهای داخل آن' },
+  { key: 'products', label: 'همه کالاها', hint: 'فهرست سراسری کالاها' },
+  { key: 'departments', label: 'بخش‌ها', hint: 'تعریف بخش‌های مصرف‌کننده' },
+  { key: 'dispatch', label: 'خروج رسمی', hint: 'ثبت خروج به بخش‌ها', roleMin: 'operator' },
+  { key: 'transactions', label: 'حرکات انبار', hint: 'ورود / خروج / اصلاح' },
+  { key: 'dept_report', label: 'گزارش بخش‌ها', hint: 'مصرف بخش‌ها' },
+  { key: 'report', label: 'گزارش موجودی', hint: 'موجودی و ارزش' },
+  { key: 'users', label: 'کاربران', hint: 'فقط برای مدیر', roleMin: 'admin' },
+];
+
+const DEFAULT_PERMS_BY_ROLE = {
+  admin: APP_SECTION_DEFS.map(s => s.key),
+  operator: APP_SECTION_DEFS.map(s => s.key).filter(k => k !== 'users'),
+  viewer: APP_SECTION_DEFS.map(s => s.key).filter(k => k !== 'users' && k !== 'dispatch'),
+};
+
 async function renderUsers() {
   const users = await api('GET', '/users');
   window._usersList = users;
@@ -3541,27 +3709,27 @@ async function renderUsers() {
   const limit = state.loginLogLimit || 20;
   const userId = state.loginLogUserId || 'all';
 
-  const desk = `<div class="table-wrap desk-only"><table class="table-fit has-actions">
+  const desk = `<div class="table-wrap users-wrap desk-only"><table class="table-fit has-actions users-table">
       <thead><tr>
-        <th class="col-name">نام کاربری</th>
+        <th class="col-user-name">نام کاربری</th>
         <th class="col-actions">عملیات</th>
-        <th class="col-name">نام نمایشی</th>
-        <th class="col-status">نقش</th>
-        <th class="col-status">وضعیت</th>
-        <th class="col-date">آخرین ورود</th>
+        <th class="col-user-display">نام نمایشی</th>
+        <th class="col-user-role">نقش</th>
+        <th class="col-user-status">وضعیت</th>
+        <th class="col-user-login">آخرین ورود</th>
       </tr></thead><tbody>
       ${users.map(u => {
         const safeUser = String(u.username || '').replace(/'/g, "\\'");
         return `<tr>
-        <td class="col-name fw-bold">${escHtml(u.username)}</td>
+        <td class="col-user-name"><span class="cell-ellip fw-bold" title="${escHtml(u.username)}">${escHtml(u.username)}</span></td>
         <td class="col-actions"><div class="row-actions">
           <button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openUserModal(${u.id})">✏️</button>
-          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" title="حذف" onclick="deleteUser(${u.id},'${safeUser}')">حذف</button>` : ''}
+          ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger btn-icon" title="حذف" onclick="deleteUser(${u.id},'${safeUser}')">🗑</button>` : ''}
         </div></td>
-        <td class="col-name">${escHtml(u.display_name)}</td>
-        <td class="col-status">${roleBadge(u.role)}</td>
-        <td class="col-status">${u.is_active ? '<span class="badge badge-green">✅ فعال</span>' : '<span class="badge badge-red">🚫 غیرفعال</span>'}</td>
-        <td class="col-date text-sm text-muted num">${escHtml(u.last_login || '—')}</td>
+        <td class="col-user-display"><span class="cell-ellip" title="${escHtml(u.display_name)}">${escHtml(u.display_name)}</span></td>
+        <td class="col-user-role">${roleBadge(u.role)}</td>
+        <td class="col-user-status">${u.is_active ? '<span class="badge badge-green">فعال</span>' : '<span class="badge badge-red">غیرفعال</span>'}</td>
+        <td class="col-user-login text-sm text-muted num">${u.last_login ? shortDate(u.last_login) : '—'}</td>
       </tr>`;
       }).join('')}
       </tbody></table></div>`;
@@ -3569,19 +3737,21 @@ async function renderUsers() {
   const mob = `<div class="mobile-list mob-only">
     ${users.map(u => {
       const safeUser = String(u.username || '').replace(/'/g, "\\'");
+      const permCount = Array.isArray(u.permissions) ? u.permissions.length : 0;
       return `<article class="m-card">
         <div class="m-card-head">
           <div style="min-width:0;">
             <div class="m-card-title">${escHtml(u.display_name || u.username)}</div>
             <div class="m-card-sub">@${escHtml(u.username)}</div>
           </div>
-          ${u.is_active ? '<span class="badge badge-green">✅ فعال</span>' : '<span class="badge badge-red">🚫 غیرفعال</span>'}
+          ${u.is_active ? '<span class="badge badge-green">فعال</span>' : '<span class="badge badge-red">غیرفعال</span>'}
         </div>
         <div class="m-card-grid">
           <div><span class="lbl">نقش</span>${roleBadge(u.role)}</div>
-          <div><span class="lbl">آخرین ورود</span>${escHtml(u.last_login || '—')}</div>
+          <div><span class="lbl">آخرین ورود</span><span class="num">${escHtml(u.last_login || '—')}</span></div>
+          <div><span class="lbl">دسترسی بخش‌ها</span>${fmt(permCount)} بخش</div>
         </div>
-        <div class="flex-gap" style="margin-top:10px;flex-wrap:wrap;">
+        <div class="users-m-actions">
           <button class="btn btn-sm btn-secondary" onclick="openUserModal(${u.id})">✏️ ویرایش</button>
           ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id},'${safeUser}')">🗑 حذف</button>` : ''}
         </div>
@@ -3651,13 +3821,18 @@ async function loadLoginLogs() {
   }
   el.innerHTML = `
     <div class="text-sm text-muted mb-4">نمایش ${fmt(logs.length)} مورد اخیر</div>
-    <div class="table-wrap desk-only"><table>
-      <thead><tr><th>تاریخ و ساعت</th><th>نام کاربری</th><th>نام نمایشی</th><th>IP</th></tr></thead>
+    <div class="table-wrap users-wrap desk-only"><table class="table-fit users-table">
+      <thead><tr>
+        <th style="width:22%">تاریخ و ساعت</th>
+        <th class="col-user-name">نام کاربری</th>
+        <th class="col-user-display">نام نمایشی</th>
+        <th style="width:18%">IP</th>
+      </tr></thead>
       <tbody>${logs.map(l=>`<tr>
-        <td class="num text-sm">${escHtml(l.logged_in_at)}</td>
-        <td class="fw-bold">${escHtml(l.username)}</td>
-        <td>${escHtml(l.display_name)}</td>
-        <td class="text-sm text-muted">${escHtml(l.ip_address)}</td>
+        <td class="num text-sm">${shortDate(l.logged_in_at)}</td>
+        <td class="col-user-name"><span class="cell-ellip fw-bold" title="${escHtml(l.username)}">${escHtml(l.username)}</span></td>
+        <td class="col-user-display"><span class="cell-ellip" title="${escHtml(l.display_name)}">${escHtml(l.display_name)}</span></td>
+        <td class="text-sm text-muted"><span class="cell-ellip" dir="ltr">${escHtml(l.ip_address || '—')}</span></td>
       </tr>`).join('')}</tbody>
     </table></div>
     <div class="mobile-list mob-only">
@@ -3678,24 +3853,77 @@ async function loadLoginLogs() {
 
 let editUserId = null;
 
+function renderUserPermissionsList(selected, role) {
+  const box = document.getElementById('user-permissions-list');
+  if (!box) return;
+  const roleVal = role || document.getElementById('user-role').value || 'viewer';
+  const selectedSet = new Set(selected || DEFAULT_PERMS_BY_ROLE[roleVal] || DEFAULT_PERMS_BY_ROLE.viewer);
+  box.innerHTML = APP_SECTION_DEFS.map(s => {
+    const adminOnly = s.roleMin === 'admin';
+    const opOnly = s.roleMin === 'operator';
+    const locked = adminOnly && roleVal === 'admin';
+    const disabled = (adminOnly && roleVal !== 'admin') || (opOnly && roleVal === 'viewer');
+    const checked = locked || (!disabled && selectedSet.has(s.key));
+    const cls = ['perm-item'];
+    if (locked) cls.push('is-locked');
+    if (disabled) cls.push('is-disabled');
+    return `<label class="${cls.join(' ')}">
+      <input type="checkbox" class="user-perm-check" value="${s.key}" ${checked ? 'checked' : ''} ${locked || disabled ? 'disabled' : ''}/>
+      <span class="perm-label">${s.label}</span>
+      <span class="perm-hint">${s.hint}${locked ? ' · همیشه برای مدیر' : ''}</span>
+    </label>`;
+  }).join('');
+}
+
+function collectUserPermissions() {
+  const role = document.getElementById('user-role').value;
+  const checks = [...document.querySelectorAll('.user-perm-check')];
+  const perms = checks.filter(c => c.checked && !c.disabled).map(c => c.value);
+  if (role === 'admin' && !perms.includes('users')) perms.push('users');
+  return perms;
+}
+
+function onUserRoleChange() {
+  const role = document.getElementById('user-role').value;
+  // هنگام تغییر نقش، پیش‌فرض همان نقش را پیشنهاد بده (چک‌باکس‌های فعال را نگه نداریم تا گیج نشود)
+  renderUserPermissionsList(DEFAULT_PERMS_BY_ROLE[role] || DEFAULT_PERMS_BY_ROLE.viewer, role);
+}
+
+function toggleUserPasswordVisibility() {
+  const input = document.getElementById('user-password');
+  const btn = document.getElementById('user-pass-toggle');
+  if (!input) return;
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  if (btn) btn.textContent = show ? '🙈' : '👁';
+}
+
 function openUserModal(id=null) {
   editUserId = id;
   document.getElementById('modal-user-title').textContent = id ? 'ویرایش کاربر' : 'کاربر جدید';
   document.getElementById('user-username').value = '';
   document.getElementById('user-displayname').value = '';
   document.getElementById('user-password').value = '';
+  document.getElementById('user-password').type = 'password';
+  const toggleBtn = document.getElementById('user-pass-toggle');
+  if (toggleBtn) toggleBtn.textContent = '👁';
   document.getElementById('user-role').value = 'viewer';
   document.getElementById('user-active').checked = true;
   document.getElementById('user-pass-hint').style.display = id ? 'block' : 'none';
+  document.getElementById('user-pass-label').textContent = id ? 'تنظیم رمز عبور جدید' : 'رمز عبور *';
   document.getElementById('user-username-group').style.display = id ? 'none' : 'flex';
+  renderUserPermissionsList(DEFAULT_PERMS_BY_ROLE.viewer, 'viewer');
   if (id) {
-    api('GET', '/users').then(users => {
-      const u = users.find(x => x.id === id);
+    const cached = (window._usersList || []).find(x => x.id === id);
+    const apply = (u) => {
       if (!u) return;
-      document.getElementById('user-displayname').value = u.display_name;
+      document.getElementById('user-displayname').value = u.display_name || '';
       document.getElementById('user-role').value = u.role;
       document.getElementById('user-active').checked = u.is_active;
-    });
+      renderUserPermissionsList(u.permissions || DEFAULT_PERMS_BY_ROLE[u.role], u.role);
+    };
+    if (cached) apply(cached);
+    else api('GET', '/users').then(users => apply(users.find(x => x.id === id)));
   }
   openModal('modal-user');
 }
@@ -3705,6 +3933,7 @@ async function saveUser() {
     display_name: document.getElementById('user-displayname').value.trim(),
     role: document.getElementById('user-role').value,
     is_active: document.getElementById('user-active').checked,
+    permissions: collectUserPermissions(),
   };
   const pass = document.getElementById('user-password').value;
   if (pass) body.password = pass;
@@ -3712,13 +3941,20 @@ async function saveUser() {
     body.username = document.getElementById('user-username').value.trim();
     if (!body.username || !pass) { toast('نام کاربری و رمز عبور الزامی است', 'error'); return; }
   }
+  if (!body.permissions.length) { toast('حداقل یک بخش را انتخاب کنید', 'error'); return; }
   const btn = document.querySelector('#modal-user .btn-primary');
   if (btn && btn.disabled) return;
   btnLoading(btn, 'در حال ذخیره...');
   try {
     if (editUserId) {
-      await api('PUT', `/users/${editUserId}`, body);
+      const updated = await api('PUT', `/users/${editUserId}`, body);
       toast('کاربر ویرایش شد ✅');
+      // اگر خود ادمین را ویرایش کرد، منو را تازه کن
+      if (updated && currentUser && updated.id === currentUser.id) {
+        currentUser = { ...currentUser, ...updated };
+        applyNavPermissions();
+        updateUserBadge();
+      }
     } else {
       await api('POST', '/users', body);
       toast('کاربر جدید ساخته شد ✅');
@@ -3911,7 +4147,7 @@ async function initApp() {
     if (!r.ok) { clearToken(); showLogin(); return; }
     currentUser = await r.json();
     showApp();
-    navigate('dashboard');
+    navigate(firstAccessiblePage());
   } catch(e) {
     showLogin();
   }

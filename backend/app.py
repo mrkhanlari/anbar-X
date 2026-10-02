@@ -11,6 +11,27 @@ import jdatetime
 import bcrypt
 import secrets
 import os
+import json
+
+# بخش‌های قابل‌دسترسی در منوی برنامه (permissions)
+APP_SECTIONS = (
+    'dashboard',
+    'warehouses',
+    'products',
+    'departments',
+    'dispatch',
+    'transactions',
+    'dept_report',
+    'report',
+    'users',
+)
+
+# پیش‌فرض دسترسی هر نقش — اگر فیلد permissions خالی باشد
+DEFAULT_PERMISSIONS = {
+    'admin': list(APP_SECTIONS),
+    'operator': [s for s in APP_SECTIONS if s != 'users'],
+    'viewer': [s for s in APP_SECTIONS if s not in ('users', 'dispatch')],
+}
 
 TEHRAN_TZ = ZoneInfo('Asia/Tehran')
 
@@ -63,6 +84,8 @@ class User(db.Model):
     password_hash = db.Column(db.String(200), nullable=False)
     display_name  = db.Column(db.String(100))
     role          = db.Column(db.String(20), default='viewer')
+    # JSON list of section keys the user may open in the UI
+    permissions   = db.Column(db.Text, default='')
     is_active     = db.Column(db.Boolean, default=True, index=True)
     created_at    = db.Column(db.DateTime, default=now_tehran)
 
@@ -71,6 +94,44 @@ class User(db.Model):
 
     def check_password(self, password):
         return bcrypt.checkpw(password.encode(), self.password_hash.encode())
+
+    def get_permissions(self):
+        """لیست بخش‌های مجاز — نقش همچنان سطح نوشتن را کنترل می‌کند."""
+        raw = (self.permissions or '').strip()
+        if raw:
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    perms = [p for p in parsed if p in APP_SECTIONS]
+                    if perms:
+                        if self.role == 'admin' and 'users' not in perms:
+                            perms.append('users')
+                        if self.role == 'viewer':
+                            perms = [p for p in perms if p != 'dispatch']
+                        if self.role != 'admin':
+                            perms = [p for p in perms if p != 'users']
+                        return perms
+            except Exception:
+                pass
+        return list(DEFAULT_PERMISSIONS.get(self.role, DEFAULT_PERMISSIONS['viewer']))
+
+    def set_permissions(self, perms):
+        if not isinstance(perms, list):
+            perms = []
+        clean = [p for p in perms if p in APP_SECTIONS]
+        if self.role == 'admin' and 'users' not in clean:
+            clean.append('users')
+        if self.role != 'admin':
+            clean = [p for p in clean if p != 'users']
+        if self.role == 'viewer':
+            clean = [p for p in clean if p != 'dispatch']
+        # حداقل یک بخش برای جلوگیری از کاربر قفل‌شده
+        if not clean:
+            clean = ['dashboard']
+        self.permissions = json.dumps(clean, ensure_ascii=False)
+
+    def can_access(self, section):
+        return section in self.get_permissions()
 
     def to_dict(self):
         jdt = jdatetime.datetime.fromgregorian(datetime=self.created_at)
@@ -81,6 +142,7 @@ class User(db.Model):
             'display_name': self.display_name or self.username,
             'role': self.role,
             'is_active': self.is_active,
+            'permissions': self.get_permissions(),
             'created_at': jdt.strftime('%Y/%m/%d'),
             'last_login': jdatetime.datetime.fromgregorian(datetime=last.logged_in_at).strftime('%Y/%m/%d %H:%M') if last else '',
         }
@@ -472,6 +534,7 @@ def get_users():
             'display_name': u.display_name or u.username,
             'role': u.role,
             'is_active': u.is_active,
+            'permissions': u.get_permissions(),
             'created_at': jdt.strftime('%Y/%m/%d'),
             'last_login': jdatetime.datetime.fromgregorian(datetime=last_dt).strftime('%Y/%m/%d %H:%M') if last_dt else '',
         })
@@ -492,6 +555,10 @@ def create_user():
         return jsonify({'error': 'این نام کاربری قبلاً ثبت شده'}), 400
     u = User(username=username, role=role, display_name=data.get('display_name', ''))
     u.set_password(password)
+    if 'permissions' in data:
+        u.set_permissions(data.get('permissions'))
+    else:
+        u.set_permissions(DEFAULT_PERMISSIONS.get(role, DEFAULT_PERMISSIONS['viewer']))
     db.session.add(u)
     db.session.commit()
     return jsonify(u.to_dict()), 201
@@ -515,6 +582,8 @@ def update_user(uid):
         if len(data['password']) < 4:
             return jsonify({'error': 'رمز عبور باید حداقل ۴ کاراکتر باشد'}), 400
         user.set_password(data['password'])
+    if 'permissions' in data:
+        user.set_permissions(data.get('permissions'))
     db.session.commit()
     return jsonify(user.to_dict())
 
@@ -525,6 +594,9 @@ def delete_user(uid):
     user = User.query.get_or_404(uid)
     if user.id == current.id:
         return jsonify({'error': 'نمیتوانید حساب خودتان را حذف کنید'}), 400
+    # پاک‌سازی وابستگی‌ها قبل از حذف کاربر (FK)
+    Session.query.filter_by(user_id=user.id).delete()
+    LoginLog.query.filter_by(user_id=user.id).delete()
     db.session.delete(user)
     db.session.commit()
     return jsonify({'ok': True})
@@ -1220,6 +1292,7 @@ def migrate():
             ('ALTER TABLE transactions ADD COLUMN unit_price REAL', 'tx.unit_price'),
             ('ALTER TABLE transactions ADD COLUMN total_cost REAL', 'tx.total_cost'),
             ('ALTER TABLE products ADD COLUMN avg_cost REAL DEFAULT 0', 'products.avg_cost'),
+            ('ALTER TABLE users ADD COLUMN permissions TEXT DEFAULT \'\'', 'users.permissions'),
             # ایندکس‌های ترکیبی برای سرعت گزارش‌ها وقتی دیتا زیاد می‌شود
             ('CREATE INDEX IF NOT EXISTS ix_tx_type_created ON transactions(type, created_at)', 'ix_tx_type_created'),
             ('CREATE INDEX IF NOT EXISTS ix_tx_dept_created ON transactions(department_id, created_at)', 'ix_tx_dept_created'),
