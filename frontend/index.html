@@ -393,7 +393,8 @@
   table.users-table .col-user-display { width: 18%; }
   table.users-table .col-user-role { width: 14%; }
   table.users-table .col-user-status { width: 12%; }
-  table.users-table .col-user-login { width: 16%; }
+  table.users-table .col-user-login { width: 16%; white-space: normal; }
+  table.users-table .col-user-login .muted { font-size: 11px; }
   table.users-table .col-actions { width: 88px; }
   table.users-table .cell-ellip {
     display: block;
@@ -402,6 +403,16 @@
     white-space: nowrap;
     max-width: 100%;
   }
+  .users-page-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .users-page-head .card-title { margin: 0; }
+  .users-page-head .btn { flex-shrink: 0; }
   table.users-table .row-actions {
     gap: 4px;
   }
@@ -478,6 +489,23 @@
     flex: 1 1 auto;
     min-height: 40px;
     justify-content: center;
+  }
+  @media (max-width: 768px) {
+    .perm-item {
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      padding: 10px;
+    }
+    .perm-item .perm-hint {
+      width: 100%;
+      padding-right: 26px;
+      line-height: 1.45;
+    }
+    .users-page-head .btn {
+      width: 100%;
+      justify-content: center;
+      min-height: var(--tap);
+    }
   }
   .qty-stack { line-height: 1.35; }
   .qty-stack .muted { color: var(--text2); font-size: 11px; }
@@ -1120,7 +1148,7 @@
     </div>
   </div>
   <div id="user-badge" style="display:none;"></div>
-  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۳.۰</div>
+  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۳.۱</div>
 </nav>
 
 <!-- Main -->
@@ -3703,8 +3731,8 @@ async function renderUsers() {
   const users = await api('GET', '/users');
   window._usersList = users;
   const c = document.getElementById('content');
-  document.getElementById('topbar-actions').innerHTML =
-    `<button class="btn btn-primary" onclick="openUserModal()">➕ کاربر جدید</button>`;
+  // دکمه در خود صفحه — تا topbar موبایل شلوغ نشود
+  document.getElementById('topbar-actions').innerHTML = '';
 
   const limit = state.loginLogLimit || 20;
   const userId = state.loginLogUserId || 'all';
@@ -3761,7 +3789,10 @@ async function renderUsers() {
 
   c.innerHTML = `
   <div class="card mb-4">
-    <div class="card-title">👥 مدیریت کاربران</div>
+    <div class="users-page-head">
+      <div class="card-title">👥 مدیریت کاربران</div>
+      <button class="btn btn-primary" onclick="openUserModal()">➕ کاربر جدید</button>
+    </div>
     ${desk}
     ${mob}
   </div>
