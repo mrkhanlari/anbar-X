@@ -576,6 +576,13 @@
     font-size: 13px; line-height: 1.5;
     word-break: break-word;
   }
+  /* برچسب «علت/توضیحات» باید بالای متن باشد، نه چسبیده به آن */
+  .m-card-note .lbl {
+    color: var(--text2);
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
   .m-card-actions {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
@@ -3564,7 +3571,7 @@ async function loadDeptReport() {
             '<div><span class="lbl">تعداد</span><b class="val-red">- ' + fmt(t.quantity) + '</b></div>' +
             '<div><span class="lbl">ثبت‌کننده</span>' + escHtml(t.created_by||'—') + '</div>' +
           '</div>' +
-          ((t.note||'').trim() ? '<div class="m-card-note"><span class="lbl">علت</span>' + escHtml(t.note) + '</div>' : '') +
+          ((t.note||'').trim() ? '<div class="m-card-note"><span class="lbl">علت</span>' + noteHtml(t.note) + '</div>' : '') +
           (actionCell(t) ? '<div style="margin-top:10px;">' + actionCell(t) + '</div>' : '') +
         '</article>'
       ).join('') +
