@@ -7,7 +7,7 @@
 
 **A self-hosted, multi-warehouse inventory management system built for LAN environments.**
 
-![Version](https://img.shields.io/badge/version-2.2.0-blue)
+![Version](https://img.shields.io/badge/version-2.3.0-blue)
 ![Python](https://img.shields.io/badge/python-3.11-green)
 ![Flask](https://img.shields.io/badge/flask-3.0-lightgrey)
 ![Docker](https://img.shields.io/badge/docker-ready-blue)
@@ -20,14 +20,15 @@
 ## ✨ Features
 
 - **Multi-warehouse management** — create, edit, and monitor multiple warehouses with live statistics
-- **Product inventory** — track items with SKU, category, unit price, and low-stock alerts
+- **Product ledger** — define products separately from purchases; stock and cost come from real movements
+- **Product card** — movement history, purchase report, average cost, and stock value
 - **Formal dispatch** — issue stock to named departments (e.g. Radiology, Reception) with reversal support
-- **Transaction history** — every stock movement is logged with timestamp, user, and notes
-- **Role-based access** — Admin / Operator / Viewer with session management and login logs
+- **Filterable reports** — search and date-range filters on movements and reports
+- **Role-based access** — Admin / Operator / Viewer with filterable login logs
 - **Reports & Export** — inventory reports and department reports, printable and exportable to Excel
 - **Jalali (Shamsi) calendar** — all dates displayed in Persian calendar
 - **Dark / Light mode** — smooth theme toggle with preference saved per browser
-- **Responsive UI** — works on desktop and mobile
+- **Mobile-responsive cards** — vertical lists without horizontal scroll on phones
 - **Automatic daily backup** — database backed up every night at 2 AM (Tehran time), 30-day retention
 - **Offline-ready** — designed for air-gapped LAN servers with no internet dependency
 
