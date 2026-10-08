@@ -583,6 +583,12 @@
     margin-bottom: 4px;
     font-size: 12px;
   }
+  .m-card-note-body {
+    display: block;
+    color: var(--text);
+    line-height: 1.5;
+    word-break: break-word;
+  }
   .m-card-actions {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
@@ -2205,7 +2211,7 @@ function renderProductCardPanel(tab) {
                 <div><span class="lbl">قیمت واحد</span>${t.unit_price!=null?fmtPrice(t.unit_price):'—'}</div>
                 <div><span class="lbl">مبلغ کل</span>${t.total_cost!=null?fmtPrice(t.total_cost):'—'}</div>
               </div>
-              ${t.note ? `<div class="m-card-note"><span class="lbl">توضیحات</span>${noteHtml(t.note)}</div>` : ''}
+              ${t.note ? `<div class="m-card-note"><span class="lbl">توضیحات</span><div class="m-card-note-body">${noteHtml(t.note)}</div></div>` : ''}
               ${window._isViewer ? '' : `<div class="flex-gap" style="margin-top:10px;flex-wrap:wrap;">
                 <button class="btn btn-sm btn-danger" onclick="reversePurchase(${t.id},${t.quantity},'${String(t.unit_name||'').replace(/'/g,"\\'")}','${String(data.product.name||'').replace(/'/g,"\\'")}')">🗑 حذف این ورود</button>
               </div>`}
@@ -3170,8 +3176,8 @@ async function renderDepartments() {
           '<div class="m-card-title">' + escHtml(d.name) + '</div>' +
           '<div class="m-card-sub">ثبت: ' + escHtml(d.created_at || '—') + '</div>' +
         '</div></div>' +
-        '<div class="m-card-note"><span class="lbl">توضیحات</span>' +
-          escHtml((d.description || '').trim() || '—') + '</div>' +
+        '<div class="m-card-note"><span class="lbl">توضیحات</span><div class="m-card-note-body">' +
+          escHtml((d.description || '').trim() || '—') + '</div></div>' +
         (window._isViewer ? '' :
           '<div class="flex-gap" style="margin-top:10px;flex-wrap:wrap;">' +
             '<button class="btn btn-sm btn-secondary" onclick="openDeptModal(' + d.id + ')">✏️ ویرایش</button>' +
@@ -3571,7 +3577,7 @@ async function loadDeptReport() {
             '<div><span class="lbl">تعداد</span><b class="val-red">- ' + fmt(t.quantity) + '</b></div>' +
             '<div><span class="lbl">ثبت‌کننده</span>' + escHtml(t.created_by||'—') + '</div>' +
           '</div>' +
-          ((t.note||'').trim() ? '<div class="m-card-note"><span class="lbl">علت</span>' + noteHtml(t.note) + '</div>' : '') +
+          ((t.note||'').trim() ? '<div class="m-card-note"><span class="lbl">علت</span><div class="m-card-note-body">' + noteHtml(t.note) + '</div></div>' : '') +
           (actionCell(t) ? '<div style="margin-top:10px;">' + actionCell(t) + '</div>' : '') +
         '</article>'
       ).join('') +
