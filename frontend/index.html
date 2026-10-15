@@ -1270,7 +1270,7 @@
     </div>
   </div>
   <div id="user-badge" style="display:none;"></div>
-  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۵.۱</div>
+  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۵.۳</div>
 </nav>
 
 <!-- Main -->
@@ -4139,12 +4139,15 @@ function confirmMergeProducts() {
 // ─── Trash ────────────────────────────────────────────────────────────────────
 
 function trashRestoreBtn(type, it) {
-  const nameJs = JSON.stringify(String(it.name || ''));
+  const nameAttr = escHtml(String(it.name || ''));
   if (type === 'product' && it.is_merge) {
-    const label = it.can_unmerge ? '↩️ برگرداندن ادغام' : '↩️ بازیابی';
-    return `<button class="btn btn-sm btn-success" onclick="restoreTrashItem('product',${it.id},${nameJs},${it.can_unmerge ? 'true' : 'false'})">${label}</button>`;
+    return `<button type="button" class="btn btn-sm btn-success"
+      data-trash-action="restore" data-type="product" data-id="${it.id}"
+      data-name="${nameAttr}" data-merge="1">↩️ برگرداندن ادغام</button>`;
   }
-  return `<button class="btn btn-sm btn-success" onclick="restoreTrashItem('${type}',${it.id},${nameJs})">↩️ بازیابی</button>`;
+  return `<button type="button" class="btn btn-sm btn-success"
+    data-trash-action="restore" data-type="${type}" data-id="${it.id}"
+    data-name="${nameAttr}">↩️ بازیابی</button>`;
 }
 
 async function renderTrash() {
@@ -4153,7 +4156,6 @@ async function renderTrash() {
       '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-text">به سطل زباله دسترسی ندارید</div></div>';
     return;
   }
-  const canWrite = currentUser && currentUser.role !== 'viewer';
   const c = document.getElementById('content');
   c.innerHTML = '<div class="spinner"></div>';
   const data = await api('GET', '/trash');
@@ -4163,17 +4165,19 @@ async function renderTrash() {
 
   const typeKey = { product: 'products', warehouse: 'warehouses', department: 'departments' };
   const section = (title, items, type) => {
-    const emptyBtn = (items.length && canWrite)
-      ? `<button class="btn btn-sm btn-secondary" onclick="emptyTrash('${typeKey[type]}')">🧹 خالی کردن این دسته</button>`
+    const emptyBtn = items.length
+      ? `<button type="button" class="btn btn-sm btn-secondary" onclick="emptyTrash('${typeKey[type]}')">🧹 خالی کردن این دسته</button>`
       : '';
     if (!items.length) {
       return `<div class="card mb-4"><div class="card-title">${title}</div>
         <div class="text-sm text-muted">موردی نیست</div></div>`;
     }
     const rowActions = (it) => {
-      if (!canWrite) return '<span class="text-sm text-muted">فقط مشاهده</span>';
+      const nameAttr = escHtml(String(it.name || ''));
       return `${trashRestoreBtn(type, it)}
-        <button class="btn btn-sm btn-danger" onclick="purgeTrashItem('${type}',${it.id},${JSON.stringify(String(it.name||''))})">💀 حذف دائم</button>`;
+        <button type="button" class="btn btn-sm btn-danger"
+          data-trash-action="purge" data-type="${type}" data-id="${it.id}"
+          data-name="${nameAttr}">💀 حذف دائم</button>`;
     };
     const nameCell = (it) => {
       const badge = (type === 'product' && it.is_merge)
@@ -4209,7 +4213,7 @@ async function renderTrash() {
         </div>
       </div>
       <div class="flex-gap" style="flex-wrap:wrap;">
-        ${canWrite ? `<button class="btn btn-secondary" ${total?'' :'disabled'} onclick="emptyTrash('all')">🧹 خالی کردن همه</button>` : ''}
+        <button type="button" class="btn btn-secondary" ${total?'' :'disabled'} onclick="emptyTrash('all')">🧹 خالی کردن همه</button>
       </div>
     </div>
     <div class="m-card-grid" style="margin-top:14px;">
@@ -4222,20 +4226,37 @@ async function renderTrash() {
   ${section('📦 کالاها', data.products || [], 'product')}
   ${section('🏭 انبارها', data.warehouses || [], 'warehouse')}
   ${section('🏥 بخش‌ها', data.departments || [], 'department')}`;
+
+  // کلیک دکمه‌های سطل با data-attribute — قابل‌اطمینان‌تر از onclick توکار
+  c.querySelectorAll('[data-trash-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const action = btn.getAttribute('data-trash-action');
+      const type = btn.getAttribute('data-type');
+      const id = parseInt(btn.getAttribute('data-id'), 10);
+      const name = btn.getAttribute('data-name') || '';
+      const isMerge = btn.getAttribute('data-merge') === '1';
+      if (action === 'restore') restoreTrashItem(type, id, name, isMerge);
+      else if (action === 'purge') purgeTrashItem(type, id, name);
+    });
+  });
 }
 
 async function restoreTrashItem(type, id, name, isMerge=false) {
   const title = isMerge ? '↩️ برگرداندن ادغام' : '↩️ بازیابی';
   const msg = isMerge
-    ? `ادغام «${name}» برگردانده شود؟ حرکات و موجودی به مبدا برمی‌گردد و از مقصد جدا می‌شود.`
+    ? `ادغام «${name}» کاملاً برگردانده شود؟ کالا، موجودی و حرکات به حالت قبل از ادغام برمی‌گردند.`
     : `«${name}» از سطل زباله بازیابی شود؟`;
   showConfirm(
     title,
     msg,
     async () => {
-      const res = await api('POST', '/trash/restore', { type, id });
-      toast(res && res.unmerged ? 'ادغام برگردانده شد ✅' : 'بازیابی شد ✅');
-      renderTrash();
+      try {
+        const res = await api('POST', '/trash/restore', { type, id });
+        toast(res && res.unmerged ? 'ادغام به حالت اول برگشت ✅' : 'بازیابی شد ✅');
+        await renderTrash();
+      } catch (e) {
+        // خطا در api() توست شده
+      }
     },
     isMerge ? '↩️ برگرداندن ادغام' : '↩️ بازیابی',
     false
@@ -4247,9 +4268,11 @@ async function purgeTrashItem(type, id, name) {
     '💀 حذف دائمی',
     `«${name}» برای همیشه پاک شود؟ این کار قابل برگشت نیست.`,
     async () => {
-      await api('POST', '/trash/purge', { type, id });
-      toast('برای همیشه حذف شد');
-      renderTrash();
+      try {
+        await api('POST', '/trash/purge', { type, id });
+        toast('برای همیشه حذف شد');
+        await renderTrash();
+      } catch (e) {}
     },
     '💀 حذف دائم',
     true
@@ -4826,10 +4849,19 @@ function showConfirm(title, message, onConfirm, confirmLabel='تأیید', dange
   openModal('modal-confirm');
 }
 
-function confirmAction() {
-  closeModal('modal-confirm');
-  if (_confirmCallback) _confirmCallback();
+async function confirmAction() {
+  const cb = _confirmCallback;
   _confirmCallback = null;
+  closeModal('modal-confirm');
+  if (!cb) return;
+  const btn = document.getElementById('confirm-ok-btn');
+  try {
+    btnLoading(btn, 'لطفاً صبر کنید...');
+    await cb();
+  } catch (e) {
+  } finally {
+    btnDone(btn);
+  }
 }
 
 // ─── Reverse Dispatch ────────────────────────────────────────────────────────

@@ -1131,54 +1131,155 @@ def merge_products():
     })
 
 
+def _detect_merged_into_id(source):
+    """شناسه مقصد ادغام از فیلد یا متن توضیحات"""
+    if source.merged_into_id:
+        return int(source.merged_into_id)
+    import re
+    text = source.description or ''
+    m = re.search(r'ادغام[‌\s]*شده در\s*«[^»]*»\s*\(#(\d+)\)', text)
+    if m:
+        return int(m.group(1))
+    m = re.search(r'\(#(\d+)\)', text)
+    if m and 'ادغام' in text:
+        return int(m.group(1))
+    return None
+
+
+def _strip_merge_note(note, source_id, source_name=None):
+    if not note:
+        return ''
+    import re
+    out = note
+    # برچسب استاندارد: [ادغام از «نام» #id]
+    out = re.sub(rf'\s*\[ادغام از «[^»]*» #{source_id}\]', '', out)
+    if source_name:
+        out = out.replace(f' [ادغام از «{source_name}» #{source_id}]', '')
+    return out.strip()
+
+
 def _undo_product_merge(source):
-    """برگرداندن ادغام: حرکات و موجودی به مبدا برمی‌گردد."""
+    """
+    برگرداندن ادغام به حالت اول:
+    - حرکات منتقل‌شده به مبدا برمی‌گردند
+    - موجودی/قیمت مقصد و مبدا به قبل از ادغام
+    - رکورد adjust ادغام حذف می‌شود
+    """
+    import re
+
     merge = (ProductMerge.query
              .filter_by(source_id=source.id, undone_at=None)
              .order_by(ProductMerge.id.desc())
              .first())
-    if not merge:
-        return None, 'رکورد ادغام برای برگرداندن یافت نشد؛ فقط بازیابی ساده انجام می‌شود'
 
-    dest = Product.query.get(merge.dest_id)
+    dest_id = (merge.dest_id if merge else None) or _detect_merged_into_id(source)
+    if not dest_id:
+        return None, 'مقصد ادغام مشخص نیست'
+
+    dest = Product.query.get(dest_id)
     if not dest:
-        return None, 'کالای مقصد ادغام دیگر وجود ندارد؛ برگرداندن ادغام ممکن نیست'
+        # مقصد پاک شده — حداقل خود مبدا را فعال کن
+        source.merged_into_id = None
+        source.deleted_at = None
+        source.is_active = True
+        source.updated_at = now_tehran()
+        if source.description:
+            lines = [ln for ln in (source.description or '').split('\n')
+                     if not ln.strip().startswith('ادغام') and 'ادغام‌شده' not in ln]
+            source.description = '\n'.join(lines).strip()
+        if merge:
+            merge.undone_at = now_tehran()
+        return merge, None
+
     if dest.deleted_at:
         return None, f'ابتدا کالای مقصد «{dest.name}» را از سطل زباله بازیابی کنید'
 
-    note_tag = f' [ادغام از «{merge.source_name}» #{source.id}]'
-    moved_ids = merge.moved_ids()
+    source_name = (merge.source_name if merge else None) or source.name
+    moved_ids = merge.moved_ids() if merge else []
+    audit = Transaction.query.get(merge.audit_tx_id) if (merge and merge.audit_tx_id) else None
+
+    # اگر رکورد ادغام نبود، از روی یادداشت حرکات بازسازی کن
+    if not moved_ids:
+        for tx in Transaction.query.filter_by(product_id=dest.id).all():
+            note = tx.note or ''
+            if f'#{source.id}]' in note and 'ادغام از' in note:
+                moved_ids.append(tx.id)
+            elif (tx.type == 'adjust' and 'ادغام کالا' in note
+                  and f'(#{source.id})' in note and audit is None):
+                audit = tx
+
+    # مقادیر قبل از ادغام
+    if merge:
+        src_qty = float(merge.src_qty or 0)
+        dst_qty = float(merge.dst_qty_before or 0)
+        src_avg = float(merge.src_avg_cost or 0)
+        dst_avg = float(merge.dst_avg_cost_before or 0)
+        src_unit = float(merge.src_unit_price or 0)
+        dst_unit = float(merge.dst_unit_price_before or 0)
+        dest_name_before = merge.dest_name_before or dest.name
+    else:
+        src_qty = dst_qty = None
+        src_avg = float(source.avg_cost or 0)
+        dst_avg = float(dest.avg_cost or 0)
+        src_unit = float(source.unit_price or 0)
+        dst_unit = float(dest.unit_price or 0)
+        dest_name_before = dest.name
+        if audit and audit.note:
+            m = re.search(
+                r'موجودی مبدا\s+([0-9.]+)\s*\+\s*مقصد\s+([0-9.]+)\s*=\s*([0-9.]+)',
+                audit.note,
+            )
+            if m:
+                src_qty = float(m.group(1))
+                dst_qty = float(m.group(2))
+        if src_qty is None:
+            # جمع دلتای حرکات برگردانده‌شونده
+            src_qty = 0.0
+            for tx in Transaction.query.filter(Transaction.id.in_(moved_ids or [-1])).all():
+                src_qty += float(tx.signed_delta() or 0)
+            src_qty = max(src_qty, 0.0)
+        if dst_qty is None:
+            dst_qty = max(float(dest.quantity or 0) - src_qty, 0.0)
+
+    # برگرداندن حرکات
     if moved_ids:
         for tx in Transaction.query.filter(Transaction.id.in_(moved_ids)).all():
             tx.product_id = source.id
-            if tx.note:
-                tx.note = tx.note.replace(note_tag, '').strip()
+            tx.note = _strip_merge_note(tx.note, source.id, source_name)
 
-    if merge.audit_tx_id:
-        audit = Transaction.query.get(merge.audit_tx_id)
-        if audit:
-            db.session.delete(audit)
+    if audit:
+        db.session.delete(audit)
 
-    dest.name = merge.dest_name_before or dest.name
-    dest.quantity = float(merge.dst_qty_before or 0)
-    dest.avg_cost = float(merge.dst_avg_cost_before or 0)
-    dest.unit_price = float(merge.dst_unit_price_before or 0)
+    # بازگردانی مقصد
+    if merge and merge.keep_name == 'source':
+        dest.name = dest_name_before
+    elif merge:
+        dest.name = dest_name_before
+    dest.quantity = float(dst_qty or 0)
+    dest.avg_cost = float(dst_avg or 0)
+    dest.unit_price = float(dst_unit or 0)
     dest.updated_at = now_tehran()
 
-    source.quantity = float(merge.src_qty or 0)
-    source.avg_cost = float(merge.src_avg_cost or 0)
-    source.unit_price = float(merge.src_unit_price or 0)
+    # بازگردانی مبدا
+    source.quantity = float(src_qty or 0)
+    source.avg_cost = float(src_avg or 0)
+    source.unit_price = float(src_unit or 0)
     source.merged_into_id = None
     source.deleted_at = None
     source.is_active = True
     source.updated_at = now_tehran()
-    # پاک کردن یادداشت ادغام از توضیحات
     if source.description:
-        lines = [ln for ln in source.description.split('\n') if not ln.strip().startswith('ادغام‌شده در')]
+        lines = [ln for ln in source.description.split('\n')
+                 if 'ادغام‌شده' not in ln and not ln.strip().startswith('ادغام‌شده')]
         source.description = '\n'.join(lines).strip()
 
-    merge.undone_at = now_tehran()
-    return merge, None
+    if merge:
+        merge.undone_at = now_tehran()
+    else:
+        # برای ادغام‌های قدیمی بدون رکورد، یک رکورد undone ثبت نکن — کافی است
+        pass
+
+    return merge or True, None
 
 @app.route('/api/products/<int:pid>/status', methods=['PATCH'])
 @require_auth('operator')
@@ -1692,22 +1793,21 @@ def list_trash():
         for p in (Product.query.options(joinedload(Product.warehouse))
                   .filter(Product.deleted_at.isnot(None))
                   .order_by(Product.deleted_at.desc()).all()):
-            is_merge = bool(p.merged_into_id)
-            merge = None
+            dest_id = _detect_merged_into_id(p)
+            merge = (ProductMerge.query
+                     .filter_by(source_id=p.id, undone_at=None)
+                     .order_by(ProductMerge.id.desc())
+                     .first())
+            is_merge = bool(dest_id or merge or ('ادغام' in (p.description or '')))
             dest_name = ''
-            can_unmerge = False
-            if is_merge:
-                merge = (ProductMerge.query
-                         .filter_by(source_id=p.id, undone_at=None)
-                         .order_by(ProductMerge.id.desc())
-                         .first())
-                can_unmerge = bool(merge)
-                if merge:
-                    dest = Product.query.get(merge.dest_id)
-                    dest_name = (dest.name if dest else merge.final_name) or ''
-                elif p.merged_into_id:
-                    dest = Product.query.get(p.merged_into_id)
-                    dest_name = dest.name if dest else f'#{p.merged_into_id}'
+            if merge:
+                dest = Product.query.get(merge.dest_id)
+                dest_name = (dest.name if dest else merge.final_name) or ''
+            elif dest_id:
+                dest = Product.query.get(dest_id)
+                dest_name = dest.name if dest else f'#{dest_id}'
+            # همیشه می‌توان تلاش برای برگرداندن ادغام کرد
+            can_unmerge = is_merge
             meta_parts = []
             if p.warehouse:
                 meta_parts.append(p.warehouse.name)
@@ -1724,7 +1824,7 @@ def list_trash():
                 'deleted_at_raw': p.deleted_at.isoformat(sep=' ') if p.deleted_at else '',
                 'is_merge': is_merge,
                 'can_unmerge': can_unmerge,
-                'merged_into_id': p.merged_into_id,
+                'merged_into_id': dest_id or (merge.dest_id if merge else None),
                 'merged_into_name': dest_name,
             })
     if kind in ('all', 'warehouses'):
@@ -1767,8 +1867,9 @@ def list_trash():
 
 
 @app.route('/api/trash/restore', methods=['POST'])
-@require_section('trash', write=True)
+@require_section('trash')
 def restore_trash_item():
+    """بازیابی از سطل — برای کالاهای ادغامی، ادغام کاملاً برمی‌گردد."""
     data = request.json or {}
     kind = (data.get('type') or '').strip()
     try:
@@ -1788,24 +1889,36 @@ def restore_trash_item():
         if wh and wh.deleted_at:
             return jsonify({'error': f'ابتدا انبار «{wh.name}» را از سطل زباله بازیابی کنید'}), 400
 
-        if item.merged_into_id:
-            merge, err = _undo_product_merge(item)
-            if err and not merge:
-                # اگر رکورد ادغام نبود، بازیابی ساده — ولی موجودی خالی می‌ماند
-                force = bool(data.get('force_simple'))
-                if not force:
-                    return jsonify({'error': err, 'code': 'MERGE_UNDO_UNAVAILABLE'}), 400
+        is_merge = bool(
+            item.merged_into_id
+            or _detect_merged_into_id(item)
+            or ProductMerge.query.filter_by(source_id=item.id, undone_at=None).first()
+            or ('ادغام' in (item.description or ''))
+        )
+        if is_merge:
+            result, err = _undo_product_merge(item)
+            if err and 'ابتدا کالای مقصد' in err:
+                return jsonify({'error': err}), 400
+            if err:
+                # مقصد نامشخص یا داده ناقص — حداقل خود کالا برگردد
                 item.deleted_at = None
                 item.is_active = True
                 item.merged_into_id = None
                 item.updated_at = now_tehran()
-            elif err:
-                return jsonify({'error': err}), 400
+                if item.description:
+                    lines = [ln for ln in item.description.split('\n') if 'ادغام' not in ln]
+                    item.description = '\n'.join(lines).strip()
             else:
                 unmerged = True
+                if item.deleted_at:
+                    item.deleted_at = None
+                    item.is_active = True
+                    item.merged_into_id = None
+                    item.updated_at = now_tehran()
         else:
             item.deleted_at = None
             item.is_active = True
+            item.merged_into_id = None
             item.updated_at = now_tehran()
     elif kind == 'warehouse':
         item = Warehouse.query.get_or_404(item_id)
@@ -1814,9 +1927,9 @@ def restore_trash_item():
         item.deleted_at = None
         item.is_active = True
         # کالاهایی که همراه انبار حذف شده بودند برمی‌گردند (فعال)
-        # کالاهای ادغامی را دست نمی‌زنیم
+        # کالاهای ادغامی را دست نمی‌زنیم — باید جدا با برگرداندن ادغام شوند
         for p in item.products:
-            if p.deleted_at and not p.merged_into_id:
+            if p.deleted_at and not _detect_merged_into_id(p):
                 p.deleted_at = None
                 p.is_active = True
                 p.updated_at = now_tehran()
@@ -1838,7 +1951,7 @@ def restore_trash_item():
 
 
 @app.route('/api/trash/purge', methods=['POST'])
-@require_section('trash', write=True)
+@require_section('trash')
 def purge_trash_item():
     """حذف دائمی یک مورد از سطل زباله"""
     data = request.json or {}
@@ -1885,7 +1998,7 @@ def purge_trash_item():
 
 
 @app.route('/api/trash/empty', methods=['POST'])
-@require_section('trash', write=True)
+@require_section('trash')
 def empty_trash():
     """خالی کردن کامل سطل زباله یا فقط یک نوع"""
     data = request.json or {}
