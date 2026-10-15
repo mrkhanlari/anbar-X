@@ -1166,7 +1166,7 @@
     </div>
   </div>
   <div id="user-badge" style="display:none;"></div>
-  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۴.۰</div>
+  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۴.۱</div>
 </nav>
 
 <!-- Main -->
@@ -1302,6 +1302,17 @@
       <div class="form-group full">
         <label>توضیحات کالا</label>
         <textarea id="prod-desc" placeholder="توضیح اختیاری..."></textarea>
+      </div>
+      <div class="form-group full" id="prod-active-group">
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;line-height:1.5;">
+          <input type="checkbox" id="prod-active" checked style="width:16px;height:16px;margin-top:3px;flex-shrink:0;"/>
+          <span>
+            <b>کالا فعال است</b>
+            <span class="text-sm text-muted" style="display:block;margin-top:4px;">
+              اگر غیرفعال باشد فقط در «حرکات انبار» و «گزارش بخش‌ها» دیده می‌شود و از داشبورد، لیست کالاها و خروج رسمی مخفی می‌ماند.
+            </span>
+          </span>
+        </label>
       </div>
       <div class="form-group full" id="prod-create-hint" style="display:none;">
         <div class="text-sm" style="color:var(--yellow);">
@@ -2074,6 +2085,9 @@ async function renderProductCard() {
     : p.status==='low'
     ? '<span class="badge badge-yellow">⚠️ کم‌موجود</span>'
     : '<span class="badge badge-green">✅ موجود</span>';
+  const activeBadge = p.is_active
+    ? '<span class="badge badge-green">فعال</span>'
+    : '<span class="badge badge-red">غیرفعال</span>';
 
   const metaParts = [
     p.warehouse_name || '',
@@ -2090,19 +2104,30 @@ async function renderProductCard() {
   else if (tab === 'out') { viewTab = 'history'; }
   state.productCardTab = viewTab;
 
+  const canWrite = !window._isViewer && p.is_active;
+
   document.getElementById('content').innerHTML = `
   <div class="card mb-4">
     <div class="pc-hero">
       <div class="pc-hero-main">
         <div class="pc-hero-name">${escHtml(p.name)}</div>
         <div class="pc-hero-meta">${metaParts.join(' · ')}</div>
-        <div style="margin-top:10px;">${statusBadge}</div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">${statusBadge}${activeBadge}</div>
+        ${window._isViewer ? '' : `
+        <label class="pc-active-toggle" style="display:flex;align-items:center;gap:10px;margin-top:14px;cursor:pointer;user-select:none;">
+          <input type="checkbox" id="pc-active" ${p.is_active ? 'checked' : ''} onchange="toggleProductActive(${p.id}, this.checked)" style="width:16px;height:16px;"/>
+          <span style="font-size:13px;line-height:1.45;">
+            <b>کالا فعال است</b>
+            <span class="text-muted" style="display:block;font-size:12px;margin-top:2px;">غیرفعال = مخفی از داشبورد و لیست‌ها؛ تاریخچه در حرکات انبار و گزارش بخش‌ها می‌ماند</span>
+          </span>
+        </label>`}
+        ${!p.is_active ? '<div class="text-sm" style="margin-top:10px;color:var(--yellow);">این کالا غیرفعال است و در داشبورد / لیست کالاها / خروج رسمی نمایش داده نمی‌شود.</div>' : ''}
         <div class="pc-hero-actions">
-          ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" onclick="openTxModal(${p.id},'in')">⬆️ ورود خرید</button>`}
-          ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openTxModal(${p.id},'adjust')">📝 اصلاح موجودی</button>`}
+          ${canWrite ? `<button class="btn btn-sm btn-success" onclick="openTxModal(${p.id},'in')">⬆️ ورود خرید</button>` : ''}
+          ${canWrite ? `<button class="btn btn-sm btn-secondary" onclick="openTxModal(${p.id},'adjust')">📝 اصلاح موجودی</button>` : ''}
           ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️ مشخصات</button>`}
         </div>
-        ${window._isViewer ? '' : `<div class="text-sm text-muted" style="margin-top:10px;">برای خروج کالا از منوی «خروج رسمی» استفاده کنید.</div>`}
+        ${canWrite ? `<div class="text-sm text-muted" style="margin-top:10px;">برای خروج کالا از منوی «خروج رسمی» استفاده کنید.</div>` : ''}
       </div>
       <div class="pc-hero-qty">
         <div>
@@ -2864,6 +2889,7 @@ async function openProductModal(id=null, whId=null) {
       document.getElementById('prod-unit').value = p.unit;
       document.getElementById('prod-min').value = p.min_stock||0;
       document.getElementById('prod-desc').value = p.description||'';
+      document.getElementById('prod-active').checked = p.is_active !== false;
       sel.value = p.warehouse_id;
       document.getElementById('prod-qty-ro').textContent = `${fmt(p.quantity)} ${p.unit}`;
       document.getElementById('prod-price-ro').textContent = p.unit_price ? fmtPrice(p.unit_price) : '—';
@@ -2876,6 +2902,7 @@ async function openProductModal(id=null, whId=null) {
     ['prod-name','prod-sku','prod-cat','prod-desc'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('prod-min').value = 0;
     document.getElementById('prod-unit').value = 'عدد';
+    document.getElementById('prod-active').checked = true;
     if (whId) sel.value = whId;
     document.getElementById('prod-wh-group').style.display = 'flex';
     if (stockInfo) stockInfo.style.display = 'none';
@@ -2898,6 +2925,7 @@ async function saveProduct() {
       min_stock: parseFloat(document.getElementById('prod-min').value)||0,
       description: document.getElementById('prod-desc').value,
       warehouse_id: parseInt(document.getElementById('prod-wh').value),
+      is_active: document.getElementById('prod-active').checked,
     };
     if (state.editProductId) {
       await api('PUT', `/products/${state.editProductId}`, body);
@@ -2909,7 +2937,7 @@ async function saveProduct() {
       toast('کالا تعریف شد — حالا ورود خرید را ثبت کنید 📦');
       closeModal('modal-product');
       if (created && created.id) {
-        openProductCard(created.id, 'in');
+        openProductCard(created.id, body.is_active === false ? 'history' : 'in');
       } else {
         await renderPage();
       }
@@ -2922,10 +2950,21 @@ async function saveProduct() {
 }
 
 async function deleteProduct(id, name) {
-  if (!confirm(`آیا از حذف کالای "${name}" مطمئن هستید؟`)) return;
+  if (!confirm(`آیا از حذف کالای "${name}" مطمئن هستید؟\n(کالا غیرفعال می‌شود و فقط در حرکات انبار / گزارش بخش‌ها می‌ماند)`)) return;
   await api('DELETE', `/products/${id}`);
-  toast('کالا حذف شد 🗑');
+  toast('کالا غیرفعال شد 🗑');
   renderPage();
+}
+
+async function toggleProductActive(pid, isActive) {
+  const box = document.getElementById('pc-active');
+  try {
+    await api('PATCH', `/products/${pid}/active`, { is_active: !!isActive });
+    toast(isActive ? 'کالا فعال شد ✅' : 'کالا غیرفعال شد — از داشبورد و لیست‌ها مخفی شد');
+    await renderProductCard();
+  } catch (e) {
+    if (box) box.checked = !isActive;
+  }
 }
 
 // ─── Transactions ────────────────────────────────────────────────────────────

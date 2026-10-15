@@ -794,6 +794,7 @@ def create_product():
         unit_price=0, avg_cost=0,
         min_stock=float(data.get('min_stock', 0) or 0),
         description=data.get('description', ''),
+        is_active=bool(data['is_active']) if 'is_active' in data else True,
     )
     db.session.add(p)
     db.session.commit()
@@ -808,7 +809,23 @@ def update_product(pid):
     for f in ['name', 'sku', 'category', 'unit', 'min_stock', 'description']:
         if f in data:
             setattr(p, f, data[f])
+    if 'is_active' in data:
+        p.is_active = bool(data['is_active'])
     # قیمت واحد فقط از ورود خرید به‌روز می‌شود؛ اگر صریح فرستاده شد نادیده بگیر مگر admin path جدا
+    p.updated_at = now_tehran()
+    db.session.commit()
+    return jsonify(p.to_dict())
+
+
+@app.route('/api/products/<int:pid>/active', methods=['PATCH'])
+@require_auth('operator')
+def set_product_active(pid):
+    """فعال / غیرفعال کردن کالا — غیرفعال از لیست‌ها و داشبورد مخفی می‌شود"""
+    p = Product.query.get_or_404(pid)
+    data = request.json or {}
+    if 'is_active' not in data:
+        return jsonify({'error': 'مقدار is_active الزامی است'}), 400
+    p.is_active = bool(data['is_active'])
     p.updated_at = now_tehran()
     db.session.commit()
     return jsonify(p.to_dict())
@@ -1065,6 +1082,8 @@ def product_card(pid):
 @require_auth('operator')
 def add_transaction(pid):
     p = Product.query.get_or_404(pid)
+    if not p.is_active:
+        return jsonify({'error': 'این کالا غیرفعال است؛ ابتدا از کارت کالا فعالش کنید'}), 400
     user = get_current_user()
     data = request.json or {}
     tx_type = data.get('type')
@@ -1187,6 +1206,8 @@ def create_dispatch():
         return jsonify({'error': 'مقدار باید بیشتر از صفر باشد'}), 400
     product = Product.query.get_or_404(product_id)
     dept    = Department.query.get_or_404(department_id)
+    if not product.is_active:
+        return jsonify({'error': 'این کالا غیرفعال است و نمی‌توان برای آن خروج ثبت کرد'}), 400
     if not dept.is_active:
         return jsonify({'error': 'این بخش غیرفعال است'}), 400
     if product.quantity < quantity:
@@ -1425,11 +1446,14 @@ def dashboard():
     low_stock = [p for p in active_products if p.get_status() == 'low']
     out_of_stock = [p for p in active_products if p.get_status() == 'out']
 
+    # حرکات اخیر داشبورد هم فقط کالاهای فعال — تاریخچهٔ غیرفعال‌ها در «حرکات انبار» می‌ماند
     recent_txs = (Transaction.query
+                  .join(Product, Transaction.product_id == Product.id)
                   .options(
                       joinedload(Transaction.product).joinedload(Product.warehouse),
                       joinedload(Transaction.department),
                   )
+                  .filter(Product.is_active == True)
                   .order_by(Transaction.created_at.desc()).limit(10).all())
     return jsonify({
         'warehouse_count':   warehouse_count,
