@@ -780,6 +780,107 @@
     pointer-events: none;
   }
 
+  /* ── Searchable combobox (merge product picker) ── */
+  .merge-combo {
+    position: relative;
+    width: 100%;
+  }
+  .merge-combo-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'Vazirmatn', sans-serif;
+    font-size: 14px;
+    text-align: right;
+    cursor: pointer;
+    min-height: 42px;
+    transition: border-color .15s;
+  }
+  .merge-combo-btn:hover:not(:disabled) { border-color: var(--accent); }
+  .merge-combo-btn:disabled {
+    opacity: .65;
+    cursor: not-allowed;
+  }
+  .merge-combo-btn.is-open { border-color: var(--accent); }
+  .merge-combo-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .merge-combo-label.is-placeholder { color: var(--text3); font-weight: 500; }
+  .merge-combo-caret {
+    color: var(--text3);
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .merge-combo-panel {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + 4px);
+    right: 0;
+    left: 0;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .merge-combo-search {
+    padding: 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg3);
+  }
+  .merge-combo-search input {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 13px;
+    min-height: 36px;
+  }
+  .merge-combo-list {
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 4px;
+  }
+  .merge-combo-item {
+    width: 100%;
+    display: block;
+    text-align: right;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-family: 'Vazirmatn', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    line-height: 1.45;
+  }
+  .merge-combo-item:hover,
+  .merge-combo-item.is-active {
+    background: rgba(59,130,246,.12);
+  }
+  .merge-combo-item .sub {
+    display: block;
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 2px;
+  }
+  .merge-combo-empty {
+    padding: 14px 12px;
+    text-align: center;
+    color: var(--text3);
+    font-size: 13px;
+  }
+
   /* ── Warehouse Cards Grid ── */
   .wh-grid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -3693,6 +3794,31 @@ async function loadDeptReport() {
 
 // ─── Merge Products ───────────────────────────────────────────────────────────
 
+function mergeComboHtml(side, label) {
+  return `<div class="form-group span-2">
+    <label>${label}</label>
+    <div class="merge-combo" id="merge-combo-${side}" data-side="${side}">
+      <button type="button" class="merge-combo-btn" id="merge-${side}-btn"
+        onclick="toggleMergeCombo('${side}')" disabled>
+        <span class="merge-combo-label is-placeholder" id="merge-${side}-label">ابتدا انبار را انتخاب کنید</span>
+        <span class="merge-combo-caret">▾</span>
+      </button>
+      <input type="hidden" id="merge-${side}" value=""/>
+      <div class="merge-combo-panel" id="merge-${side}-panel" hidden>
+        <div class="merge-combo-search">
+          <input id="merge-${side}-q" type="search" autocomplete="off"
+            placeholder="جستجوی نام کالا..."
+            oninput="onMergeSearchInput('${side}')"
+            onclick="event.stopPropagation()"/>
+        </div>
+        <div class="merge-combo-list" id="merge-${side}-list">
+          <div class="merge-combo-empty">ابتدا انبار را انتخاب کنید</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
 async function renderMergeProducts() {
   if (!userCanAccess('merge_products')) {
     document.getElementById('content').innerHTML =
@@ -3703,6 +3829,7 @@ async function renderMergeProducts() {
   window._mergePreview = null;
   window._mergeWhProducts = [];
   window._mergeSearchTimers = {};
+  window._mergeOpenSide = null;
   const whs = state.warehouses;
   const c = document.getElementById('content');
   c.innerHTML = `
@@ -3711,7 +3838,7 @@ async function renderMergeProducts() {
     <div class="text-sm text-muted" style="margin-bottom:14px;line-height:1.7;">
       اگر یک کالا دو بار (یا با دو اسم) ثبت شده، کالای <b>مبدا</b> داخل <b>مقصد</b> ادغام می‌شود:
       همه ورود/خروج/قیمت/ساعت/بخش‌ها به مقصد منتقل می‌شود، موجودی‌ها جمع می‌شود و مبدا به سطل زباله می‌رود (قابل برگرداندن).
-      این کار فقط داخل <b>یک انبار</b> مجاز است. برای پیدا کردن کالا، نام را در کادر جستجو تایپ کنید.
+      این کار فقط داخل <b>یک انبار</b> مجاز است. روی فیلد کالا بزنید و در بالای لیست جستجو کنید.
     </div>
     <div class="filter-bar">
       <div class="form-group">
@@ -3721,32 +3848,8 @@ async function renderMergeProducts() {
           ${whs.map(w => `<option value="${w.id}">${escHtml(w.name)}</option>`).join('')}
         </select>
       </div>
-      <div class="form-group span-2">
-        <label>جستجوی مبدا</label>
-        <div class="search-bar">
-          <span class="search-icon">🔍</span>
-          <input id="merge-source-q" placeholder="نام کالا را بنویسید..." oninput="onMergeSearchInput('source')" disabled style="width:100%;"/>
-        </div>
-      </div>
-      <div class="form-group span-2">
-        <label>کالای مبدا (حذف/ادغام می‌شود) *</label>
-        <select id="merge-source" onchange="onMergeSelectionChange()" size="6" style="height:auto;min-height:140px;">
-          <option value="">ابتدا انبار را انتخاب کنید</option>
-        </select>
-      </div>
-      <div class="form-group span-2">
-        <label>جستجوی مقصد</label>
-        <div class="search-bar">
-          <span class="search-icon">🔍</span>
-          <input id="merge-dest-q" placeholder="نام کالا را بنویسید..." oninput="onMergeSearchInput('dest')" disabled style="width:100%;"/>
-        </div>
-      </div>
-      <div class="form-group span-2">
-        <label>کالای مقصد (باقی می‌ماند) *</label>
-        <select id="merge-dest" onchange="onMergeSelectionChange()" size="6" style="height:auto;min-height:140px;">
-          <option value="">ابتدا انبار را انتخاب کنید</option>
-        </select>
-      </div>
+      ${mergeComboHtml('source', 'کالای مبدا (حذف/ادغام می‌شود) *')}
+      ${mergeComboHtml('dest', 'کالای مقصد (باقی می‌ماند) *')}
       <div class="form-group">
         <label>نام نهایی</label>
         <select id="merge-keep-name">
@@ -3761,82 +3864,154 @@ async function renderMergeProducts() {
     </div>
   </div>
   <div id="merge-preview"><div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">انبار و دو کالا را انتخاب کنید، سپس پیش‌نمایش را بزنید</div></div></div>`;
+
+  if (!window._mergeComboDocBound) {
+    window._mergeComboDocBound = true;
+    document.addEventListener('click', (e) => {
+      if (!window._mergeOpenSide) return;
+      if (e.target.closest && e.target.closest('.merge-combo')) return;
+      closeMergeCombo(window._mergeOpenSide);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && window._mergeOpenSide) closeMergeCombo(window._mergeOpenSide);
+    });
+  }
 }
 
-function fillMergeSelect(sel, items, keepId) {
-  if (!sel) return;
-  const opts = ['<option value="">انتخاب کالا...</option>']
-    .concat(items.map(p => {
-      const selected = keepId && String(p.id) === String(keepId) ? ' selected' : '';
-      return `<option value="${p.id}"${selected}>${escHtml(p.name)} — موجودی ${fmt(p.quantity)} ${escHtml(p.unit||'')}${p.sku ? ' · ' + escHtml(p.sku) : ''}</option>`;
-    }));
-  sel.innerHTML = opts.join('');
-  if (keepId && ![...sel.options].some(o => o.value === String(keepId))) {
-    // انتخاب قبلی در نتایج جستجو نیست — نگهش می‌داریم
-    const prev = (window._mergeWhProducts || []).find(p => String(p.id) === String(keepId));
-    if (prev) {
-      const o = document.createElement('option');
-      o.value = String(prev.id);
-      o.textContent = `${prev.name} — موجودی ${prev.quantity} ${prev.unit || ''} (انتخاب‌شده)`;
-      o.selected = true;
-      sel.appendChild(o);
-    }
+function setMergeComboLabel(side, text, isPlaceholder=false) {
+  const label = document.getElementById(`merge-${side}-label`);
+  if (!label) return;
+  label.textContent = text;
+  label.classList.toggle('is-placeholder', !!isPlaceholder);
+}
+
+function setMergeComboEnabled(side, enabled) {
+  const btn = document.getElementById(`merge-${side}-btn`);
+  if (btn) btn.disabled = !enabled;
+}
+
+function closeMergeCombo(side) {
+  const panel = document.getElementById(`merge-${side}-panel`);
+  const btn = document.getElementById(`merge-${side}-btn`);
+  if (panel) panel.hidden = true;
+  if (btn) btn.classList.remove('is-open');
+  if (window._mergeOpenSide === side) window._mergeOpenSide = null;
+}
+
+function toggleMergeCombo(side) {
+  const btn = document.getElementById(`merge-${side}-btn`);
+  if (!btn || btn.disabled) return;
+  const panel = document.getElementById(`merge-${side}-panel`);
+  const opening = panel && panel.hidden;
+  // بستن طرف دیگر
+  ['source', 'dest'].forEach(s => { if (s !== side) closeMergeCombo(s); });
+  if (!opening) {
+    closeMergeCombo(side);
+    return;
   }
+  panel.hidden = false;
+  btn.classList.add('is-open');
+  window._mergeOpenSide = side;
+  const q = document.getElementById(`merge-${side}-q`);
+  if (q) {
+    q.value = '';
+    setTimeout(() => q.focus(), 30);
+  }
+  loadMergeProductOptions(side, '');
+}
+
+function renderMergeComboList(side, items) {
+  const list = document.getElementById(`merge-${side}-list`);
+  if (!list) return;
+  const selectedId = document.getElementById(`merge-${side}`)?.value || '';
+  if (!items.length) {
+    list.innerHTML = '<div class="merge-combo-empty">کالایی پیدا نشد</div>';
+    return;
+  }
+  list.innerHTML = items.map(p => {
+    const active = String(p.id) === String(selectedId) ? ' is-active' : '';
+    const sub = `موجودی ${fmt(p.quantity)} ${escHtml(p.unit || '')}${p.sku ? ' · ' + escHtml(p.sku) : ''}`;
+    return `<button type="button" class="merge-combo-item${active}"
+      onclick="pickMergeProduct('${side}',${p.id})">
+      <span>${escHtml(p.name)}</span>
+      <span class="sub">${sub}</span>
+    </button>`;
+  }).join('');
+}
+
+function pickMergeProduct(side, id) {
+  const p = (window._mergeWhProducts || []).find(x => String(x.id) === String(id));
+  const hidden = document.getElementById(`merge-${side}`);
+  if (hidden) hidden.value = String(id);
+  if (p) {
+    setMergeComboLabel(side, `${p.name} — موجودی ${fmt(p.quantity)} ${p.unit || ''}`, false);
+  } else {
+    setMergeComboLabel(side, `کالا #${id}`, false);
+  }
+  closeMergeCombo(side);
+  onMergeSelectionChange();
 }
 
 async function loadMergeProductOptions(side, q='') {
   const whId = document.getElementById('merge-wh')?.value || '';
-  const sel = document.getElementById(side === 'source' ? 'merge-source' : 'merge-dest');
-  if (!whId || !sel) return;
-  const keepId = sel.value || '';
-  sel.innerHTML = '<option value="">در حال جستجو...</option>';
+  const list = document.getElementById(`merge-${side}-list`);
+  if (!whId || !list) return;
+  list.innerHTML = '<div class="merge-combo-empty">در حال جستجو...</div>';
   const qs = new URLSearchParams({
     warehouse_id: whId,
-    per_page: '100',
+    per_page: '80',
   });
   if (q.trim()) qs.set('search', q.trim());
-  const res = await api('GET', `/products?${qs.toString()}`);
-  const items = (res && res.items) || [];
-  // کش همه نتایج برای نام‌ها
-  const byId = new Map((window._mergeWhProducts || []).map(p => [p.id, p]));
-  items.forEach(p => byId.set(p.id, p));
-  window._mergeWhProducts = [...byId.values()];
-  fillMergeSelect(sel, items, keepId);
+  try {
+    const res = await api('GET', `/products?${qs.toString()}`);
+    const items = (res && res.items) || [];
+    const byId = new Map((window._mergeWhProducts || []).map(p => [p.id, p]));
+    items.forEach(p => byId.set(p.id, p));
+    window._mergeWhProducts = [...byId.values()];
+    renderMergeComboList(side, items);
+  } catch (e) {
+    list.innerHTML = '<div class="merge-combo-empty">خطا در جستجو</div>';
+  }
 }
 
 function onMergeSearchInput(side) {
   const timers = window._mergeSearchTimers || (window._mergeSearchTimers = {});
   clearTimeout(timers[side]);
   timers[side] = setTimeout(() => {
-    const q = document.getElementById(side === 'source' ? 'merge-source-q' : 'merge-dest-q')?.value || '';
+    const q = document.getElementById(`merge-${side}-q`)?.value || '';
     loadMergeProductOptions(side, q);
-  }, 280);
+  }, 250);
 }
 
 async function onMergeWarehouseChange() {
   const whId = document.getElementById('merge-wh')?.value || '';
-  const src = document.getElementById('merge-source');
-  const dst = document.getElementById('merge-dest');
-  const srcQ = document.getElementById('merge-source-q');
-  const dstQ = document.getElementById('merge-dest-q');
   const preview = document.getElementById('merge-preview');
   const btn = document.getElementById('merge-run-btn');
   window._mergePreview = null;
+  window._mergeWhProducts = [];
   if (btn) btn.disabled = true;
-  if (srcQ) { srcQ.value = ''; srcQ.disabled = !whId; }
-  if (dstQ) { dstQ.value = ''; dstQ.disabled = !whId; }
+  closeMergeCombo('source');
+  closeMergeCombo('dest');
+  ['source', 'dest'].forEach(side => {
+    const hidden = document.getElementById(`merge-${side}`);
+    if (hidden) hidden.value = '';
+    const q = document.getElementById(`merge-${side}-q`);
+    if (q) q.value = '';
+    if (!whId) {
+      setMergeComboEnabled(side, false);
+      setMergeComboLabel(side, 'ابتدا انبار را انتخاب کنید', true);
+      const list = document.getElementById(`merge-${side}-list`);
+      if (list) list.innerHTML = '<div class="merge-combo-empty">ابتدا انبار را انتخاب کنید</div>';
+    } else {
+      setMergeComboEnabled(side, true);
+      setMergeComboLabel(side, 'انتخاب کالا...', true);
+    }
+  });
   if (!whId) {
-    window._mergeWhProducts = [];
-    if (src) src.innerHTML = '<option value="">ابتدا انبار را انتخاب کنید</option>';
-    if (dst) dst.innerHTML = '<option value="">ابتدا انبار را انتخاب کنید</option>';
     if (preview) preview.innerHTML = '<div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">انبار را انتخاب کنید</div></div>';
     return;
   }
-  await Promise.all([
-    loadMergeProductOptions('source', ''),
-    loadMergeProductOptions('dest', ''),
-  ]);
-  if (preview) preview.innerHTML = '<div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">با جستجو مبدا و مقصد را پیدا کنید</div></div>';
+  if (preview) preview.innerHTML = '<div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">روی فیلد کالا بزنید و جستجو/انتخاب کنید</div></div>';
 }
 
 function onMergeSelectionChange() {
