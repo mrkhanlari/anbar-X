@@ -1163,7 +1163,7 @@
     </div>
   </div>
   <div id="user-badge" style="display:none;"></div>
-  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۳.۲</div>
+  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۳.۳</div>
 </nav>
 
 <!-- Main -->
@@ -2286,31 +2286,51 @@ function buildProductCardMoves(txs) {
 // ─── All Products ─────────────────────────────────────────────────────────────
 
 async function renderAllProducts() {
-  window._allProdsSearch = '';
+  window._allProdsSearch = window._allProdsSearch || '';
+  window._allProdsWhId = window._allProdsWhId || '';
   // بدون این، اگه مستقیم به این صفحه بیای (بدون رفتن به «انبارها» قبلش) ستون انبار همیشه «—» نشون داده می‌شد
   state.warehouses = state.warehouses.length ? state.warehouses : await api('GET', '/warehouses');
+  const whs = state.warehouses;
   document.getElementById('topbar-actions').innerHTML =
     window._isViewer ? '' : `<button class="btn btn-primary" onclick="openProductModal()">➕ کالای جدید</button>`;
   const c = document.getElementById('content');
-  c.innerHTML = `<div class="card">
-    <div class="flex-between mb-4" style="flex-wrap:wrap;gap:10px;">
-      <div class="card-title" style="margin:0" id="all-prods-count">در حال بارگذاری...</div>
-      <div class="search-bar" style="flex:1;min-width:180px;max-width:320px;">
-        <span class="search-icon">🔍</span>
-        <input id="all-prod-search" placeholder="جستجو..." oninput="searchAllProds(this.value)" style="width:100%;"/>
+  c.innerHTML = `
+  <div class="card mb-4" id="all-prods-filter-card">
+    <div class="filter-bar">
+      <div class="form-group">
+        <label>انبار</label>
+        <select id="all-prod-wh">
+          <option value="">همه انبارها</option>
+          ${whs.map(w => `<option value="${w.id}" ${String(window._allProdsWhId)===String(w.id)?'selected':''}>${escHtml(w.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group span-2">
+        <label>جستجوی کالا</label>
+        <div class="search-bar">
+          <span class="search-icon">🔍</span>
+          <input id="all-prod-search" placeholder="نام، کد یا دسته..." value="${escHtml(window._allProdsSearch || '')}" style="width:100%;"/>
+        </div>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-primary" onclick="searchAllProds()">🔍 جستجو</button>
       </div>
     </div>
+    <div class="text-sm text-muted" style="margin-top:10px;">انبار را انتخاب کنید و جستجو را بزنید · Enter هم جستجو می‌کند</div>
+  </div>
+  <div class="card">
+    <div class="card-title" id="all-prods-count" style="margin-bottom:14px;">در حال بارگذاری...</div>
     <div id="all-prods-body"><div class="spinner"></div></div>
   </div>`;
+  bindFilterEnterNav(document.getElementById('all-prods-filter-card'), () => searchAllProds());
   await loadProdPage(1);
 }
 
-let _allProdsSearchTimer = null;
-function searchAllProds(val) {
-  // debounce — تا با هر حرف تایپ‌شده درخواست جدا به سرور نره
-  window._allProdsSearch = val;
-  clearTimeout(_allProdsSearchTimer);
-  _allProdsSearchTimer = setTimeout(() => loadProdPage(1), 350);
+function searchAllProds() {
+  const whEl = document.getElementById('all-prod-wh');
+  const qEl = document.getElementById('all-prod-search');
+  window._allProdsWhId = whEl ? (whEl.value || '') : '';
+  window._allProdsSearch = qEl ? (qEl.value || '').trim() : '';
+  loadProdPage(1);
 }
 
 function goToProdPage(page) { loadProdPage(page); }
@@ -2323,18 +2343,27 @@ function prodStatusBadge(p) {
 
 async function loadProdPage(page) {
   const search = window._allProdsSearch || '';
+  const whId = window._allProdsWhId || '';
   const params = new URLSearchParams({page, per_page: 50});
   if (search) params.set('search', search);
+  if (whId) params.set('warehouse_id', whId);
   const res = await api('GET', `/products?${params.toString()}`);
 
   const countEl = document.getElementById('all-prods-count');
-  if (countEl) countEl.textContent = `همه کالاها (${fmt(res.total)})`;
+  if (countEl) {
+    const whName = whId
+      ? ((state.warehouses.find(w => String(w.id) === String(whId)) || {}).name || 'انبار')
+      : '';
+    countEl.textContent = whName
+      ? `کالاهای ${whName} (${fmt(res.total)})`
+      : `همه کالاها (${fmt(res.total)})`;
+  }
 
   const body = document.getElementById('all-prods-body');
   if (!body) return;
   if (!res.total) {
-    body.innerHTML = search
-      ? `<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">نتیجه‌ای یافت نشد</div></div>`
+    body.innerHTML = (search || whId)
+      ? `<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">نتیجه‌ای با این فیلتر یافت نشد</div></div>`
       : `<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">هیچ کالایی ثبت نشده</div></div>`;
     return;
   }

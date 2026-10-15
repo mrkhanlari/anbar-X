@@ -734,13 +734,25 @@ def get_products(wid):
 @app.route('/api/products', methods=['GET'])
 @require_auth()
 def get_all_products():
-    search = request.args.get('search', '')
+    search = request.args.get('search', '').strip()
+    wh_id = request.args.get('warehouse_id', '').strip()
     page = max(1, request.args.get('page', 1, type=int))
     per_page = min(max(request.args.get('per_page', 50, type=int), 1), 200)
 
     query = Product.query.options(joinedload(Product.warehouse)).filter_by(is_active=True)
+    if wh_id not in ('', 'all', None):
+        try:
+            query = query.filter(Product.warehouse_id == int(wh_id))
+        except (TypeError, ValueError):
+            pass
     if search:
-        query = query.filter(Product.name.ilike(f'%{search}%'))
+        query = query.filter(
+            db.or_(
+                Product.name.ilike(f'%{search}%'),
+                Product.sku.ilike(f'%{search}%'),
+                Product.category.ilike(f'%{search}%'),
+            )
+        )
     query = query.order_by(Product.id.desc())
 
     total = query.count()
