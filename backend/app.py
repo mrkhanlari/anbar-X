@@ -25,10 +25,11 @@ APP_SECTIONS = (
     'report',
     'users',
     'merge_products',
+    'trash',
 )
 
 # بخش‌هایی که فقط مدیر می‌بیند
-ADMIN_ONLY_SECTIONS = ('users', 'merge_products')
+ADMIN_ONLY_SECTIONS = ('users', 'merge_products', 'trash')
 
 # پیش‌فرض دسترسی هر نقش — اگر فیلد permissions خالی باشد
 DEFAULT_PERMISSIONS = {
@@ -186,11 +187,14 @@ class Warehouse(db.Model):
     description = db.Column(db.Text)
     created_at  = db.Column(db.DateTime, default=now_tehran)
     is_active   = db.Column(db.Boolean, default=True, index=True)
+    deleted_at  = db.Column(db.DateTime, nullable=True, index=True)
     products    = db.relationship('Product', backref='warehouse', lazy=True, cascade='all, delete-orphan')
 
     def to_dict(self):
         jdt = jdatetime.datetime.fromgregorian(datetime=self.created_at)
-        active_products = [p for p in self.products if p.is_active]
+        # آمار انبار: کالاهای حذف‌نشده (فعال + غیرفعال)
+        alive = [p for p in self.products if not p.deleted_at]
+        live_active = [p for p in alive if p.is_active]
         return {
             'id': self.id,
             'name': self.name,
@@ -198,9 +202,11 @@ class Warehouse(db.Model):
             'description': self.description or '',
             'created_at': jdt.strftime('%Y/%m/%d'),
             'is_active': self.is_active,
-            'product_count': len(active_products),
-            'total_items': sum(p.quantity for p in active_products),
-            'total_value': sum(p.stock_value() for p in active_products),
+            'deleted_at': jdatetime.datetime.fromgregorian(datetime=self.deleted_at).strftime('%Y/%m/%d %H:%M') if self.deleted_at else '',
+            'product_count': len(alive),
+            'active_product_count': len(live_active),
+            'total_items': sum(p.quantity for p in live_active),
+            'total_value': sum(p.stock_value() for p in live_active),
         }
 
 
@@ -210,6 +216,7 @@ class Department(db.Model):
     name        = db.Column(db.String(100), nullable=False, index=True)
     description = db.Column(db.Text)
     is_active   = db.Column(db.Boolean, default=True, index=True)
+    deleted_at  = db.Column(db.DateTime, nullable=True, index=True)
     created_at  = db.Column(db.DateTime, default=now_tehran)
 
     def to_dict(self):
@@ -219,6 +226,7 @@ class Department(db.Model):
             'name': self.name,
             'description': self.description or '',
             'is_active': self.is_active,
+            'deleted_at': jdatetime.datetime.fromgregorian(datetime=self.deleted_at).strftime('%Y/%m/%d %H:%M') if self.deleted_at else '',
             'created_at': jdt.strftime('%Y/%m/%d'),
         }
 
@@ -239,6 +247,7 @@ class Product(db.Model):
     created_at    = db.Column(db.DateTime, default=now_tehran)
     updated_at    = db.Column(db.DateTime, default=now_tehran, onupdate=now_tehran)
     is_active     = db.Column(db.Boolean, default=True, index=True)
+    deleted_at    = db.Column(db.DateTime, nullable=True, index=True)
     manual_status = db.Column(db.String(20), default=None)
     transactions  = db.relationship('Transaction', backref='product', lazy=True, cascade='all, delete-orphan')
 
@@ -294,6 +303,7 @@ class Product(db.Model):
             'created_at': jdt_c.strftime('%Y/%m/%d'),
             'updated_at': jdt_u.strftime('%Y/%m/%d %H:%M'),
             'is_active': self.is_active,
+            'deleted_at': jdatetime.datetime.fromgregorian(datetime=self.deleted_at).strftime('%Y/%m/%d %H:%M') if self.deleted_at else '',
             'status': self.get_status(),
             'manual_status': self.manual_status or '',
             'total_value': self.stock_value(),
@@ -648,9 +658,10 @@ def get_all_login_logs():
 @require_auth()
 def get_warehouses():
     # joinedload جلوگیری می‌کند از N+1 query برای products
-    whs = Warehouse.query.filter_by(is_active=True).options(
-        joinedload(Warehouse.products)
-    ).all()
+    whs = (Warehouse.query
+           .filter(Warehouse.is_active == True, Warehouse.deleted_at.is_(None))
+           .options(joinedload(Warehouse.products))
+           .all())
     return jsonify([w.to_dict() for w in whs])
 
 @app.route('/api/warehouses', methods=['POST'])
@@ -678,8 +689,16 @@ def update_warehouse(wid):
 @app.route('/api/warehouses/<int:wid>', methods=['DELETE'])
 @require_auth('admin')
 def delete_warehouse(wid):
+    """حذف نرم انبار → سطل زباله؛ کالاهایش هم به سطل می‌روند"""
     wh = Warehouse.query.get_or_404(wid)
+    now = now_tehran()
     wh.is_active = False
+    wh.deleted_at = now
+    for p in wh.products:
+        if not p.deleted_at:
+            p.is_active = False
+            p.deleted_at = now
+            p.updated_at = now
     db.session.commit()
     return jsonify({'ok': True})
 
@@ -691,7 +710,9 @@ def delete_warehouse(wid):
 @app.route('/api/departments', methods=['GET'])
 @require_auth()
 def get_departments():
-    depts = Department.query.filter_by(is_active=True).order_by(Department.name).all()
+    depts = (Department.query
+             .filter(Department.is_active == True, Department.deleted_at.is_(None))
+             .order_by(Department.name).all())
     return jsonify([d.to_dict() for d in depts])
 
 @app.route('/api/departments', methods=['POST'])
@@ -722,6 +743,7 @@ def update_department(did):
 def delete_department(did):
     dept = Department.query.get_or_404(did)
     dept.is_active = False
+    dept.deleted_at = now_tehran()
     db.session.commit()
     return jsonify({'ok': True})
 
@@ -733,10 +755,14 @@ def delete_department(did):
 @app.route('/api/warehouses/<int:wid>/products', methods=['GET'])
 @require_auth()
 def get_products(wid):
+    """کالاهای انبار: فعال + غیرفعال (برای فعال‌سازی دوباره) — حذف‌شده‌ها در سطل زباله‌اند"""
     prods = (Product.query
              .options(joinedload(Product.warehouse))
-             .filter_by(warehouse_id=wid, is_active=True)
-             .order_by(Product.id.desc()).all())
+             .filter(
+                 Product.warehouse_id == wid,
+                 Product.deleted_at.is_(None),
+             )
+             .order_by(Product.is_active.desc(), Product.id.desc()).all())
     return jsonify([p.to_dict() for p in prods])
 
 @app.route('/api/products', methods=['GET'])
@@ -747,7 +773,8 @@ def get_all_products():
     page = max(1, request.args.get('page', 1, type=int))
     per_page = min(max(request.args.get('per_page', 50, type=int), 1), 200)
 
-    query = Product.query.options(joinedload(Product.warehouse)).filter_by(is_active=True)
+    query = (Product.query.options(joinedload(Product.warehouse))
+             .filter(Product.is_active == True, Product.deleted_at.is_(None)))
     if wh_id not in ('', 'all', None):
         try:
             query = query.filter(Product.warehouse_id == int(wh_id))
@@ -810,6 +837,8 @@ def update_product(pid):
         if f in data:
             setattr(p, f, data[f])
     if 'is_active' in data:
+        if p.deleted_at:
+            return jsonify({'error': 'این کالا در سطل زباله است؛ ابتدا بازیابی کنید'}), 400
         p.is_active = bool(data['is_active'])
     # قیمت واحد فقط از ورود خرید به‌روز می‌شود؛ اگر صریح فرستاده شد نادیده بگیر مگر admin path جدا
     p.updated_at = now_tehran()
@@ -820,8 +849,10 @@ def update_product(pid):
 @app.route('/api/products/<int:pid>/active', methods=['PATCH'])
 @require_auth('operator')
 def set_product_active(pid):
-    """فعال / غیرفعال کردن کالا — غیرفعال از لیست‌ها و داشبورد مخفی می‌شود"""
+    """فعال / غیرفعال — غیرفعال در انبار می‌ماند؛ از داشبورد/همه کالاها/خروج مخفی می‌شود"""
     p = Product.query.get_or_404(pid)
+    if p.deleted_at:
+        return jsonify({'error': 'این کالا در سطل زباله است؛ ابتدا بازیابی کنید'}), 400
     data = request.json or {}
     if 'is_active' not in data:
         return jsonify({'error': 'مقدار is_active الزامی است'}), 400
@@ -833,8 +864,11 @@ def set_product_active(pid):
 @app.route('/api/products/<int:pid>', methods=['DELETE'])
 @require_auth('operator')
 def delete_product(pid):
+    """حذف نرم → سطل زباله (از انبار هم مخفی می‌شود)"""
     p = Product.query.get_or_404(pid)
     p.is_active = False
+    p.deleted_at = now_tehran()
+    p.updated_at = now_tehran()
     db.session.commit()
     return jsonify({'ok': True})
 
@@ -868,6 +902,8 @@ def preview_product_merge():
 
     source = Product.query.options(joinedload(Product.warehouse)).get_or_404(source_id)
     dest = Product.query.options(joinedload(Product.warehouse)).get_or_404(dest_id)
+    if source.deleted_at or dest.deleted_at:
+        return jsonify({'error': 'کالای داخل سطل زباله را نمی‌توان ادغام کرد'}), 400
     if not source.is_active or not dest.is_active:
         return jsonify({'error': 'هر دو کالا باید فعال باشند'}), 400
     if source.warehouse_id != dest.warehouse_id:
@@ -923,6 +959,8 @@ def merge_products():
 
     source = Product.query.get_or_404(source_id)
     dest = Product.query.get_or_404(dest_id)
+    if source.deleted_at or dest.deleted_at:
+        return jsonify({'error': 'کالای داخل سطل زباله را نمی‌توان ادغام کرد'}), 400
     if not source.is_active or not dest.is_active:
         return jsonify({'error': 'هر دو کالا باید فعال باشند'}), 400
     if source.warehouse_id != dest.warehouse_id:
@@ -992,6 +1030,7 @@ def merge_products():
 
     source.quantity = 0
     source.is_active = False
+    source.deleted_at = now_tehran()
     source.description = (
         (source.description or '').strip()
         + (('\n' if (source.description or '').strip() else '')
@@ -1082,6 +1121,8 @@ def product_card(pid):
 @require_auth('operator')
 def add_transaction(pid):
     p = Product.query.get_or_404(pid)
+    if p.deleted_at:
+        return jsonify({'error': 'این کالا حذف شده و در سطل زباله است'}), 400
     if not p.is_active:
         return jsonify({'error': 'این کالا غیرفعال است؛ ابتدا از کارت کالا فعالش کنید'}), 400
     user = get_current_user()
@@ -1206,10 +1247,12 @@ def create_dispatch():
         return jsonify({'error': 'مقدار باید بیشتر از صفر باشد'}), 400
     product = Product.query.get_or_404(product_id)
     dept    = Department.query.get_or_404(department_id)
+    if product.deleted_at:
+        return jsonify({'error': 'این کالا حذف شده و در سطل زباله است'}), 400
     if not product.is_active:
         return jsonify({'error': 'این کالا غیرفعال است و نمی‌توان برای آن خروج ثبت کرد'}), 400
-    if not dept.is_active:
-        return jsonify({'error': 'این بخش غیرفعال است'}), 400
+    if dept.deleted_at or not dept.is_active:
+        return jsonify({'error': 'این بخش غیرفعال یا حذف‌شده است'}), 400
     if product.quantity < quantity:
         return jsonify({'error': f'موجودی کافی نیست (موجودی: {product.quantity} {product.unit})'}), 400
     before = product.quantity
@@ -1431,13 +1474,15 @@ def dispatch_report():
 @require_auth()
 def dashboard():
     from sqlalchemy import func
-    warehouse_count = db.session.query(func.count(Warehouse.id)).filter(Warehouse.is_active == True).scalar()
+    warehouse_count = (db.session.query(func.count(Warehouse.id))
+                       .filter(Warehouse.is_active == True, Warehouse.deleted_at.is_(None))
+                       .scalar())
 
     # آمار و لیست هشدار باید از یک منطق واحد (get_status) بیایند
     # تا با manual_status و حداقل موجودی ناسازگار نشوند
     active_products = (Product.query
                        .options(joinedload(Product.warehouse))
-                       .filter_by(is_active=True)
+                       .filter(Product.is_active == True, Product.deleted_at.is_(None))
                        .order_by(Product.name.asc())
                        .all())
     product_count = len(active_products)
@@ -1453,7 +1498,7 @@ def dashboard():
                       joinedload(Transaction.product).joinedload(Product.warehouse),
                       joinedload(Transaction.department),
                   )
-                  .filter(Product.is_active == True)
+                  .filter(Product.is_active == True, Product.deleted_at.is_(None))
                   .order_by(Transaction.created_at.desc()).limit(10).all())
     return jsonify({
         'warehouse_count':   warehouse_count,
@@ -1472,7 +1517,8 @@ def inventory_report():
     wid = request.args.get('warehouse_id')
     status_filter = request.args.get('status')
     search = (request.args.get('search') or request.args.get('product') or '').strip()
-    query = Product.query.options(joinedload(Product.warehouse)).filter_by(is_active=True)
+    query = (Product.query.options(joinedload(Product.warehouse))
+             .filter(Product.is_active == True, Product.deleted_at.is_(None)))
     if wid:
         query = query.filter_by(warehouse_id=int(wid))
     if search:
@@ -1494,6 +1540,196 @@ def inventory_report():
 
 
 # ═══════════════════════════════════════════════════════════════════
+# TRASH (سطل زباله — فقط ادمین)
+# ═══════════════════════════════════════════════════════════════════
+
+def _fmt_deleted_at(dt):
+    if not dt:
+        return ''
+    return jdatetime.datetime.fromgregorian(datetime=dt).strftime('%Y/%m/%d %H:%M')
+
+
+@app.route('/api/trash', methods=['GET'])
+@require_auth('admin')
+def list_trash():
+    """لیست حذف‌شده‌ها به تفکیک نوع"""
+    kind = (request.args.get('type') or 'all').strip()
+    products, warehouses, departments = [], [], []
+
+    if kind in ('all', 'products'):
+        for p in (Product.query.options(joinedload(Product.warehouse))
+                  .filter(Product.deleted_at.isnot(None))
+                  .order_by(Product.deleted_at.desc()).all()):
+            products.append({
+                'id': p.id,
+                'type': 'product',
+                'name': p.name,
+                'meta': (p.warehouse.name if p.warehouse else '') + (f' · موجودی {p.quantity:g} {p.unit or ""}' if p.quantity is not None else ''),
+                'deleted_at': _fmt_deleted_at(p.deleted_at),
+                'deleted_at_raw': p.deleted_at.isoformat(sep=' ') if p.deleted_at else '',
+            })
+    if kind in ('all', 'warehouses'):
+        for w in (Warehouse.query.filter(Warehouse.deleted_at.isnot(None))
+                  .order_by(Warehouse.deleted_at.desc()).all()):
+            warehouses.append({
+                'id': w.id,
+                'type': 'warehouse',
+                'name': w.name,
+                'meta': w.location or '',
+                'deleted_at': _fmt_deleted_at(w.deleted_at),
+                'deleted_at_raw': w.deleted_at.isoformat(sep=' ') if w.deleted_at else '',
+            })
+    if kind in ('all', 'departments'):
+        for d in (Department.query.filter(Department.deleted_at.isnot(None))
+                  .order_by(Department.deleted_at.desc()).all()):
+            departments.append({
+                'id': d.id,
+                'type': 'department',
+                'name': d.name,
+                'meta': (d.description or '')[:80],
+                'deleted_at': _fmt_deleted_at(d.deleted_at),
+                'deleted_at_raw': d.deleted_at.isoformat(sep=' ') if d.deleted_at else '',
+            })
+
+    return jsonify({
+        'products': products,
+        'warehouses': warehouses,
+        'departments': departments,
+        'counts': {
+            'products': len(products) if kind in ('all', 'products') else Product.query.filter(Product.deleted_at.isnot(None)).count(),
+            'warehouses': len(warehouses) if kind in ('all', 'warehouses') else Warehouse.query.filter(Warehouse.deleted_at.isnot(None)).count(),
+            'departments': len(departments) if kind in ('all', 'departments') else Department.query.filter(Department.deleted_at.isnot(None)).count(),
+        },
+    })
+
+
+@app.route('/api/trash/restore', methods=['POST'])
+@require_auth('admin')
+def restore_trash_item():
+    data = request.json or {}
+    kind = (data.get('type') or '').strip()
+    try:
+        item_id = int(data.get('id') or 0)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'شناسه نامعتبر'}), 400
+    if not item_id or kind not in ('product', 'warehouse', 'department'):
+        return jsonify({'error': 'نوع یا شناسه نامعتبر'}), 400
+
+    if kind == 'product':
+        item = Product.query.get_or_404(item_id)
+        if not item.deleted_at:
+            return jsonify({'error': 'این کالا در سطل زباله نیست'}), 400
+        # انبار والد اگر حذف شده، اول باید بازیابی شود
+        wh = Warehouse.query.get(item.warehouse_id)
+        if wh and wh.deleted_at:
+            return jsonify({'error': f'ابتدا انبار «{wh.name}» را از سطل زباله بازیابی کنید'}), 400
+        item.deleted_at = None
+        item.is_active = True
+        item.updated_at = now_tehran()
+    elif kind == 'warehouse':
+        item = Warehouse.query.get_or_404(item_id)
+        if not item.deleted_at:
+            return jsonify({'error': 'این انبار در سطل زباله نیست'}), 400
+        item.deleted_at = None
+        item.is_active = True
+        # کالاهایی که همراه انبار حذف شده بودند برمی‌گردند (فعال)
+        for p in item.products:
+            if p.deleted_at:
+                p.deleted_at = None
+                p.is_active = True
+                p.updated_at = now_tehran()
+    else:
+        item = Department.query.get_or_404(item_id)
+        if not item.deleted_at:
+            return jsonify({'error': 'این بخش در سطل زباله نیست'}), 400
+        item.deleted_at = None
+        item.is_active = True
+
+    db.session.commit()
+    return jsonify({'ok': True, 'type': kind, 'id': item_id, 'item': item.to_dict()})
+
+
+@app.route('/api/trash/purge', methods=['POST'])
+@require_auth('admin')
+def purge_trash_item():
+    """حذف دائمی یک مورد از سطل زباله"""
+    data = request.json or {}
+    kind = (data.get('type') or '').strip()
+    try:
+        item_id = int(data.get('id') or 0)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'شناسه نامعتبر'}), 400
+    if not item_id or kind not in ('product', 'warehouse', 'department'):
+        return jsonify({'error': 'نوع یا شناسه نامعتبر'}), 400
+
+    if kind == 'product':
+        item = Product.query.get_or_404(item_id)
+        if not item.deleted_at:
+            return jsonify({'error': 'فقط موارد داخل سطل زباله قابل پاک‌سازی دائمی هستند'}), 400
+        Transaction.query.filter_by(product_id=item.id).delete(synchronize_session=False)
+        db.session.delete(item)
+    elif kind == 'warehouse':
+        item = Warehouse.query.get_or_404(item_id)
+        if not item.deleted_at:
+            return jsonify({'error': 'فقط موارد داخل سطل زباله قابل پاک‌سازی دائمی هستند'}), 400
+        # کالاهای این انبار هم باید permanently پاک شوند
+        for p in list(item.products):
+            Transaction.query.filter_by(product_id=p.id).delete(synchronize_session=False)
+            db.session.delete(p)
+        db.session.delete(item)
+    else:
+        item = Department.query.get_or_404(item_id)
+        if not item.deleted_at:
+            return jsonify({'error': 'فقط موارد داخل سطل زباله قابل پاک‌سازی دائمی هستند'}), 400
+        # حرکات مرتبط را نگه می‌داریم ولی department_id را خالی می‌کنیم
+        Transaction.query.filter_by(department_id=item.id).update(
+            {Transaction.department_id: None}, synchronize_session=False)
+        db.session.delete(item)
+
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/trash/empty', methods=['POST'])
+@require_auth('admin')
+def empty_trash():
+    """خالی کردن کامل سطل زباله یا فقط یک نوع"""
+    data = request.json or {}
+    kind = (data.get('type') or 'all').strip()
+    if kind not in ('all', 'products', 'warehouses', 'departments'):
+        return jsonify({'error': 'نوع نامعتبر'}), 400
+
+    purged = {'products': 0, 'warehouses': 0, 'departments': 0}
+
+    if kind in ('all', 'products'):
+        ids = [pid for (pid,) in db.session.query(Product.id).filter(Product.deleted_at.isnot(None)).all()]
+        if ids:
+            Transaction.query.filter(Transaction.product_id.in_(ids)).delete(synchronize_session=False)
+            purged['products'] = Product.query.filter(Product.id.in_(ids)).delete(synchronize_session=False)
+
+    if kind in ('all', 'warehouses'):
+        whs = Warehouse.query.filter(Warehouse.deleted_at.isnot(None)).all()
+        for wh in whs:
+            for p in list(wh.products):
+                Transaction.query.filter_by(product_id=p.id).delete(synchronize_session=False)
+                db.session.delete(p)
+                purged['products'] += 1
+            db.session.delete(wh)
+            purged['warehouses'] += 1
+
+    if kind in ('all', 'departments'):
+        deps = Department.query.filter(Department.deleted_at.isnot(None)).all()
+        for dep in deps:
+            Transaction.query.filter_by(department_id=dep.id).update(
+                {Transaction.department_id: None}, synchronize_session=False)
+            db.session.delete(dep)
+            purged['departments'] += 1
+
+    db.session.commit()
+    return jsonify({'ok': True, 'purged': purged})
+
+
+# ═══════════════════════════════════════════════════════════════════
 # INIT
 # ═══════════════════════════════════════════════════════════════════
 
@@ -1508,6 +1744,9 @@ def migrate():
             ('ALTER TABLE transactions ADD COLUMN total_cost REAL', 'tx.total_cost'),
             ('ALTER TABLE products ADD COLUMN avg_cost REAL DEFAULT 0', 'products.avg_cost'),
             ('ALTER TABLE users ADD COLUMN permissions TEXT DEFAULT \'\'', 'users.permissions'),
+            ('ALTER TABLE products ADD COLUMN deleted_at DATETIME', 'products.deleted_at'),
+            ('ALTER TABLE warehouses ADD COLUMN deleted_at DATETIME', 'warehouses.deleted_at'),
+            ('ALTER TABLE departments ADD COLUMN deleted_at DATETIME', 'departments.deleted_at'),
             # ایندکس‌های ترکیبی برای سرعت گزارش‌ها وقتی دیتا زیاد می‌شود
             ('CREATE INDEX IF NOT EXISTS ix_tx_type_created ON transactions(type, created_at)', 'ix_tx_type_created'),
             ('CREATE INDEX IF NOT EXISTS ix_tx_dept_created ON transactions(department_id, created_at)', 'ix_tx_dept_created'),
@@ -1515,6 +1754,9 @@ def migrate():
             ('CREATE INDEX IF NOT EXISTS ix_tx_created_id ON transactions(created_at, id)', 'ix_tx_created_id'),
             ('CREATE INDEX IF NOT EXISTS ix_products_wh_active ON products(warehouse_id, is_active)', 'ix_products_wh_active'),
             ('CREATE INDEX IF NOT EXISTS ix_products_active_name ON products(is_active, name)', 'ix_products_active_name'),
+            ('CREATE INDEX IF NOT EXISTS ix_products_deleted ON products(deleted_at)', 'ix_products_deleted'),
+            ('CREATE INDEX IF NOT EXISTS ix_warehouses_deleted ON warehouses(deleted_at)', 'ix_warehouses_deleted'),
+            ('CREATE INDEX IF NOT EXISTS ix_departments_deleted ON departments(deleted_at)', 'ix_departments_deleted'),
         ]:
             try:
                 conn.execute(db.text(sql))

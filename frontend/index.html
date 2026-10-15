@@ -1157,6 +1157,9 @@
       <div class="nav-item nav-admin-only" data-nav="merge_products" onclick="navigate('merge_products')" style="display:none;">
         <span class="icon">🔀</span> ادغام کالا
       </div>
+      <div class="nav-item nav-admin-only" data-nav="trash" onclick="navigate('trash')" style="display:none;">
+        <span class="icon">🗑</span> سطل زباله
+      </div>
       <div class="nav-item" onclick="openChangePasswordModal()">
         <span class="icon">🔑</span> تغییر رمز
       </div>
@@ -1166,7 +1169,7 @@
     </div>
   </div>
   <div id="user-badge" style="display:none;"></div>
-  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۴.۱</div>
+  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۵.۰</div>
 </nav>
 
 <!-- Main -->
@@ -1309,7 +1312,7 @@
           <span>
             <b>کالا فعال است</b>
             <span class="text-sm text-muted" style="display:block;margin-top:4px;">
-              اگر غیرفعال باشد فقط در «حرکات انبار» و «گزارش بخش‌ها» دیده می‌شود و از داشبورد، لیست کالاها و خروج رسمی مخفی می‌ماند.
+              غیرفعال: در همین انبار می‌ماند تا دوباره فعالش کنید، ولی از داشبورد، «همه کالاها» و خروج رسمی مخفی است. برای حذف کامل از دکمه حذف استفاده کنید (سطل زباله).
             </span>
           </span>
         </label>
@@ -1580,7 +1583,7 @@ function navLabelForPage(page) {
   return {
     dashboard: 'داشبورد', warehouses: 'انبارها',
     products: 'همه کالاها', transactions: 'حرکات انبار', report: 'گزارش موجودی',
-    warehouse_detail: 'انبارها', users: 'کاربران', merge_products: 'ادغام کالا',
+    warehouse_detail: 'انبارها', users: 'کاربران', merge_products: 'ادغام کالا', trash: 'سطل زباله',
     departments: 'بخش‌ها', dispatch: 'خروج رسمی', dept_report: 'گزارش بخش‌ها',
     product_card: productCardNav,
   }[page];
@@ -1593,7 +1596,7 @@ function userCanAccess(page) {
     warehouse_detail: 'warehouses',
     product_card: 'products',
   }[page] || page;
-  if (mapped === 'users' || mapped === 'merge_products') return currentUser.role === 'admin';
+  if (mapped === 'users' || mapped === 'merge_products' || mapped === 'trash') return currentUser.role === 'admin';
   if (mapped === 'dispatch' && currentUser.role === 'viewer') return false;
   const perms = currentUser.permissions;
   if (!Array.isArray(perms) || !perms.length) return true; // سازگاری با نشست‌های قدیمی
@@ -1767,7 +1770,7 @@ async function renderPage() {
   const titles = {
     dashboard: 'داشبورد', warehouses: 'مدیریت انبارها',
     products: 'همه کالاها', transactions: 'حرکات انبار', report: 'گزارش موجودی',
-    warehouse_detail: '', users: 'مدیریت کاربران', merge_products: 'ادغام کالا',
+    warehouse_detail: '', users: 'مدیریت کاربران', merge_products: 'ادغام کالا', trash: 'سطل زباله',
     departments: 'مدیریت بخش‌ها', dispatch: 'خروج رسمی کالا', dept_report: 'گزارش بخش‌ها',
     product_card: 'کارت کالا',
   };
@@ -1783,6 +1786,7 @@ async function renderPage() {
     else if (state.page === 'report')           await renderReport();
     else if (state.page === 'users')            await renderUsers();
     else if (state.page === 'merge_products')   await renderMergeProducts();
+    else if (state.page === 'trash')            await renderTrash();
     else if (state.page === 'departments')      await renderDepartments();
     else if (state.page === 'dispatch')         await renderDispatch();
     else if (state.page === 'dept_report')      await renderDeptReport();
@@ -1941,13 +1945,15 @@ async function renderWarehouseDetail() {
     <button class="btn btn-secondary" onclick="navigate('warehouses')">← بازگشت</button>
     ${window._isViewer ? '' : `<button class="btn btn-primary" onclick="openProductModal(null,${wid})">➕ کالای جدید</button>`}`;
 
-  const low = prods.filter(p=>p.status==='low').length;
-  const out = prods.filter(p=>p.status==='out').length;
-  const totalVal = prods.reduce((s,p)=>s+p.total_value,0);
+  const live = prods.filter(p => p.is_active !== false);
+  const inactiveCount = prods.length - live.length;
+  const low = live.filter(p=>p.status==='low').length;
+  const out = live.filter(p=>p.status==='out').length;
+  const totalVal = live.reduce((s,p)=>s+p.total_value,0);
 
   document.getElementById('content').innerHTML = `
   <div class="stats-grid" style="margin-bottom:24px;">
-    <div class="stat-card"><div class="stat-label">📦 نوع کالا</div><div class="stat-value val-blue">${fmt(prods.length)}</div></div>
+    <div class="stat-card"><div class="stat-label">📦 نوع کالا</div><div class="stat-value val-blue">${fmt(prods.length)}${inactiveCount ? `<div class="text-sm text-muted" style="font-weight:500;margin-top:4px;">${fmt(inactiveCount)} غیرفعال</div>` : ''}</div></div>
     <div class="stat-card"><div class="stat-label">⚠️ موجودی کم</div><div class="stat-value val-yellow">${fmt(low)}</div></div>
     <div class="stat-card"><div class="stat-label">🚫 تمام‌شده</div><div class="stat-value val-red">${fmt(out)}</div></div>
     <div class="stat-card"><div class="stat-label">💰 ارزش کل</div><div class="stat-value val-green" style="font-size:18px;">${fmtPrice(totalVal)}</div></div>
@@ -1996,15 +2002,17 @@ function prodRow(p) {
   const safeName = String(p.name || '').replace(/'/g, "\\'");
   const lastBuy = p.unit_price ? fmtPrice(p.unit_price) : '—';
   const avg = p.avg_cost ? fmtPrice(p.avg_cost) : (p.cost_basis ? fmtPrice(p.cost_basis) : '—');
-  return `<tr id="prod-row-${p.id}">
+  const inactive = p.is_active === false;
+  return `<tr id="prod-row-${p.id}" style="${inactive ? 'opacity:.72;' : ''}">
     <td class="col-name fw-bold">
       <span class="clickable-name" onclick="openProductCard(${p.id})" title="${escHtml(p.name)}">${escHtml(p.name)}</span>
+      ${inactive ? ' <span class="badge badge-red">غیرفعال</span>' : ''}
       ${p.description?`<br><span class="text-sm text-muted">${escHtml(p.description)}</span>`:''}
     </td>
     <td class="col-actions-wide">
       <div class="row-actions">
         <button class="btn btn-sm btn-primary" title="کارت کالا" onclick="openProductCard(${p.id})">📋</button>
-        ${window._isViewer ? '' : `<button class="btn btn-sm btn-success" title="ورود خرید" onclick="openProductCard(${p.id},'in')">⬆️</button>`}
+        ${window._isViewer || inactive ? '' : `<button class="btn btn-sm btn-success" title="ورود خرید" onclick="openProductCard(${p.id},'in')">⬆️</button>`}
         ${window._isViewer ? '' : `<button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="openProductModal(${p.id})">✏️</button>`}
         ${window._isViewer ? '' : `<button class="btn btn-sm btn-danger" title="حذف" onclick="deleteProduct(${p.id},'${safeName}')">حذف</button>`}
       </div>
@@ -2023,23 +2031,27 @@ function prodRow(p) {
 
 function whProdCard(p) {
   const safeName = String(p.name || '').replace(/'/g, "\\'");
+  const inactive = p.is_active === false;
   const actions = window._isViewer
     ? `<div class="m-card-actions no-delete">
         <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت</button>
       </div>`
     : `<div class="m-card-actions">
         <button class="btn btn-sm btn-primary" onclick="openProductCard(${p.id})">📋 کارت</button>
-        <button class="btn btn-sm btn-success" onclick="openProductCard(${p.id},'in')">⬆️ ورود</button>
+        ${inactive ? '' : `<button class="btn btn-sm btn-success" onclick="openProductCard(${p.id},'in')">⬆️ ورود</button>`}
         <button class="btn btn-sm btn-secondary" onclick="openProductModal(${p.id})">✏️ ویرایش</button>
         <button class="btn btn-sm btn-danger btn-del" title="حذف کالا" onclick="deleteProduct(${p.id},'${safeName}')">🗑</button>
       </div>`;
-  return `<article class="m-card" id="prod-card-${p.id}">
+  return `<article class="m-card" id="prod-card-${p.id}" style="${inactive ? 'opacity:.85;border-style:dashed;' : ''}">
     <div class="m-card-head">
       <div style="min-width:0;">
         <div class="m-card-title clickable-name" onclick="openProductCard(${p.id})">${escHtml(p.name)}</div>
-        <div class="m-card-sub">${escHtml(p.sku || 'بدون SKU')}${p.category ? ' · ' + escHtml(p.category) : ''}</div>
+        <div class="m-card-sub">${escHtml(p.sku || 'بدون SKU')}${p.category ? ' · ' + escHtml(p.category) : ''}${inactive ? ' · غیرفعال' : ''}</div>
       </div>
-      ${whProdStatusBadge(p)}
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
+        ${inactive ? '<span class="badge badge-red">غیرفعال</span>' : ''}
+        ${whProdStatusBadge(p)}
+      </div>
     </div>
     <div class="m-card-grid">
       <div><span class="lbl">موجودی</span><b>${fmt(p.quantity)} ${escHtml(p.unit||'')}</b></div>
@@ -2118,10 +2130,11 @@ async function renderProductCard() {
           <input type="checkbox" id="pc-active" ${p.is_active ? 'checked' : ''} onchange="toggleProductActive(${p.id}, this.checked)" style="width:16px;height:16px;"/>
           <span style="font-size:13px;line-height:1.45;">
             <b>کالا فعال است</b>
-            <span class="text-muted" style="display:block;font-size:12px;margin-top:2px;">غیرفعال = مخفی از داشبورد و لیست‌ها؛ تاریخچه در حرکات انبار و گزارش بخش‌ها می‌ماند</span>
+            <span class="text-muted" style="display:block;font-size:12px;margin-top:2px;">غیرفعال در همین انبار می‌ماند؛ از داشبورد و همه کالاها مخفی است. حذف = سطل زباله</span>
           </span>
         </label>`}
-        ${!p.is_active ? '<div class="text-sm" style="margin-top:10px;color:var(--yellow);">این کالا غیرفعال است و در داشبورد / لیست کالاها / خروج رسمی نمایش داده نمی‌شود.</div>' : ''}
+        ${!p.is_active ? '<div class="text-sm" style="margin-top:10px;color:var(--yellow);">این کالا غیرفعال است — هنوز در انبار دیده می‌شود؛ برای استفاده دوباره تیک فعال را بزنید.</div>' : ''}
+        ${p.deleted_at ? '<div class="text-sm" style="margin-top:10px;color:var(--red);">این کالا در سطل زباله است و باید از پنل ادمین بازیابی شود.</div>' : ''}
         <div class="pc-hero-actions">
           ${canWrite ? `<button class="btn btn-sm btn-success" onclick="openTxModal(${p.id},'in')">⬆️ ورود خرید</button>` : ''}
           ${canWrite ? `<button class="btn btn-sm btn-secondary" onclick="openTxModal(${p.id},'adjust')">📝 اصلاح موجودی</button>` : ''}
@@ -2856,9 +2869,9 @@ async function saveWarehouse() {
 }
 
 async function deleteWarehouse(id, name) {
-  if (!confirm(`آیا از حذف انبار "${name}" مطمئن هستید؟`)) return;
+  if (!confirm(`آیا از حذف انبار "${name}" مطمئن هستید؟\nانبار و کالاهایش به سطل زباله می‌روند؛ ادمین می‌تواند بازیابی کند.`)) return;
   await api('DELETE', `/warehouses/${id}`);
-  toast('انبار حذف شد 🗑');
+  toast('انبار به سطل زباله منتقل شد 🗑');
   renderPage();
 }
 
@@ -2950,9 +2963,9 @@ async function saveProduct() {
 }
 
 async function deleteProduct(id, name) {
-  if (!confirm(`آیا از حذف کالای "${name}" مطمئن هستید؟\n(کالا غیرفعال می‌شود و فقط در حرکات انبار / گزارش بخش‌ها می‌ماند)`)) return;
+  if (!confirm(`آیا از حذف کالای "${name}" مطمئن هستید؟\nبه سطل زباله می‌رود و از انبار مخفی می‌شود؛ ادمین می‌تواند بازیابی کند.`)) return;
   await api('DELETE', `/products/${id}`);
-  toast('کالا غیرفعال شد 🗑');
+  toast('کالا به سطل زباله منتقل شد 🗑');
   renderPage();
 }
 
@@ -2960,7 +2973,7 @@ async function toggleProductActive(pid, isActive) {
   const box = document.getElementById('pc-active');
   try {
     await api('PATCH', `/products/${pid}/active`, { is_active: !!isActive });
-    toast(isActive ? 'کالا فعال شد ✅' : 'کالا غیرفعال شد — از داشبورد و لیست‌ها مخفی شد');
+    toast(isActive ? 'کالا فعال شد ✅' : 'کالا غیرفعال شد — در انبار می‌ماند؛ از داشبورد و همه کالاها مخفی است');
     await renderProductCard();
   } catch (e) {
     if (box) box.checked = !isActive;
@@ -3307,9 +3320,9 @@ async function saveDept() {
 }
 
 async function deleteDept(id, name) {
-  if (!confirm('آیا از حذف بخش "' + name + '" مطمئن هستید؟')) return;
+  if (!confirm('آیا از حذف بخش "' + name + '" مطمئن هستید؟\nبه سطل زباله می‌رود؛ ادمین می‌تواند بازیابی کند.')) return;
   await api('DELETE', '/departments/' + id);
-  toast('بخش حذف شد 🗑');
+  toast('بخش به سطل زباله منتقل شد 🗑');
   renderPage();
 }
 
@@ -3453,7 +3466,7 @@ async function loadDispatchProducts() {
 
   if (display) display.placeholder = 'در حال بارگذاری...';
   const allProds = await api('GET', '/warehouses/' + whId + '/products');
-  _dispProds = allProds.filter(p => p.quantity > 0);
+  _dispProds = allProds.filter(p => p.is_active !== false && p.quantity > 0);
 
   if (!_dispProds.length) {
     if (list) list.innerHTML = '<div class="search-select-empty">موجودی موجود نیست</div>';
@@ -3879,6 +3892,121 @@ function confirmMergeProducts() {
   );
 }
 
+// ─── Trash (admin) ────────────────────────────────────────────────────────────
+
+async function renderTrash() {
+  if (!currentUser || currentUser.role !== 'admin') {
+    document.getElementById('content').innerHTML =
+      '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-text">فقط مدیر به سطل زباله دسترسی دارد</div></div>';
+    return;
+  }
+  const c = document.getElementById('content');
+  c.innerHTML = '<div class="spinner"></div>';
+  const data = await api('GET', '/trash');
+  const counts = data.counts || {};
+  const total = (counts.products || 0) + (counts.warehouses || 0) + (counts.departments || 0);
+
+  const typeKey = { product: 'products', warehouse: 'warehouses', department: 'departments' };
+  const section = (title, items, type) => {
+    const emptyBtn = items.length
+      ? `<button class="btn btn-sm btn-secondary" onclick="emptyTrash('${typeKey[type]}')">🧹 خالی کردن این دسته</button>`
+      : '';
+    if (!items.length) {
+      return `<div class="card mb-4"><div class="card-title">${title}</div>
+        <div class="text-sm text-muted">موردی نیست</div></div>`;
+    }
+    const desk = `<div class="table-wrap desk-only"><table class="table-fit has-actions">
+      <thead><tr><th class="col-name">نام</th><th class="col-actions-wide">عملیات</th><th class="col-detail">جزئیات</th><th class="col-date">حذف شده</th></tr></thead>
+      <tbody>${items.map(it => `<tr>
+        <td class="col-name fw-bold">${escHtml(it.name)}</td>
+        <td class="col-actions-wide"><div class="row-actions">
+          <button class="btn btn-sm btn-success" onclick="restoreTrashItem('${type}',${it.id},${JSON.stringify(String(it.name||''))})">↩️ بازیابی</button>
+          <button class="btn btn-sm btn-danger" onclick="purgeTrashItem('${type}',${it.id},${JSON.stringify(String(it.name||''))})">💀 حذف دائم</button>
+        </div></td>
+        <td class="col-detail text-sm text-muted">${escHtml(it.meta || '—')}</td>
+        <td class="col-date num text-sm">${escHtml(it.deleted_at || '—')}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+    const mob = `<div class="mobile-list mob-only">${items.map(it => `<article class="m-card">
+      <div class="m-card-head"><div style="min-width:0;"><div class="m-card-title">${escHtml(it.name)}</div>
+        <div class="m-card-sub">${escHtml(it.meta || '')}</div></div>
+        <div class="text-sm text-muted num">${escHtml(it.deleted_at || '')}</div></div>
+      <div class="users-m-actions">
+        <button class="btn btn-sm btn-success" onclick="restoreTrashItem('${type}',${it.id},${JSON.stringify(String(it.name||''))})">↩️ بازیابی</button>
+        <button class="btn btn-sm btn-danger" onclick="purgeTrashItem('${type}',${it.id},${JSON.stringify(String(it.name||''))})">💀 حذف دائم</button>
+      </div>
+    </article>`).join('')}</div>`;
+    return `<div class="card mb-4"><div class="flex-between mb-4" style="flex-wrap:wrap;gap:8px;"><div class="card-title" style="margin:0">${title} (${fmt(items.length)})</div>${emptyBtn}</div>${desk}${mob}</div>`;
+  };
+
+  c.innerHTML = `
+  <div class="card mb-4">
+    <div class="flex-between" style="flex-wrap:wrap;gap:12px;">
+      <div>
+        <div class="card-title" style="margin:0">🗑 سطل زباله</div>
+        <div class="text-sm text-muted" style="margin-top:6px;line-height:1.6;">
+          موارد حذف‌شده اینجاست. بازیابی = برمی‌گردد. حذف دائم / خالی‌کردن = غیرقابل برگشت.
+        </div>
+      </div>
+      <div class="flex-gap" style="flex-wrap:wrap;">
+        <button class="btn btn-secondary" ${total?'' :'disabled'} onclick="emptyTrash('all')">🧹 خالی کردن همه</button>
+      </div>
+    </div>
+    <div class="m-card-grid" style="margin-top:14px;">
+      <div><span class="lbl">کالاها</span><b>${fmt(counts.products||0)}</b></div>
+      <div><span class="lbl">انبارها</span><b>${fmt(counts.warehouses||0)}</b></div>
+      <div><span class="lbl">بخش‌ها</span><b>${fmt(counts.departments||0)}</b></div>
+    </div>
+  </div>
+  ${section('📦 کالاها', data.products || [], 'product')}
+  ${section('🏭 انبارها', data.warehouses || [], 'warehouse')}
+  ${section('🏥 بخش‌ها', data.departments || [], 'department')}`;
+}
+
+async function restoreTrashItem(type, id, name) {
+  showConfirm(
+    '↩️ بازیابی',
+    `«${name}» از سطل زباله بازیابی شود؟`,
+    async () => {
+      await api('POST', '/trash/restore', { type, id });
+      toast('بازیابی شد ✅');
+      renderTrash();
+    },
+    '↩️ بازیابی',
+    false
+  );
+}
+
+async function purgeTrashItem(type, id, name) {
+  showConfirm(
+    '💀 حذف دائمی',
+    `«${name}» برای همیشه پاک شود؟ این کار قابل برگشت نیست.`,
+    async () => {
+      await api('POST', '/trash/purge', { type, id });
+      toast('برای همیشه حذف شد');
+      renderTrash();
+    },
+    '💀 حذف دائم',
+    true
+  );
+}
+
+async function emptyTrash(type='all') {
+  showConfirm(
+    '🧹 خالی کردن سطل زباله',
+    type === 'all'
+      ? 'همه موارد سطل زباله برای همیشه پاک شوند؟'
+      : 'این دسته از سطل زباله خالی شود؟',
+    async () => {
+      const res = await api('POST', '/trash/empty', { type });
+      const p = res.purged || {};
+      toast(`پاک شد: ${fmt(p.products||0)} کالا، ${fmt(p.warehouses||0)} انبار، ${fmt(p.departments||0)} بخش`);
+      renderTrash();
+    },
+    '🧹 خالی کن',
+    true
+  );
+}
+
 // ─── Login / Logout ──────────────────────────────────────────────────────────
 
 
@@ -3906,7 +4034,7 @@ function applyNavPermissions() {
   document.querySelectorAll('.nav-item[data-nav]').forEach(el => {
     const key = el.getAttribute('data-nav');
     let show = true;
-    if (key === 'users' || key === 'merge_products') show = currentUser && currentUser.role === 'admin';
+    if (key === 'users' || key === 'merge_products' || key === 'trash') show = currentUser && currentUser.role === 'admin';
     else if (key === 'dispatch') show = currentUser && currentUser.role !== 'viewer';
     if (show && perms) show = perms.includes(key);
     el.style.display = show ? 'flex' : 'none';
@@ -3936,7 +4064,7 @@ function updateUserBadge() {
 }
 
 function firstAccessiblePage() {
-  const order = ['dashboard', 'warehouses', 'products', 'departments', 'dispatch', 'transactions', 'dept_report', 'report', 'users', 'merge_products'];
+  const order = ['dashboard', 'warehouses', 'products', 'departments', 'dispatch', 'transactions', 'dept_report', 'report', 'users', 'merge_products', 'trash'];
   for (const p of order) {
     if (userCanAccess(p)) return p;
   }
@@ -4018,12 +4146,14 @@ const APP_SECTION_DEFS = [
   { key: 'report', label: 'گزارش موجودی', hint: 'موجودی و ارزش' },
   { key: 'users', label: 'کاربران', hint: 'فقط برای مدیر', roleMin: 'admin' },
   { key: 'merge_products', label: 'ادغام کالا', hint: 'یکپارچه‌سازی کالاهای تکراری — فقط مدیر', roleMin: 'admin' },
+  { key: 'trash', label: 'سطل زباله', hint: 'بازیابی / پاک‌سازی حذف‌شده‌ها — فقط مدیر', roleMin: 'admin' },
 ];
 
+const ADMIN_PERM_KEYS = ['users', 'merge_products', 'trash'];
 const DEFAULT_PERMS_BY_ROLE = {
   admin: APP_SECTION_DEFS.map(s => s.key),
-  operator: APP_SECTION_DEFS.map(s => s.key).filter(k => k !== 'users' && k !== 'merge_products'),
-  viewer: APP_SECTION_DEFS.map(s => s.key).filter(k => k !== 'users' && k !== 'merge_products' && k !== 'dispatch'),
+  operator: APP_SECTION_DEFS.map(s => s.key).filter(k => !ADMIN_PERM_KEYS.includes(k)),
+  viewer: APP_SECTION_DEFS.map(s => s.key).filter(k => !ADMIN_PERM_KEYS.includes(k) && k !== 'dispatch'),
 };
 
 async function renderUsers() {
@@ -4210,8 +4340,7 @@ function collectUserPermissions() {
   const checks = [...document.querySelectorAll('.user-perm-check')];
   const perms = checks.filter(c => c.checked && !c.disabled).map(c => c.value);
   if (role === 'admin') {
-    if (!perms.includes('users')) perms.push('users');
-    if (!perms.includes('merge_products')) perms.push('merge_products');
+    ADMIN_PERM_KEYS.forEach(k => { if (!perms.includes(k)) perms.push(k); });
   }
   return perms;
 }
