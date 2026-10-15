@@ -28,14 +28,17 @@ APP_SECTIONS = (
     'trash',
 )
 
-# بخش‌هایی که فقط مدیر می‌بیند
-ADMIN_ONLY_SECTIONS = ('users', 'merge_products', 'trash')
+# بخش‌هایی که فقط مدیر می‌بیند (اجباری برای ادمین)
+ADMIN_ONLY_SECTIONS = ('users',)
+
+# بخش‌های حساس که به صورت اختیاری به اپراتور هم داده می‌شود (پیش‌فرض خاموش)
+GRANTABLE_SECTIONS = ('merge_products', 'trash')
 
 # پیش‌فرض دسترسی هر نقش — اگر فیلد permissions خالی باشد
 DEFAULT_PERMISSIONS = {
     'admin': list(APP_SECTIONS),
-    'operator': [s for s in APP_SECTIONS if s not in ADMIN_ONLY_SECTIONS],
-    'viewer': [s for s in APP_SECTIONS if s not in ADMIN_ONLY_SECTIONS and s != 'dispatch'],
+    'operator': [s for s in APP_SECTIONS if s not in ADMIN_ONLY_SECTIONS and s not in GRANTABLE_SECTIONS],
+    'viewer': [s for s in APP_SECTIONS if s not in ADMIN_ONLY_SECTIONS and s not in GRANTABLE_SECTIONS and s != 'dispatch'],
 }
 
 TEHRAN_TZ = ZoneInfo('Asia/Tehran')
@@ -113,10 +116,11 @@ class User(db.Model):
                             for sec in ADMIN_ONLY_SECTIONS:
                                 if sec not in perms:
                                     perms.append(sec)
-                        if self.role == 'viewer':
-                            perms = [p for p in perms if p != 'dispatch']
                         if self.role != 'admin':
                             perms = [p for p in perms if p not in ADMIN_ONLY_SECTIONS]
+                        if self.role == 'viewer':
+                            # بازدیدکننده: خروج رسمی، ادغام و نوشتن سطل ندارد
+                            perms = [p for p in perms if p not in ('dispatch', 'merge_products')]
                         return perms
             except Exception:
                 pass
@@ -133,7 +137,7 @@ class User(db.Model):
         if self.role != 'admin':
             clean = [p for p in clean if p not in ADMIN_ONLY_SECTIONS]
         if self.role == 'viewer':
-            clean = [p for p in clean if p != 'dispatch']
+            clean = [p for p in clean if p not in ('dispatch', 'merge_products')]
         # حداقل یک بخش برای جلوگیری از کاربر قفل‌شده
         if not clean:
             clean = ['dashboard']
@@ -248,6 +252,8 @@ class Product(db.Model):
     updated_at    = db.Column(db.DateTime, default=now_tehran, onupdate=now_tehran)
     is_active     = db.Column(db.Boolean, default=True, index=True)
     deleted_at    = db.Column(db.DateTime, nullable=True, index=True)
+    # اگر از طریق ادغام به سطل رفته باشد، شناسه کالای مقصد
+    merged_into_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True, index=True)
     manual_status = db.Column(db.String(20), default=None)
     transactions  = db.relationship('Transaction', backref='product', lazy=True, cascade='all, delete-orphan')
 
@@ -304,10 +310,41 @@ class Product(db.Model):
             'updated_at': jdt_u.strftime('%Y/%m/%d %H:%M'),
             'is_active': self.is_active,
             'deleted_at': jdatetime.datetime.fromgregorian(datetime=self.deleted_at).strftime('%Y/%m/%d %H:%M') if self.deleted_at else '',
+            'merged_into_id': self.merged_into_id,
             'status': self.get_status(),
             'manual_status': self.manual_status or '',
             'total_value': self.stock_value(),
         }
+
+
+class ProductMerge(db.Model):
+    """تاریخچه ادغام برای امکان برگرداندن از سطل زباله"""
+    __tablename__ = 'product_merges'
+    id                   = db.Column(db.Integer, primary_key=True)
+    source_id            = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False, index=True)
+    dest_id              = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False, index=True)
+    source_name          = db.Column(db.String(200))
+    dest_name_before     = db.Column(db.String(200))
+    final_name           = db.Column(db.String(200))
+    src_qty              = db.Column(db.Float, default=0)
+    dst_qty_before       = db.Column(db.Float, default=0)
+    src_avg_cost         = db.Column(db.Float, default=0)
+    dst_avg_cost_before  = db.Column(db.Float, default=0)
+    src_unit_price       = db.Column(db.Float, default=0)
+    dst_unit_price_before = db.Column(db.Float, default=0)
+    moved_tx_ids         = db.Column(db.Text, default='[]')
+    audit_tx_id          = db.Column(db.Integer, nullable=True)
+    keep_name            = db.Column(db.String(20), default='destination')
+    created_by           = db.Column(db.String(100), default='')
+    created_at           = db.Column(db.DateTime, default=now_tehran)
+    undone_at            = db.Column(db.DateTime, nullable=True)
+
+    def moved_ids(self):
+        try:
+            ids = json.loads(self.moved_tx_ids or '[]')
+            return [int(x) for x in ids] if isinstance(ids, list) else []
+        except Exception:
+            return []
 
 
 class Transaction(db.Model):
@@ -421,6 +458,24 @@ def require_auth(role=None):
                 return jsonify({'error': 'دسترسی ندارید', 'code': 'FORBIDDEN'}), 403
             if role == 'operator' and user.role not in ('admin', 'operator'):
                 return jsonify({'error': 'دسترسی ندارید', 'code': 'FORBIDDEN'}), 403
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def require_section(section, write=False):
+    """دسترسی بر اساس تیک بخش‌ها در پنل کاربران (به‌علاوه حداقل نقش برای نوشتن)."""
+    def decorator(f):
+        from functools import wraps
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            user = get_current_user()
+            if not user or not user.is_active:
+                return jsonify({'error': 'لاگین نشدید', 'code': 'UNAUTHORIZED'}), 401
+            if not user.can_access(section):
+                return jsonify({'error': 'به این بخش دسترسی ندارید', 'code': 'FORBIDDEN'}), 403
+            if write and user.role not in ('admin', 'operator'):
+                return jsonify({'error': 'دسترسی نوشتن ندارید', 'code': 'FORBIDDEN'}), 403
             return f(*args, **kwargs)
         return wrapper
     return decorator
@@ -887,7 +942,7 @@ def _product_merge_summary(p):
 
 
 @app.route('/api/products/merge/preview', methods=['GET'])
-@require_auth('admin')
+@require_section('merge_products', write=True)
 def preview_product_merge():
     """پیش‌نمایش ادغام دو کالای تکراری در یک انبار"""
     try:
@@ -934,13 +989,13 @@ def preview_product_merge():
 
 
 @app.route('/api/products/merge', methods=['POST'])
-@require_auth('admin')
+@require_section('merge_products', write=True)
 def merge_products():
     """
     ادغام کالای تکراری:
     - همه حرکات (ورود/خروج/قیمت/ساعت/بخش) از مبدا به مقصد منتقل می‌شود
     - موجودی‌ها جمع می‌شوند و میانگین هزینه موزون می‌شود
-    - کالای مبدا غیرفعال می‌شود (تاریخچه در مقصد می‌ماند)
+    - کالای مبدا به سطل زباله می‌رود (قابل برگرداندن ادغام)
     """
     data = request.json or {}
     try:
@@ -971,8 +1026,13 @@ def merge_products():
 
     src_qty = float(source.quantity or 0)
     dst_qty = float(dest.quantity or 0)
+    src_avg = float(source.avg_cost or 0)
+    dst_avg = float(dest.avg_cost or 0)
+    src_unit = float(source.unit_price or 0)
+    dst_unit = float(dest.unit_price or 0)
     src_cost = float(source.cost_basis() or 0)
     dst_cost = float(dest.cost_basis() or 0)
+    dest_name_before = dest.name
     merged_qty = src_qty + dst_qty
     if merged_qty > 0 and (src_cost > 0 or dst_cost > 0):
         merged_avg = ((max(src_qty, 0) * src_cost) + (max(dst_qty, 0) * dst_cost)) / merged_qty
@@ -1027,10 +1087,31 @@ def merge_products():
         created_by=actor,
     )
     db.session.add(audit)
+    db.session.flush()
+
+    merge_rec = ProductMerge(
+        source_id=source.id,
+        dest_id=dest.id,
+        source_name=source_name,
+        dest_name_before=dest_name_before,
+        final_name=final_name,
+        src_qty=src_qty,
+        dst_qty_before=dst_qty,
+        src_avg_cost=src_avg,
+        dst_avg_cost_before=dst_avg,
+        src_unit_price=src_unit,
+        dst_unit_price_before=dst_unit,
+        moved_tx_ids=json.dumps(source_tx_ids),
+        audit_tx_id=audit.id,
+        keep_name=keep_name,
+        created_by=actor,
+    )
+    db.session.add(merge_rec)
 
     source.quantity = 0
     source.is_active = False
     source.deleted_at = now_tehran()
+    source.merged_into_id = dest.id
     source.description = (
         (source.description or '').strip()
         + (('\n' if (source.description or '').strip() else '')
@@ -1046,7 +1127,58 @@ def merge_products():
         'destination': dest.to_dict(),
         'source_id': source.id,
         'audit_tx_id': audit.id,
+        'merge_id': merge_rec.id,
     })
+
+
+def _undo_product_merge(source):
+    """برگرداندن ادغام: حرکات و موجودی به مبدا برمی‌گردد."""
+    merge = (ProductMerge.query
+             .filter_by(source_id=source.id, undone_at=None)
+             .order_by(ProductMerge.id.desc())
+             .first())
+    if not merge:
+        return None, 'رکورد ادغام برای برگرداندن یافت نشد؛ فقط بازیابی ساده انجام می‌شود'
+
+    dest = Product.query.get(merge.dest_id)
+    if not dest:
+        return None, 'کالای مقصد ادغام دیگر وجود ندارد؛ برگرداندن ادغام ممکن نیست'
+    if dest.deleted_at:
+        return None, f'ابتدا کالای مقصد «{dest.name}» را از سطل زباله بازیابی کنید'
+
+    note_tag = f' [ادغام از «{merge.source_name}» #{source.id}]'
+    moved_ids = merge.moved_ids()
+    if moved_ids:
+        for tx in Transaction.query.filter(Transaction.id.in_(moved_ids)).all():
+            tx.product_id = source.id
+            if tx.note:
+                tx.note = tx.note.replace(note_tag, '').strip()
+
+    if merge.audit_tx_id:
+        audit = Transaction.query.get(merge.audit_tx_id)
+        if audit:
+            db.session.delete(audit)
+
+    dest.name = merge.dest_name_before or dest.name
+    dest.quantity = float(merge.dst_qty_before or 0)
+    dest.avg_cost = float(merge.dst_avg_cost_before or 0)
+    dest.unit_price = float(merge.dst_unit_price_before or 0)
+    dest.updated_at = now_tehran()
+
+    source.quantity = float(merge.src_qty or 0)
+    source.avg_cost = float(merge.src_avg_cost or 0)
+    source.unit_price = float(merge.src_unit_price or 0)
+    source.merged_into_id = None
+    source.deleted_at = None
+    source.is_active = True
+    source.updated_at = now_tehran()
+    # پاک کردن یادداشت ادغام از توضیحات
+    if source.description:
+        lines = [ln for ln in source.description.split('\n') if not ln.strip().startswith('ادغام‌شده در')]
+        source.description = '\n'.join(lines).strip()
+
+    merge.undone_at = now_tehran()
+    return merge, None
 
 @app.route('/api/products/<int:pid>/status', methods=['PATCH'])
 @require_auth('operator')
@@ -1550,7 +1682,7 @@ def _fmt_deleted_at(dt):
 
 
 @app.route('/api/trash', methods=['GET'])
-@require_auth('admin')
+@require_section('trash')
 def list_trash():
     """لیست حذف‌شده‌ها به تفکیک نوع"""
     kind = (request.args.get('type') or 'all').strip()
@@ -1560,13 +1692,40 @@ def list_trash():
         for p in (Product.query.options(joinedload(Product.warehouse))
                   .filter(Product.deleted_at.isnot(None))
                   .order_by(Product.deleted_at.desc()).all()):
+            is_merge = bool(p.merged_into_id)
+            merge = None
+            dest_name = ''
+            can_unmerge = False
+            if is_merge:
+                merge = (ProductMerge.query
+                         .filter_by(source_id=p.id, undone_at=None)
+                         .order_by(ProductMerge.id.desc())
+                         .first())
+                can_unmerge = bool(merge)
+                if merge:
+                    dest = Product.query.get(merge.dest_id)
+                    dest_name = (dest.name if dest else merge.final_name) or ''
+                elif p.merged_into_id:
+                    dest = Product.query.get(p.merged_into_id)
+                    dest_name = dest.name if dest else f'#{p.merged_into_id}'
+            meta_parts = []
+            if p.warehouse:
+                meta_parts.append(p.warehouse.name)
+            if is_merge:
+                meta_parts.append(f'ادغام‌شده در «{dest_name}»' if dest_name else 'ادغام‌شده')
+            else:
+                meta_parts.append(f'موجودی {p.quantity:g} {p.unit or ""}')
             products.append({
                 'id': p.id,
                 'type': 'product',
                 'name': p.name,
-                'meta': (p.warehouse.name if p.warehouse else '') + (f' · موجودی {p.quantity:g} {p.unit or ""}' if p.quantity is not None else ''),
+                'meta': ' · '.join(meta_parts),
                 'deleted_at': _fmt_deleted_at(p.deleted_at),
                 'deleted_at_raw': p.deleted_at.isoformat(sep=' ') if p.deleted_at else '',
+                'is_merge': is_merge,
+                'can_unmerge': can_unmerge,
+                'merged_into_id': p.merged_into_id,
+                'merged_into_name': dest_name,
             })
     if kind in ('all', 'warehouses'):
         for w in (Warehouse.query.filter(Warehouse.deleted_at.isnot(None))
@@ -1591,6 +1750,9 @@ def list_trash():
                 'deleted_at_raw': d.deleted_at.isoformat(sep=' ') if d.deleted_at else '',
             })
 
+    merge_count = Product.query.filter(
+        Product.deleted_at.isnot(None), Product.merged_into_id.isnot(None)
+    ).count()
     return jsonify({
         'products': products,
         'warehouses': warehouses,
@@ -1599,12 +1761,13 @@ def list_trash():
             'products': len(products) if kind in ('all', 'products') else Product.query.filter(Product.deleted_at.isnot(None)).count(),
             'warehouses': len(warehouses) if kind in ('all', 'warehouses') else Warehouse.query.filter(Warehouse.deleted_at.isnot(None)).count(),
             'departments': len(departments) if kind in ('all', 'departments') else Department.query.filter(Department.deleted_at.isnot(None)).count(),
+            'merges': merge_count,
         },
     })
 
 
 @app.route('/api/trash/restore', methods=['POST'])
-@require_auth('admin')
+@require_section('trash', write=True)
 def restore_trash_item():
     data = request.json or {}
     kind = (data.get('type') or '').strip()
@@ -1615,6 +1778,7 @@ def restore_trash_item():
     if not item_id or kind not in ('product', 'warehouse', 'department'):
         return jsonify({'error': 'نوع یا شناسه نامعتبر'}), 400
 
+    unmerged = False
     if kind == 'product':
         item = Product.query.get_or_404(item_id)
         if not item.deleted_at:
@@ -1623,9 +1787,26 @@ def restore_trash_item():
         wh = Warehouse.query.get(item.warehouse_id)
         if wh and wh.deleted_at:
             return jsonify({'error': f'ابتدا انبار «{wh.name}» را از سطل زباله بازیابی کنید'}), 400
-        item.deleted_at = None
-        item.is_active = True
-        item.updated_at = now_tehran()
+
+        if item.merged_into_id:
+            merge, err = _undo_product_merge(item)
+            if err and not merge:
+                # اگر رکورد ادغام نبود، بازیابی ساده — ولی موجودی خالی می‌ماند
+                force = bool(data.get('force_simple'))
+                if not force:
+                    return jsonify({'error': err, 'code': 'MERGE_UNDO_UNAVAILABLE'}), 400
+                item.deleted_at = None
+                item.is_active = True
+                item.merged_into_id = None
+                item.updated_at = now_tehran()
+            elif err:
+                return jsonify({'error': err}), 400
+            else:
+                unmerged = True
+        else:
+            item.deleted_at = None
+            item.is_active = True
+            item.updated_at = now_tehran()
     elif kind == 'warehouse':
         item = Warehouse.query.get_or_404(item_id)
         if not item.deleted_at:
@@ -1633,8 +1814,9 @@ def restore_trash_item():
         item.deleted_at = None
         item.is_active = True
         # کالاهایی که همراه انبار حذف شده بودند برمی‌گردند (فعال)
+        # کالاهای ادغامی را دست نمی‌زنیم
         for p in item.products:
-            if p.deleted_at:
+            if p.deleted_at and not p.merged_into_id:
                 p.deleted_at = None
                 p.is_active = True
                 p.updated_at = now_tehran()
@@ -1646,11 +1828,17 @@ def restore_trash_item():
         item.is_active = True
 
     db.session.commit()
-    return jsonify({'ok': True, 'type': kind, 'id': item_id, 'item': item.to_dict()})
+    return jsonify({
+        'ok': True,
+        'type': kind,
+        'id': item_id,
+        'item': item.to_dict(),
+        'unmerged': unmerged,
+    })
 
 
 @app.route('/api/trash/purge', methods=['POST'])
-@require_auth('admin')
+@require_section('trash', write=True)
 def purge_trash_item():
     """حذف دائمی یک مورد از سطل زباله"""
     data = request.json or {}
@@ -1666,6 +1854,9 @@ def purge_trash_item():
         item = Product.query.get_or_404(item_id)
         if not item.deleted_at:
             return jsonify({'error': 'فقط موارد داخل سطل زباله قابل پاک‌سازی دائمی هستند'}), 400
+        ProductMerge.query.filter(
+            db.or_(ProductMerge.source_id == item.id, ProductMerge.dest_id == item.id)
+        ).delete(synchronize_session=False)
         Transaction.query.filter_by(product_id=item.id).delete(synchronize_session=False)
         db.session.delete(item)
     elif kind == 'warehouse':
@@ -1674,6 +1865,9 @@ def purge_trash_item():
             return jsonify({'error': 'فقط موارد داخل سطل زباله قابل پاک‌سازی دائمی هستند'}), 400
         # کالاهای این انبار هم باید permanently پاک شوند
         for p in list(item.products):
+            ProductMerge.query.filter(
+                db.or_(ProductMerge.source_id == p.id, ProductMerge.dest_id == p.id)
+            ).delete(synchronize_session=False)
             Transaction.query.filter_by(product_id=p.id).delete(synchronize_session=False)
             db.session.delete(p)
         db.session.delete(item)
@@ -1691,7 +1885,7 @@ def purge_trash_item():
 
 
 @app.route('/api/trash/empty', methods=['POST'])
-@require_auth('admin')
+@require_section('trash', write=True)
 def empty_trash():
     """خالی کردن کامل سطل زباله یا فقط یک نوع"""
     data = request.json or {}
@@ -1704,6 +1898,9 @@ def empty_trash():
     if kind in ('all', 'products'):
         ids = [pid for (pid,) in db.session.query(Product.id).filter(Product.deleted_at.isnot(None)).all()]
         if ids:
+            ProductMerge.query.filter(
+                db.or_(ProductMerge.source_id.in_(ids), ProductMerge.dest_id.in_(ids))
+            ).delete(synchronize_session=False)
             Transaction.query.filter(Transaction.product_id.in_(ids)).delete(synchronize_session=False)
             purged['products'] = Product.query.filter(Product.id.in_(ids)).delete(synchronize_session=False)
 
@@ -1711,6 +1908,9 @@ def empty_trash():
         whs = Warehouse.query.filter(Warehouse.deleted_at.isnot(None)).all()
         for wh in whs:
             for p in list(wh.products):
+                ProductMerge.query.filter(
+                    db.or_(ProductMerge.source_id == p.id, ProductMerge.dest_id == p.id)
+                ).delete(synchronize_session=False)
                 Transaction.query.filter_by(product_id=p.id).delete(synchronize_session=False)
                 db.session.delete(p)
                 purged['products'] += 1
@@ -1747,6 +1947,7 @@ def migrate():
             ('ALTER TABLE products ADD COLUMN deleted_at DATETIME', 'products.deleted_at'),
             ('ALTER TABLE warehouses ADD COLUMN deleted_at DATETIME', 'warehouses.deleted_at'),
             ('ALTER TABLE departments ADD COLUMN deleted_at DATETIME', 'departments.deleted_at'),
+            ('ALTER TABLE products ADD COLUMN merged_into_id INTEGER REFERENCES products(id)', 'products.merged_into_id'),
             # ایندکس‌های ترکیبی برای سرعت گزارش‌ها وقتی دیتا زیاد می‌شود
             ('CREATE INDEX IF NOT EXISTS ix_tx_type_created ON transactions(type, created_at)', 'ix_tx_type_created'),
             ('CREATE INDEX IF NOT EXISTS ix_tx_dept_created ON transactions(department_id, created_at)', 'ix_tx_dept_created'),
@@ -1755,6 +1956,7 @@ def migrate():
             ('CREATE INDEX IF NOT EXISTS ix_products_wh_active ON products(warehouse_id, is_active)', 'ix_products_wh_active'),
             ('CREATE INDEX IF NOT EXISTS ix_products_active_name ON products(is_active, name)', 'ix_products_active_name'),
             ('CREATE INDEX IF NOT EXISTS ix_products_deleted ON products(deleted_at)', 'ix_products_deleted'),
+            ('CREATE INDEX IF NOT EXISTS ix_products_merged_into ON products(merged_into_id)', 'ix_products_merged_into'),
             ('CREATE INDEX IF NOT EXISTS ix_warehouses_deleted ON warehouses(deleted_at)', 'ix_warehouses_deleted'),
             ('CREATE INDEX IF NOT EXISTS ix_departments_deleted ON departments(deleted_at)', 'ix_departments_deleted'),
         ]:

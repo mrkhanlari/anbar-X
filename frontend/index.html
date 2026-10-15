@@ -1169,7 +1169,7 @@
     </div>
   </div>
   <div id="user-badge" style="display:none;"></div>
-  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۵.۰</div>
+  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۵.۱</div>
 </nav>
 
 <!-- Main -->
@@ -1596,10 +1596,15 @@ function userCanAccess(page) {
     warehouse_detail: 'warehouses',
     product_card: 'products',
   }[page] || page;
-  if (mapped === 'users' || mapped === 'merge_products' || mapped === 'trash') return currentUser.role === 'admin';
+  if (mapped === 'users') return currentUser.role === 'admin';
   if (mapped === 'dispatch' && currentUser.role === 'viewer') return false;
+  if (mapped === 'merge_products' && currentUser.role === 'viewer') return false;
   const perms = currentUser.permissions;
-  if (!Array.isArray(perms) || !perms.length) return true; // سازگاری با نشست‌های قدیمی
+  if (!Array.isArray(perms) || !perms.length) {
+    // سازگاری با نشست‌های قدیمی بدون permissions
+    if (mapped === 'merge_products' || mapped === 'trash') return currentUser.role === 'admin';
+    return true;
+  }
   return perms.includes(mapped);
 }
 
@@ -3686,17 +3691,18 @@ async function loadDeptReport() {
   }
 }
 
-// ─── Merge Products (admin) ───────────────────────────────────────────────────
+// ─── Merge Products ───────────────────────────────────────────────────────────
 
 async function renderMergeProducts() {
-  if (!currentUser || currentUser.role !== 'admin') {
+  if (!userCanAccess('merge_products')) {
     document.getElementById('content').innerHTML =
-      '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-text">فقط مدیر به این بخش دسترسی دارد</div></div>';
+      '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-text">به بخش ادغام کالا دسترسی ندارید</div></div>';
     return;
   }
   state.warehouses = state.warehouses.length ? state.warehouses : await api('GET', '/warehouses');
   window._mergePreview = null;
   window._mergeWhProducts = [];
+  window._mergeSearchTimers = {};
   const whs = state.warehouses;
   const c = document.getElementById('content');
   c.innerHTML = `
@@ -3704,8 +3710,8 @@ async function renderMergeProducts() {
     <div class="card-title">🔀 ادغام کالاهای تکراری</div>
     <div class="text-sm text-muted" style="margin-bottom:14px;line-height:1.7;">
       اگر یک کالا دو بار (یا با دو اسم) ثبت شده، کالای <b>مبدا</b> داخل <b>مقصد</b> ادغام می‌شود:
-      همه ورود/خروج/قیمت/ساعت/بخش‌ها به مقصد منتقل می‌شود، موجودی‌ها جمع می‌شود و مبدا غیرفعال می‌گردد.
-      این کار فقط داخل <b>یک انبار</b> مجاز است.
+      همه ورود/خروج/قیمت/ساعت/بخش‌ها به مقصد منتقل می‌شود، موجودی‌ها جمع می‌شود و مبدا به سطل زباله می‌رود (قابل برگرداندن).
+      این کار فقط داخل <b>یک انبار</b> مجاز است. برای پیدا کردن کالا، نام را در کادر جستجو تایپ کنید.
     </div>
     <div class="filter-bar">
       <div class="form-group">
@@ -3716,14 +3722,28 @@ async function renderMergeProducts() {
         </select>
       </div>
       <div class="form-group span-2">
+        <label>جستجوی مبدا</label>
+        <div class="search-bar">
+          <span class="search-icon">🔍</span>
+          <input id="merge-source-q" placeholder="نام کالا را بنویسید..." oninput="onMergeSearchInput('source')" disabled style="width:100%;"/>
+        </div>
+      </div>
+      <div class="form-group span-2">
         <label>کالای مبدا (حذف/ادغام می‌شود) *</label>
-        <select id="merge-source" onchange="onMergeSelectionChange()">
+        <select id="merge-source" onchange="onMergeSelectionChange()" size="6" style="height:auto;min-height:140px;">
           <option value="">ابتدا انبار را انتخاب کنید</option>
         </select>
       </div>
       <div class="form-group span-2">
+        <label>جستجوی مقصد</label>
+        <div class="search-bar">
+          <span class="search-icon">🔍</span>
+          <input id="merge-dest-q" placeholder="نام کالا را بنویسید..." oninput="onMergeSearchInput('dest')" disabled style="width:100%;"/>
+        </div>
+      </div>
+      <div class="form-group span-2">
         <label>کالای مقصد (باقی می‌ماند) *</label>
-        <select id="merge-dest" onchange="onMergeSelectionChange()">
+        <select id="merge-dest" onchange="onMergeSelectionChange()" size="6" style="height:auto;min-height:140px;">
           <option value="">ابتدا انبار را انتخاب کنید</option>
         </select>
       </div>
@@ -3743,14 +3763,68 @@ async function renderMergeProducts() {
   <div id="merge-preview"><div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">انبار و دو کالا را انتخاب کنید، سپس پیش‌نمایش را بزنید</div></div></div>`;
 }
 
+function fillMergeSelect(sel, items, keepId) {
+  if (!sel) return;
+  const opts = ['<option value="">انتخاب کالا...</option>']
+    .concat(items.map(p => {
+      const selected = keepId && String(p.id) === String(keepId) ? ' selected' : '';
+      return `<option value="${p.id}"${selected}>${escHtml(p.name)} — موجودی ${fmt(p.quantity)} ${escHtml(p.unit||'')}${p.sku ? ' · ' + escHtml(p.sku) : ''}</option>`;
+    }));
+  sel.innerHTML = opts.join('');
+  if (keepId && ![...sel.options].some(o => o.value === String(keepId))) {
+    // انتخاب قبلی در نتایج جستجو نیست — نگهش می‌داریم
+    const prev = (window._mergeWhProducts || []).find(p => String(p.id) === String(keepId));
+    if (prev) {
+      const o = document.createElement('option');
+      o.value = String(prev.id);
+      o.textContent = `${prev.name} — موجودی ${prev.quantity} ${prev.unit || ''} (انتخاب‌شده)`;
+      o.selected = true;
+      sel.appendChild(o);
+    }
+  }
+}
+
+async function loadMergeProductOptions(side, q='') {
+  const whId = document.getElementById('merge-wh')?.value || '';
+  const sel = document.getElementById(side === 'source' ? 'merge-source' : 'merge-dest');
+  if (!whId || !sel) return;
+  const keepId = sel.value || '';
+  sel.innerHTML = '<option value="">در حال جستجو...</option>';
+  const qs = new URLSearchParams({
+    warehouse_id: whId,
+    per_page: '100',
+  });
+  if (q.trim()) qs.set('search', q.trim());
+  const res = await api('GET', `/products?${qs.toString()}`);
+  const items = (res && res.items) || [];
+  // کش همه نتایج برای نام‌ها
+  const byId = new Map((window._mergeWhProducts || []).map(p => [p.id, p]));
+  items.forEach(p => byId.set(p.id, p));
+  window._mergeWhProducts = [...byId.values()];
+  fillMergeSelect(sel, items, keepId);
+}
+
+function onMergeSearchInput(side) {
+  const timers = window._mergeSearchTimers || (window._mergeSearchTimers = {});
+  clearTimeout(timers[side]);
+  timers[side] = setTimeout(() => {
+    const q = document.getElementById(side === 'source' ? 'merge-source-q' : 'merge-dest-q')?.value || '';
+    loadMergeProductOptions(side, q);
+  }, 280);
+}
+
 async function onMergeWarehouseChange() {
   const whId = document.getElementById('merge-wh')?.value || '';
   const src = document.getElementById('merge-source');
   const dst = document.getElementById('merge-dest');
+  const srcQ = document.getElementById('merge-source-q');
+  const dstQ = document.getElementById('merge-dest-q');
   const preview = document.getElementById('merge-preview');
   const btn = document.getElementById('merge-run-btn');
   window._mergePreview = null;
   if (btn) btn.disabled = true;
+  if (srcQ) { srcQ.value = ''; srcQ.disabled = !whId; }
+  if (dstQ) { dstQ.value = ''; dstQ.disabled = !whId; }
   if (!whId) {
     window._mergeWhProducts = [];
     if (src) src.innerHTML = '<option value="">ابتدا انبار را انتخاب کنید</option>';
@@ -3758,16 +3832,11 @@ async function onMergeWarehouseChange() {
     if (preview) preview.innerHTML = '<div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">انبار را انتخاب کنید</div></div>';
     return;
   }
-  if (src) src.innerHTML = '<option value="">در حال بارگذاری...</option>';
-  if (dst) dst.innerHTML = '<option value="">در حال بارگذاری...</option>';
-  const res = await api('GET', `/products?warehouse_id=${encodeURIComponent(whId)}&per_page=200`);
-  const items = (res && res.items) || [];
-  window._mergeWhProducts = items;
-  const opts = '<option value="">انتخاب کالا...</option>' +
-    items.map(p => `<option value="${p.id}">${escHtml(p.name)} — موجودی ${fmt(p.quantity)} ${escHtml(p.unit||'')}</option>`).join('');
-  if (src) src.innerHTML = opts;
-  if (dst) dst.innerHTML = opts;
-  if (preview) preview.innerHTML = '<div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">مبدا و مقصد را انتخاب کنید</div></div>';
+  await Promise.all([
+    loadMergeProductOptions('source', ''),
+    loadMergeProductOptions('dest', ''),
+  ]);
+  if (preview) preview.innerHTML = '<div class="empty"><div class="empty-icon">🔎</div><div class="empty-text">با جستجو مبدا و مقصد را پیدا کنید</div></div>';
 }
 
 function onMergeSelectionChange() {
@@ -3892,48 +3961,64 @@ function confirmMergeProducts() {
   );
 }
 
-// ─── Trash (admin) ────────────────────────────────────────────────────────────
+// ─── Trash ────────────────────────────────────────────────────────────────────
+
+function trashRestoreBtn(type, it) {
+  const nameJs = JSON.stringify(String(it.name || ''));
+  if (type === 'product' && it.is_merge) {
+    const label = it.can_unmerge ? '↩️ برگرداندن ادغام' : '↩️ بازیابی';
+    return `<button class="btn btn-sm btn-success" onclick="restoreTrashItem('product',${it.id},${nameJs},${it.can_unmerge ? 'true' : 'false'})">${label}</button>`;
+  }
+  return `<button class="btn btn-sm btn-success" onclick="restoreTrashItem('${type}',${it.id},${nameJs})">↩️ بازیابی</button>`;
+}
 
 async function renderTrash() {
-  if (!currentUser || currentUser.role !== 'admin') {
+  if (!userCanAccess('trash')) {
     document.getElementById('content').innerHTML =
-      '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-text">فقط مدیر به سطل زباله دسترسی دارد</div></div>';
+      '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-text">به سطل زباله دسترسی ندارید</div></div>';
     return;
   }
+  const canWrite = currentUser && currentUser.role !== 'viewer';
   const c = document.getElementById('content');
   c.innerHTML = '<div class="spinner"></div>';
   const data = await api('GET', '/trash');
   const counts = data.counts || {};
   const total = (counts.products || 0) + (counts.warehouses || 0) + (counts.departments || 0);
+  const mergeCount = counts.merges || (data.products || []).filter(p => p.is_merge).length;
 
   const typeKey = { product: 'products', warehouse: 'warehouses', department: 'departments' };
   const section = (title, items, type) => {
-    const emptyBtn = items.length
+    const emptyBtn = (items.length && canWrite)
       ? `<button class="btn btn-sm btn-secondary" onclick="emptyTrash('${typeKey[type]}')">🧹 خالی کردن این دسته</button>`
       : '';
     if (!items.length) {
       return `<div class="card mb-4"><div class="card-title">${title}</div>
         <div class="text-sm text-muted">موردی نیست</div></div>`;
     }
+    const rowActions = (it) => {
+      if (!canWrite) return '<span class="text-sm text-muted">فقط مشاهده</span>';
+      return `${trashRestoreBtn(type, it)}
+        <button class="btn btn-sm btn-danger" onclick="purgeTrashItem('${type}',${it.id},${JSON.stringify(String(it.name||''))})">💀 حذف دائم</button>`;
+    };
+    const nameCell = (it) => {
+      const badge = (type === 'product' && it.is_merge)
+        ? ' <span class="badge badge-yellow">ادغام‌شده</span>'
+        : '';
+      return `<span class="fw-bold">${escHtml(it.name)}</span>${badge}`;
+    };
     const desk = `<div class="table-wrap desk-only"><table class="table-fit has-actions">
       <thead><tr><th class="col-name">نام</th><th class="col-actions-wide">عملیات</th><th class="col-detail">جزئیات</th><th class="col-date">حذف شده</th></tr></thead>
       <tbody>${items.map(it => `<tr>
-        <td class="col-name fw-bold">${escHtml(it.name)}</td>
-        <td class="col-actions-wide"><div class="row-actions">
-          <button class="btn btn-sm btn-success" onclick="restoreTrashItem('${type}',${it.id},${JSON.stringify(String(it.name||''))})">↩️ بازیابی</button>
-          <button class="btn btn-sm btn-danger" onclick="purgeTrashItem('${type}',${it.id},${JSON.stringify(String(it.name||''))})">💀 حذف دائم</button>
-        </div></td>
+        <td class="col-name">${nameCell(it)}</td>
+        <td class="col-actions-wide"><div class="row-actions">${rowActions(it)}</div></td>
         <td class="col-detail text-sm text-muted">${escHtml(it.meta || '—')}</td>
         <td class="col-date num text-sm">${escHtml(it.deleted_at || '—')}</td>
       </tr>`).join('')}</tbody></table></div>`;
     const mob = `<div class="mobile-list mob-only">${items.map(it => `<article class="m-card">
-      <div class="m-card-head"><div style="min-width:0;"><div class="m-card-title">${escHtml(it.name)}</div>
+      <div class="m-card-head"><div style="min-width:0;"><div class="m-card-title">${escHtml(it.name)}${(type==='product'&&it.is_merge)?' <span class="badge badge-yellow">ادغام</span>':''}</div>
         <div class="m-card-sub">${escHtml(it.meta || '')}</div></div>
         <div class="text-sm text-muted num">${escHtml(it.deleted_at || '')}</div></div>
-      <div class="users-m-actions">
-        <button class="btn btn-sm btn-success" onclick="restoreTrashItem('${type}',${it.id},${JSON.stringify(String(it.name||''))})">↩️ بازیابی</button>
-        <button class="btn btn-sm btn-danger" onclick="purgeTrashItem('${type}',${it.id},${JSON.stringify(String(it.name||''))})">💀 حذف دائم</button>
-      </div>
+      <div class="users-m-actions">${rowActions(it)}</div>
     </article>`).join('')}</div>`;
     return `<div class="card mb-4"><div class="flex-between mb-4" style="flex-wrap:wrap;gap:8px;"><div class="card-title" style="margin:0">${title} (${fmt(items.length)})</div>${emptyBtn}</div>${desk}${mob}</div>`;
   };
@@ -3944,15 +4029,17 @@ async function renderTrash() {
       <div>
         <div class="card-title" style="margin:0">🗑 سطل زباله</div>
         <div class="text-sm text-muted" style="margin-top:6px;line-height:1.6;">
-          موارد حذف‌شده اینجاست. بازیابی = برمی‌گردد. حذف دائم / خالی‌کردن = غیرقابل برگشت.
+          موارد حذف‌شده و ادغام‌شده اینجاست. «برگرداندن ادغام» حرکات و موجودی را به کالای مبدا برمی‌گرداند.
+          حذف دائم / خالی‌کردن = غیرقابل برگشت.
         </div>
       </div>
       <div class="flex-gap" style="flex-wrap:wrap;">
-        <button class="btn btn-secondary" ${total?'' :'disabled'} onclick="emptyTrash('all')">🧹 خالی کردن همه</button>
+        ${canWrite ? `<button class="btn btn-secondary" ${total?'' :'disabled'} onclick="emptyTrash('all')">🧹 خالی کردن همه</button>` : ''}
       </div>
     </div>
     <div class="m-card-grid" style="margin-top:14px;">
       <div><span class="lbl">کالاها</span><b>${fmt(counts.products||0)}</b></div>
+      <div><span class="lbl">ادغام‌شده</span><b>${fmt(mergeCount)}</b></div>
       <div><span class="lbl">انبارها</span><b>${fmt(counts.warehouses||0)}</b></div>
       <div><span class="lbl">بخش‌ها</span><b>${fmt(counts.departments||0)}</b></div>
     </div>
@@ -3962,16 +4049,20 @@ async function renderTrash() {
   ${section('🏥 بخش‌ها', data.departments || [], 'department')}`;
 }
 
-async function restoreTrashItem(type, id, name) {
+async function restoreTrashItem(type, id, name, isMerge=false) {
+  const title = isMerge ? '↩️ برگرداندن ادغام' : '↩️ بازیابی';
+  const msg = isMerge
+    ? `ادغام «${name}» برگردانده شود؟ حرکات و موجودی به مبدا برمی‌گردد و از مقصد جدا می‌شود.`
+    : `«${name}» از سطل زباله بازیابی شود؟`;
   showConfirm(
-    '↩️ بازیابی',
-    `«${name}» از سطل زباله بازیابی شود؟`,
+    title,
+    msg,
     async () => {
-      await api('POST', '/trash/restore', { type, id });
-      toast('بازیابی شد ✅');
+      const res = await api('POST', '/trash/restore', { type, id });
+      toast(res && res.unmerged ? 'ادغام برگردانده شد ✅' : 'بازیابی شد ✅');
       renderTrash();
     },
-    '↩️ بازیابی',
+    isMerge ? '↩️ برگرداندن ادغام' : '↩️ بازیابی',
     false
   );
 }
@@ -4030,14 +4121,9 @@ function showApp() {
 }
 
 function applyNavPermissions() {
-  const perms = (currentUser && Array.isArray(currentUser.permissions)) ? currentUser.permissions : null;
   document.querySelectorAll('.nav-item[data-nav]').forEach(el => {
     const key = el.getAttribute('data-nav');
-    let show = true;
-    if (key === 'users' || key === 'merge_products' || key === 'trash') show = currentUser && currentUser.role === 'admin';
-    else if (key === 'dispatch') show = currentUser && currentUser.role !== 'viewer';
-    if (show && perms) show = perms.includes(key);
-    el.style.display = show ? 'flex' : 'none';
+    el.style.display = userCanAccess(key) ? 'flex' : 'none';
   });
 }
 
@@ -4145,15 +4231,16 @@ const APP_SECTION_DEFS = [
   { key: 'dept_report', label: 'گزارش بخش‌ها', hint: 'مصرف بخش‌ها' },
   { key: 'report', label: 'گزارش موجودی', hint: 'موجودی و ارزش' },
   { key: 'users', label: 'کاربران', hint: 'فقط برای مدیر', roleMin: 'admin' },
-  { key: 'merge_products', label: 'ادغام کالا', hint: 'یکپارچه‌سازی کالاهای تکراری — فقط مدیر', roleMin: 'admin' },
-  { key: 'trash', label: 'سطل زباله', hint: 'بازیابی / پاک‌سازی حذف‌شده‌ها — فقط مدیر', roleMin: 'admin' },
+  { key: 'merge_products', label: 'ادغام کالا', hint: 'یکپارچه‌سازی کالاهای تکراری — اختیاری برای اپراتور', roleMin: 'operator', grantable: true },
+  { key: 'trash', label: 'سطل زباله', hint: 'بازیابی / پاک‌سازی حذف‌شده‌ها — اختیاری برای اپراتور و بازدیدکننده', grantable: true },
 ];
 
-const ADMIN_PERM_KEYS = ['users', 'merge_products', 'trash'];
+const ADMIN_PERM_KEYS = ['users'];
+const GRANTABLE_PERM_KEYS = ['merge_products', 'trash'];
 const DEFAULT_PERMS_BY_ROLE = {
   admin: APP_SECTION_DEFS.map(s => s.key),
-  operator: APP_SECTION_DEFS.map(s => s.key).filter(k => !ADMIN_PERM_KEYS.includes(k)),
-  viewer: APP_SECTION_DEFS.map(s => s.key).filter(k => !ADMIN_PERM_KEYS.includes(k) && k !== 'dispatch'),
+  operator: APP_SECTION_DEFS.map(s => s.key).filter(k => !ADMIN_PERM_KEYS.includes(k) && !GRANTABLE_PERM_KEYS.includes(k)),
+  viewer: APP_SECTION_DEFS.map(s => s.key).filter(k => !ADMIN_PERM_KEYS.includes(k) && !GRANTABLE_PERM_KEYS.includes(k) && k !== 'dispatch'),
 };
 
 async function renderUsers() {
@@ -4319,18 +4406,22 @@ function renderUserPermissionsList(selected, role) {
   const roleVal = role || document.getElementById('user-role').value || 'viewer';
   const selectedSet = new Set(selected || DEFAULT_PERMS_BY_ROLE[roleVal] || DEFAULT_PERMS_BY_ROLE.viewer);
   box.innerHTML = APP_SECTION_DEFS.map(s => {
-    const adminOnly = s.roleMin === 'admin';
-    const opOnly = s.roleMin === 'operator';
+    const adminOnly = s.roleMin === 'admin' && !s.grantable;
+    const opOnly = s.roleMin === 'operator' && !s.grantable;
+    // ادغام فقط برای اپراتور/مدیر؛ سطل برای همه نقش‌ها قابل تیک زدن است
+    const grantBlocked = s.key === 'merge_products' && roleVal === 'viewer';
     const locked = adminOnly && roleVal === 'admin';
-    const disabled = (adminOnly && roleVal !== 'admin') || (opOnly && roleVal === 'viewer');
+    const disabled = (adminOnly && roleVal !== 'admin') || (opOnly && roleVal === 'viewer') || grantBlocked;
     const checked = locked || (!disabled && selectedSet.has(s.key));
     const cls = ['perm-item'];
     if (locked) cls.push('is-locked');
     if (disabled) cls.push('is-disabled');
+    const extraHint = locked ? ' · همیشه برای مدیر'
+      : (s.grantable ? ' · با تیک فعال می‌شود' : '');
     return `<label class="${cls.join(' ')}">
       <input type="checkbox" class="user-perm-check" value="${s.key}" ${checked ? 'checked' : ''} ${locked || disabled ? 'disabled' : ''}/>
       <span class="perm-label">${s.label}</span>
-      <span class="perm-hint">${s.hint}${locked ? ' · همیشه برای مدیر' : ''}</span>
+      <span class="perm-hint">${s.hint}${extraHint}</span>
     </label>`;
   }).join('');
 }
