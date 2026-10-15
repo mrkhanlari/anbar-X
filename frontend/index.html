@@ -1270,7 +1270,7 @@
     </div>
   </div>
   <div id="user-badge" style="display:none;"></div>
-  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۵.۳</div>
+  <div class="sidebar-footer" style="flex-shrink:0;">نسخه ۲.۵.۴</div>
 </nav>
 
 <!-- Main -->
@@ -2019,12 +2019,14 @@ async function renderWarehouses() {
     return;
   }
 
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  const canEditWh = !window._isViewer;
   c.innerHTML = `<div class="wh-grid">${whs.map(w=>`
     <div class="wh-card" onclick="navigate('warehouse_detail',{currentWarehouseId:${w.id}})">
-      ${window._isViewer ? '' : `<div class="wh-card-actions">
+      ${canEditWh ? `<div class="wh-card-actions">
         <button class="btn btn-sm btn-secondary btn-icon" title="ویرایش" onclick="event.stopPropagation();openWarehouseModal(${w.id})">✏️</button>
-        <button class="btn btn-sm btn-danger" title="حذف" onclick="event.stopPropagation();deleteWarehouse(${w.id},'${w.name}')">حذف</button>
-      </div>`}
+        ${isAdmin ? `<button class="btn btn-sm btn-danger" title="حذف — فقط مدیر" onclick="event.stopPropagation();deleteWarehouse(${w.id},'${String(w.name||'').replace(/'/g,"\\'")}')">حذف</button>` : ''}
+      </div>` : ''}
       <div class="wh-card-name">${w.name}</div>
       <div class="wh-card-loc">${w.location ? '📍 '+w.location : '📍 مکان ثبت نشده'}</div>
       <div class="wh-card-stats">
@@ -2975,6 +2977,10 @@ async function saveWarehouse() {
 }
 
 async function deleteWarehouse(id, name) {
+  if (!currentUser || currentUser.role !== 'admin') {
+    toast('فقط مدیر سیستم می‌تواند انبار را حذف کند', 'error');
+    return;
+  }
   if (!confirm(`آیا از حذف انبار "${name}" مطمئن هستید؟\nانبار و کالاهایش به سطل زباله می‌روند؛ ادمین می‌تواند بازیابی کند.`)) return;
   await api('DELETE', `/warehouses/${id}`);
   toast('انبار به سطل زباله منتقل شد 🗑');
