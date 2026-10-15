@@ -24,13 +24,17 @@ APP_SECTIONS = (
     'dept_report',
     'report',
     'users',
+    'merge_products',
 )
+
+# بخش‌هایی که فقط مدیر می‌بیند
+ADMIN_ONLY_SECTIONS = ('users', 'merge_products')
 
 # پیش‌فرض دسترسی هر نقش — اگر فیلد permissions خالی باشد
 DEFAULT_PERMISSIONS = {
     'admin': list(APP_SECTIONS),
-    'operator': [s for s in APP_SECTIONS if s != 'users'],
-    'viewer': [s for s in APP_SECTIONS if s not in ('users', 'dispatch')],
+    'operator': [s for s in APP_SECTIONS if s not in ADMIN_ONLY_SECTIONS],
+    'viewer': [s for s in APP_SECTIONS if s not in ADMIN_ONLY_SECTIONS and s != 'dispatch'],
 }
 
 TEHRAN_TZ = ZoneInfo('Asia/Tehran')
@@ -104,12 +108,14 @@ class User(db.Model):
                 if isinstance(parsed, list):
                     perms = [p for p in parsed if p in APP_SECTIONS]
                     if perms:
-                        if self.role == 'admin' and 'users' not in perms:
-                            perms.append('users')
+                        if self.role == 'admin':
+                            for sec in ADMIN_ONLY_SECTIONS:
+                                if sec not in perms:
+                                    perms.append(sec)
                         if self.role == 'viewer':
                             perms = [p for p in perms if p != 'dispatch']
                         if self.role != 'admin':
-                            perms = [p for p in perms if p != 'users']
+                            perms = [p for p in perms if p not in ADMIN_ONLY_SECTIONS]
                         return perms
             except Exception:
                 pass
@@ -119,10 +125,12 @@ class User(db.Model):
         if not isinstance(perms, list):
             perms = []
         clean = [p for p in perms if p in APP_SECTIONS]
-        if self.role == 'admin' and 'users' not in clean:
-            clean.append('users')
+        if self.role == 'admin':
+            for sec in ADMIN_ONLY_SECTIONS:
+                if sec not in clean:
+                    clean.append(sec)
         if self.role != 'admin':
-            clean = [p for p in clean if p != 'users']
+            clean = [p for p in clean if p not in ADMIN_ONLY_SECTIONS]
         if self.role == 'viewer':
             clean = [p for p in clean if p != 'dispatch']
         # حداقل یک بخش برای جلوگیری از کاربر قفل‌شده
@@ -812,6 +820,177 @@ def delete_product(pid):
     p.is_active = False
     db.session.commit()
     return jsonify({'ok': True})
+
+
+def _product_merge_summary(p):
+    """خلاصه کالا برای پیش‌نمایش ادغام"""
+    tx_q = Transaction.query.filter_by(product_id=p.id)
+    tx_count = tx_q.count()
+    recent = (tx_q.order_by(Transaction.created_at.desc(), Transaction.id.desc())
+              .limit(8).all())
+    return {
+        'product': p.to_dict(),
+        'tx_count': tx_count,
+        'recent_transactions': [t.to_dict() for t in recent],
+    }
+
+
+@app.route('/api/products/merge/preview', methods=['GET'])
+@require_auth('admin')
+def preview_product_merge():
+    """پیش‌نمایش ادغام دو کالای تکراری در یک انبار"""
+    try:
+        source_id = int(request.args.get('source_id', 0))
+        dest_id = int(request.args.get('dest_id', 0))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'شناسه کالا نامعتبر است'}), 400
+    if not source_id or not dest_id:
+        return jsonify({'error': 'کالای مبدا و مقصد را انتخاب کنید'}), 400
+    if source_id == dest_id:
+        return jsonify({'error': 'مبدا و مقصد نباید یکی باشند'}), 400
+
+    source = Product.query.options(joinedload(Product.warehouse)).get_or_404(source_id)
+    dest = Product.query.options(joinedload(Product.warehouse)).get_or_404(dest_id)
+    if not source.is_active or not dest.is_active:
+        return jsonify({'error': 'هر دو کالا باید فعال باشند'}), 400
+    if source.warehouse_id != dest.warehouse_id:
+        return jsonify({'error': 'ادغام فقط برای دو کالا در یک انبار مجاز است'}), 400
+
+    src_qty = float(source.quantity or 0)
+    dst_qty = float(dest.quantity or 0)
+    src_cost = float(source.cost_basis() or 0)
+    dst_cost = float(dest.cost_basis() or 0)
+    merged_qty = src_qty + dst_qty
+    if merged_qty > 0 and (src_cost > 0 or dst_cost > 0):
+        merged_avg = ((max(src_qty, 0) * src_cost) + (max(dst_qty, 0) * dst_cost)) / merged_qty
+    else:
+        merged_avg = dst_cost or src_cost or 0
+
+    return jsonify({
+        'source': _product_merge_summary(source),
+        'destination': _product_merge_summary(dest),
+        'result': {
+            'name': dest.name,
+            'quantity': merged_qty,
+            'avg_cost': round(merged_avg, 4),
+            'unit': dest.unit,
+            'warehouse_name': dest.warehouse.name if dest.warehouse else '',
+            'moved_tx_count': Transaction.query.filter_by(product_id=source.id).count(),
+        },
+    })
+
+
+@app.route('/api/products/merge', methods=['POST'])
+@require_auth('admin')
+def merge_products():
+    """
+    ادغام کالای تکراری:
+    - همه حرکات (ورود/خروج/قیمت/ساعت/بخش) از مبدا به مقصد منتقل می‌شود
+    - موجودی‌ها جمع می‌شوند و میانگین هزینه موزون می‌شود
+    - کالای مبدا غیرفعال می‌شود (تاریخچه در مقصد می‌ماند)
+    """
+    data = request.json or {}
+    try:
+        source_id = int(data.get('source_id') or 0)
+        dest_id = int(data.get('dest_id') or 0)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'شناسه کالا نامعتبر است'}), 400
+    if not source_id or not dest_id:
+        return jsonify({'error': 'کالای مبدا و مقصد را انتخاب کنید'}), 400
+    if source_id == dest_id:
+        return jsonify({'error': 'مبدا و مقصد نباید یکی باشند'}), 400
+
+    keep_name = (data.get('keep_name') or 'destination').strip()
+    if keep_name not in ('destination', 'source'):
+        keep_name = 'destination'
+
+    source = Product.query.get_or_404(source_id)
+    dest = Product.query.get_or_404(dest_id)
+    if not source.is_active or not dest.is_active:
+        return jsonify({'error': 'هر دو کالا باید فعال باشند'}), 400
+    if source.warehouse_id != dest.warehouse_id:
+        return jsonify({'error': 'ادغام فقط برای دو کالا در یک انبار مجاز است'}), 400
+
+    user = get_current_user()
+    actor = (user.display_name or user.username) if user else 'مدیر'
+
+    src_qty = float(source.quantity or 0)
+    dst_qty = float(dest.quantity or 0)
+    src_cost = float(source.cost_basis() or 0)
+    dst_cost = float(dest.cost_basis() or 0)
+    merged_qty = src_qty + dst_qty
+    if merged_qty > 0 and (src_cost > 0 or dst_cost > 0):
+        merged_avg = ((max(src_qty, 0) * src_cost) + (max(dst_qty, 0) * dst_cost)) / merged_qty
+    else:
+        merged_avg = dst_cost or src_cost or float(dest.avg_cost or 0) or float(dest.unit_price or 0)
+
+    final_name = source.name if keep_name == 'source' else dest.name
+    source_name = source.name
+    source_tx_ids = [tid for (tid,) in db.session.query(Transaction.id).filter_by(product_id=source.id).all()]
+    moved = len(source_tx_ids)
+
+    if source_tx_ids:
+        note_tag = f' [ادغام از «{source_name}» #{source.id}]'
+        for tx in Transaction.query.filter(Transaction.id.in_(source_tx_ids)).all():
+            tx.product_id = dest.id
+            base_note = (tx.note or '').strip()
+            if note_tag not in base_note:
+                tx.note = (base_note + note_tag).strip() if base_note else note_tag.strip()
+
+    dest.name = final_name
+    dest.quantity = merged_qty
+    dest.avg_cost = merged_avg
+    # آخرین قیمت خرید پس از جابه‌جایی حرکات
+    last_purchase = (
+        Transaction.query.filter_by(product_id=dest.id, type='in', is_reversed=False)
+        .order_by(Transaction.created_at.desc(), Transaction.id.desc())
+        .first()
+    )
+    if last_purchase and last_purchase.unit_price is not None:
+        dest.unit_price = last_purchase.unit_price
+    elif source.unit_price and (not dest.unit_price or source.updated_at >= dest.updated_at):
+        dest.unit_price = source.unit_price
+
+    if not (dest.sku or '').strip() and (source.sku or '').strip():
+        dest.sku = source.sku
+    if not (dest.category or '').strip() and (source.category or '').strip():
+        dest.category = source.category
+
+    audit_note = (
+        f'ادغام کالا: «{source_name}» (#{source.id}) → «{final_name}» (#{dest.id}). '
+        f'{moved} حرکت منتقل شد. موجودی مبدا {src_qty:g} + مقصد {dst_qty:g} = {merged_qty:g} {dest.unit or ""}.'
+    )
+    audit = Transaction(
+        product_id=dest.id,
+        type='adjust',
+        quantity=merged_qty,
+        before_qty=dst_qty,
+        after_qty=merged_qty,
+        unit_price=merged_avg,
+        total_cost=merged_qty * merged_avg,
+        note=audit_note,
+        created_by=actor,
+    )
+    db.session.add(audit)
+
+    source.quantity = 0
+    source.is_active = False
+    source.description = (
+        (source.description or '').strip()
+        + (('\n' if (source.description or '').strip() else '')
+           + f'ادغام‌شده در «{final_name}» (#{dest.id}) در {now_tehran().strftime("%Y-%m-%d %H:%M")}')
+    )
+    source.updated_at = now_tehran()
+    dest.updated_at = now_tehran()
+
+    db.session.commit()
+    return jsonify({
+        'ok': True,
+        'moved_tx_count': moved,
+        'destination': dest.to_dict(),
+        'source_id': source.id,
+        'audit_tx_id': audit.id,
+    })
 
 @app.route('/api/products/<int:pid>/status', methods=['PATCH'])
 @require_auth('operator')
